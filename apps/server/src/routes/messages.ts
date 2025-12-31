@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { db, messages } from "../db/index.js";
+import { db, messages, reactions } from "../db/index.js";
 import { eq, desc, lt } from "drizzle-orm";
 
 const sendMessageSchema = z.object({
@@ -45,8 +45,41 @@ export const messageRoutes: FastifyPluginAsync = async (fastify) => {
 
     const channelMessages = await query;
 
+    // Get reactions for all messages
+    const messageIds = channelMessages.map(m => m.id);
+    const messageReactions = messageIds.length > 0
+      ? await db.query.reactions.findMany({
+          where: (reactions, { inArray }) => inArray(reactions.messageId, messageIds),
+        })
+      : [];
+
+    // Group reactions by message and emoji
+    const reactionsByMessage = messageReactions.reduce((acc, reaction) => {
+      if (!acc[reaction.messageId]) {
+        acc[reaction.messageId] = {};
+      }
+      if (!acc[reaction.messageId][reaction.emoji]) {
+        acc[reaction.messageId][reaction.emoji] = {
+          emoji: reaction.emoji,
+          count: 0,
+          userIds: [],
+          reactionIds: {},
+        };
+      }
+      acc[reaction.messageId][reaction.emoji].count++;
+      acc[reaction.messageId][reaction.emoji].userIds.push(reaction.userId);
+      acc[reaction.messageId][reaction.emoji].reactionIds[reaction.userId] = reaction.id;
+      return acc;
+    }, {} as Record<string, Record<string, { emoji: string; count: number; userIds: string[]; reactionIds: Record<string, string> }>>);
+
+    // Add reactions to messages
+    const messagesWithReactions = channelMessages.map(msg => ({
+      ...msg,
+      reactions: Object.values(reactionsByMessage[msg.id] || {}),
+    }));
+
     return {
-      messages: channelMessages.reverse(),
+      messages: messagesWithReactions.reverse(),
       nextCursor: channelMessages.length === limitNum
         ? channelMessages[0]?.createdAt.toISOString()
         : null,

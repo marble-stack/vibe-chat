@@ -26,6 +26,7 @@ export const api = {
     register: (data: {
       email: string;
       displayName: string;
+      password: string;
       identityKeyPublic: string;
       signedPreKeyPublic: string;
       signedPreKeySignature: string;
@@ -35,10 +36,10 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-    login: (email: string) =>
+    login: (email: string, password: string) =>
       request<{ user: { id: string; email: string; displayName: string } }>("/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, password }),
       }),
 
     getUserKeys: (userId: string) =>

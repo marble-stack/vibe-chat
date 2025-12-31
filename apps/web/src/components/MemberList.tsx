@@ -5,7 +5,7 @@ export function MemberList() {
   const communityMembers = activeCommunityId ? members[activeCommunityId] || [] : [];
 
   return (
-    <div className="w-60 bg-background-secondary hidden lg:block">
+    <div className="w-60 bg-background-secondary hidden md:hidden lg:block">
       <div className="p-4">
         <h3 className="text-xs font-semibold text-text-muted uppercase mb-2">
           Members — {communityMembers.length}

@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 
 export function Login() {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const setUser = useAuthStore((state) => state.setUser);
@@ -15,7 +16,7 @@ export function Login() {
     setLoading(true);
 
     try {
-      const { user } = await api.auth.login(email);
+      const { user } = await api.auth.login(email, password);
       setUser(user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -39,6 +40,19 @@ export function Login() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-background-tertiary text-text-primary rounded px-3 py-2 outline-none focus:ring-2 focus:ring-accent-primary"
+              required
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-text-secondary text-xs font-semibold uppercase mb-2">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-background-tertiary text-text-primary rounded px-3 py-2 outline-none focus:ring-2 focus:ring-accent-primary"
               required
             />

@@ -8,6 +8,8 @@ import { storeIdentityKeys } from "../lib/keyStore";
 export function Register() {
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const setUser = useAuthStore((state) => state.setUser);
@@ -18,12 +20,26 @@ export function Register() {
     setLoading(true);
 
     try {
+      // Validate password
+      if (password.length < 8) {
+        setError("Password must be at least 8 characters");
+        setLoading(false);
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        setError("Passwords do not match");
+        setLoading(false);
+        return;
+      }
+
       // Generate real cryptographic keys using Web Crypto API
       const { keys, publicBundle } = await generateIdentityKeys();
 
       const { user } = await api.auth.register({
         email,
         displayName,
+        password,
         ...publicBundle,
       });
 
@@ -68,6 +84,34 @@ export function Register() {
               onChange={(e) => setDisplayName(e.target.value)}
               className="w-full bg-background-tertiary text-text-primary rounded px-3 py-2 outline-none focus:ring-2 focus:ring-accent-primary"
               required
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-text-secondary text-xs font-semibold uppercase mb-2">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-background-tertiary text-text-primary rounded px-3 py-2 outline-none focus:ring-2 focus:ring-accent-primary"
+              required
+              minLength={8}
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-text-secondary text-xs font-semibold uppercase mb-2">
+              Confirm Password
+            </label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full bg-background-tertiary text-text-primary rounded px-3 py-2 outline-none focus:ring-2 focus:ring-accent-primary"
+              required
+              minLength={8}
             />
           </div>
 

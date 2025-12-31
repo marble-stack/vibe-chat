@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "../stores/auth";
 import { useChatStore } from "../stores/chat";
 import { api } from "../lib/api";
@@ -22,7 +22,17 @@ export function Chat() {
     addMessage,
     addMemberIfMissing,
     setTypingUser,
+    addReaction,
+    removeReaction,
   } = useChatStore();
+
+  // Mobile navigation state
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+
+  // Close mobile sidebar when clicking outside
+  const handleBackdropClick = () => {
+    setShowMobileSidebar(false);
+  };
 
   // Ref to track current members for the WebSocket handler
   const membersRef = useRef(members);
@@ -118,15 +128,40 @@ export function Chat() {
       setTypingUser(channelId, userId, isTyping);
     };
 
+    // Handle reaction added
+    const handleReactionAdded = (msg: { payload: Record<string, unknown> }) => {
+      const { reactionId, messageId, userId, emoji } = msg.payload as {
+        reactionId: string;
+        messageId: string;
+        userId: string;
+        emoji: string;
+      };
+      addReaction(messageId, reactionId, userId, emoji);
+    };
+
+    // Handle reaction removed
+    const handleReactionRemoved = (msg: { payload: Record<string, unknown> }) => {
+      const { messageId, userId, emoji } = msg.payload as {
+        messageId: string;
+        userId: string;
+        emoji: string;
+      };
+      removeReaction(messageId, userId, emoji);
+    };
+
     wsClient.on("message:new", handleNewMessage);
     wsClient.on("typing:update", handleTypingUpdate);
+    wsClient.on("reaction:added", handleReactionAdded);
+    wsClient.on("reaction:removed", handleReactionRemoved);
 
     return () => {
       wsClient.off("message:new", handleNewMessage);
       wsClient.off("typing:update", handleTypingUpdate);
+      wsClient.off("reaction:added", handleReactionAdded);
+      wsClient.off("reaction:removed", handleReactionRemoved);
       wsClient.disconnect();
     };
-  }, [user, addMessage, setTypingUser]);
+  }, [user, addMessage, setTypingUser, addReaction, removeReaction]);
 
   // Join active channel
   useEffect(() => {
@@ -137,17 +172,33 @@ export function Chat() {
 
   return (
     <div className="h-screen flex bg-background-primary">
+      {/* Mobile backdrop overlay */}
+      {showMobileSidebar && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={handleBackdropClick}
+        />
+      )}
+
       {/* Community sidebar */}
-      <Sidebar />
+      <Sidebar
+        showMobile={showMobileSidebar}
+        onClose={() => setShowMobileSidebar(false)}
+      />
 
-      {/* Channel list */}
-      <ChannelList />
+      {/* Channel list - hidden on mobile when chat is active */}
+      <ChannelList
+        showOnMobile={!activeChannelId}
+        onOpenSidebar={() => setShowMobileSidebar(true)}
+      />
 
-      {/* Main chat area */}
-      <div className="flex-1 flex flex-col">
+      {/* Main chat area - only show on mobile when channel is selected */}
+      <div className={`flex-1 flex flex-col ${activeChannelId ? 'flex' : 'hidden md:flex'}`}>
         {activeChannelId ? (
           <>
-            <MessageList />
+            <MessageList
+              onOpenSidebar={() => setShowMobileSidebar(true)}
+            />
             <MessageInput />
           </>
         ) : (

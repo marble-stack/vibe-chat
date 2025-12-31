@@ -3,7 +3,12 @@ import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
 
-export function Sidebar() {
+interface SidebarProps {
+  showMobile: boolean;
+  onClose: () => void;
+}
+
+export function Sidebar({ showMobile, onClose }: SidebarProps) {
   const user = useAuthStore((state) => state.user);
   const { communities, activeCommunityId, setActiveCommunity, setActiveChannel, addCommunity } = useChatStore();
   const [showCreate, setShowCreate] = useState(false);
@@ -40,7 +45,11 @@ export function Sidebar() {
   };
 
   return (
-    <div className="w-[72px] bg-background-tertiary flex flex-col items-center py-3 gap-2">
+    <div
+      className={`w-[72px] bg-background-tertiary flex flex-col items-center py-3 gap-2 transition-transform md:translate-x-0 ${
+        showMobile ? 'fixed left-0 top-0 bottom-0 z-50 translate-x-0' : 'fixed left-0 top-0 bottom-0 -translate-x-full md:relative'
+      }`}
+    >
       {/* Communities */}
       {communities.map((community) => (
         <button
@@ -48,6 +57,7 @@ export function Sidebar() {
           onClick={() => {
             setActiveCommunity(community.id);
             setActiveChannel(null);
+            onClose(); // Close mobile sidebar when selecting a community
           }}
           className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold transition-all ${
             activeCommunityId === community.id

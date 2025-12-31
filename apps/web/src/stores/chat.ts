@@ -13,6 +13,13 @@ interface Channel {
   name: string;
 }
 
+interface Reaction {
+  emoji: string;
+  count: number;
+  userIds: string[];
+  reactionIds: Record<string, string>; // userId -> reactionId mapping
+}
+
 interface Message {
   id: string;
   channelId: string;
@@ -21,6 +28,7 @@ interface Message {
   plaintext?: string; // Decrypted content
   replyToId?: string;
   createdAt: string;
+  reactions?: Reaction[];
 }
 
 interface Member {
@@ -49,6 +57,8 @@ interface ChatState {
   setActiveCommunity: (communityId: string | null) => void;
   setActiveChannel: (channelId: string | null) => void;
   setTypingUser: (channelId: string, userId: string, isTyping: boolean) => void;
+  addReaction: (messageId: string, reactionId: string, userId: string, emoji: string) => void;
+  removeReaction: (messageId: string, userId: string, emoji: string) => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -136,5 +146,92 @@ export const useChatStore = create<ChatState>((set) => ({
       return {
         typingUsers: { ...state.typingUsers, [channelId]: updated },
       };
+    }),
+
+  addReaction: (messageId, reactionId, userId, emoji) =>
+    set((state) => {
+      const newMessages = { ...state.messages };
+
+      // Find the channel containing this message
+      for (const channelId in newMessages) {
+        const channelMessages = newMessages[channelId];
+        const msgIndex = channelMessages.findIndex(m => m.id === messageId);
+
+        if (msgIndex !== -1) {
+          const message = channelMessages[msgIndex];
+          const reactions = message.reactions || [];
+          const existingReaction = reactions.find(r => r.emoji === emoji);
+
+          if (existingReaction) {
+            // Update existing reaction
+            existingReaction.count++;
+            existingReaction.userIds.push(userId);
+            existingReaction.reactionIds[userId] = reactionId;
+          } else {
+            // Add new reaction
+            reactions.push({
+              emoji,
+              count: 1,
+              userIds: [userId],
+              reactionIds: { [userId]: reactionId },
+            });
+          }
+
+          channelMessages[msgIndex] = {
+            ...message,
+            reactions: [...reactions],
+          };
+
+          break;
+        }
+      }
+
+      return { messages: newMessages };
+    }),
+
+  removeReaction: (messageId, userId, emoji) =>
+    set((state) => {
+      const newMessages = { ...state.messages };
+
+      // Find the channel containing this message
+      for (const channelId in newMessages) {
+        const channelMessages = newMessages[channelId];
+        const msgIndex = channelMessages.findIndex(m => m.id === messageId);
+
+        if (msgIndex !== -1) {
+          const message = channelMessages[msgIndex];
+          const reactions = message.reactions || [];
+
+          // If emoji is provided, use it; otherwise find the reaction by userId
+          let reactionIndex = -1;
+          if (emoji) {
+            reactionIndex = reactions.findIndex(r => r.emoji === emoji);
+          } else {
+            // Find any reaction by this user
+            reactionIndex = reactions.findIndex(r => r.userIds.includes(userId));
+          }
+
+          if (reactionIndex !== -1) {
+            const reaction = reactions[reactionIndex];
+            reaction.count--;
+            reaction.userIds = reaction.userIds.filter(id => id !== userId);
+            delete reaction.reactionIds[userId];
+
+            // Remove reaction if no users left
+            if (reaction.count === 0) {
+              reactions.splice(reactionIndex, 1);
+            }
+          }
+
+          channelMessages[msgIndex] = {
+            ...message,
+            reactions: [...reactions],
+          };
+
+          break;
+        }
+      }
+
+      return { messages: newMessages };
     }),
 }));

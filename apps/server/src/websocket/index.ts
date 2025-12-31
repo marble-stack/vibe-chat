@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { WebSocket } from "ws";
-import { db, messages, users } from "../db/index.js";
-import { eq } from "drizzle-orm";
+import { db, messages, users, reactions } from "../db/index.js";
+import { eq, and } from "drizzle-orm";
 
 // Map of channelId -> Set of connected WebSockets
 const channelConnections = new Map<string, Set<WebSocket>>();
@@ -150,6 +150,81 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
           payload: { channelId, userId: user.userId, isTyping: false },
         }, socket);
       }
+      break;
+    }
+
+    case "reaction:add": {
+      const { messageId, channelId, emoji } = message.payload as {
+        messageId: string;
+        channelId: string;
+        emoji: string;
+      };
+      const user = socketUsers.get(socket);
+
+      if (!user) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Not authenticated" } }));
+        return;
+      }
+
+      // Check if user already reacted with this emoji
+      const existing = await db.query.reactions.findFirst({
+        where: and(
+          eq(reactions.messageId, messageId),
+          eq(reactions.userId, user.userId),
+          eq(reactions.emoji, emoji)
+        ),
+      });
+
+      if (existing) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Reaction already exists" } }));
+        return;
+      }
+
+      const [reaction] = await db.insert(reactions).values({
+        messageId,
+        userId: user.userId,
+        emoji,
+      }).returning();
+
+      // Broadcast to channel
+      broadcastToChannel(channelId, {
+        type: "reaction:added",
+        payload: {
+          reactionId: reaction.id,
+          messageId,
+          userId: user.userId,
+          emoji,
+        },
+      });
+      break;
+    }
+
+    case "reaction:remove": {
+      const { reactionId, channelId, messageId, emoji } = message.payload as {
+        reactionId: string;
+        channelId: string;
+        messageId: string;
+        emoji: string;
+      };
+      const user = socketUsers.get(socket);
+
+      if (!user) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Not authenticated" } }));
+        return;
+      }
+
+      await db.delete(reactions).where(eq(reactions.id, reactionId));
+
+      // Broadcast to channel
+      broadcastToChannel(channelId, {
+        type: "reaction:removed",
+        payload: {
+          reactionId,
+          messageId,
+          userId: user.userId,
+          emoji,
+        },
+      });
       break;
     }
   }

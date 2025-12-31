@@ -2,10 +2,29 @@ import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { db, users, preKeys } from "../db/index.js";
 import { eq } from "drizzle-orm";
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
+
+const scryptAsync = promisify(scrypt);
+
+// Hash password using scrypt
+async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString("hex");
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${buf.toString("hex")}.${salt}`;
+}
+
+// Verify password against hash
+async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  const [hashedPassword, salt] = hash.split(".");
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  return timingSafeEqual(Buffer.from(hashedPassword, "hex"), buf);
+}
 
 const registerSchema = z.object({
   email: z.string().email(),
   displayName: z.string().min(1).max(50),
+  password: z.string().min(8),
   identityKeyPublic: z.string(),
   signedPreKeyPublic: z.string(),
   signedPreKeySignature: z.string(),
@@ -17,6 +36,7 @@ const registerSchema = z.object({
 
 const loginSchema = z.object({
   email: z.string().email(),
+  password: z.string(),
 });
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
@@ -33,10 +53,14 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: "User already exists" });
     }
 
+    // Hash password
+    const passwordHash = await hashPassword(body.password);
+
     // Create user
     const [user] = await db.insert(users).values({
       email: body.email,
       displayName: body.displayName,
+      passwordHash,
       identityKeyPublic: body.identityKeyPublic,
       signedPreKeyPublic: body.signedPreKeyPublic,
       signedPreKeySignature: body.signedPreKeySignature,
@@ -56,7 +80,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return { user: { id: user.id, email: user.email, displayName: user.displayName } };
   });
 
-  // Login (simplified - in production use proper auth)
+  // Login
   fastify.post("/login", async (request, reply) => {
     const body = loginSchema.parse(request.body);
 
@@ -65,7 +89,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     if (!user) {
-      return reply.status(404).send({ error: "User not found" });
+      return reply.status(401).send({ error: "Invalid email or password" });
+    }
+
+    // Verify password
+    const isValidPassword = await verifyPassword(body.password, user.passwordHash);
+    if (!isValidPassword) {
+      return reply.status(401).send({ error: "Invalid email or password" });
     }
 
     // In production: generate JWT, verify identity, etc.

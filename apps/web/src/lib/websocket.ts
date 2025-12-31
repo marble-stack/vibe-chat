@@ -113,6 +113,14 @@ class WebSocketClient {
     this.send({ type: "typing:stop", payload: { channelId } });
   }
 
+  addReaction(messageId: string, channelId: string, emoji: string) {
+    this.send({ type: "reaction:add", payload: { messageId, channelId, emoji } });
+  }
+
+  removeReaction(reactionId: string, channelId: string, messageId: string, emoji: string) {
+    this.send({ type: "reaction:remove", payload: { reactionId, channelId, messageId, emoji } });
+  }
+
   on(type: string, handler: MessageHandler) {
     if (!this.handlers.has(type)) {
       this.handlers.set(type, new Set());
