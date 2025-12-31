@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(docker-compose up:*)",
+      "Bash(docker compose:*)",
+      "Bash(pnpm install)",
+      "Bash(ls \"C:\\\\Users\\\\noahr\\\\Documents\\\\Code\\\\vibe-chat\\\\apps\\\\server\\\\drizzle\"\" 2>/dev/null || echo \"No migrations yet \")",
+      "Bash(npm:*)",
+      "Bash(node:*)",
+      "Bash(pnpm db:generate:*)",
+      "Bash(pnpm --filter @vibe-chat/server db:generate:*)",
+      "Bash(pnpm db:migrate:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(pnpm --filter @vibe-chat/server add:*)",
+      "Bash(ipconfig:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)",
+      "Bash(xargs:*)",
+      "Bash(powershell -command:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: Vibe Chat E2E encrypted messaging app\n\n- Fastify + WebSocket backend with Drizzle ORM\n- React + Vite frontend with Zustand state management\n- Docker Compose setup for PostgreSQL + Redis\n- Community/Channel/Message data model\n- Real-time messaging via WebSocket\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}

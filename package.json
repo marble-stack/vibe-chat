@@ -1,0 +1,21 @@
+{
+  "name": "vibe-chat",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel run dev",
+    "dev:server": "pnpm --filter @vibe-chat/server dev",
+    "dev:web": "pnpm --filter @vibe-chat/web dev",
+    "build": "pnpm --parallel run build",
+    "lint": "pnpm --parallel run lint",
+    "db:migrate": "pnpm --filter @vibe-chat/server db:migrate",
+    "db:seed": "pnpm --filter @vibe-chat/server db:seed"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "packageManager": "pnpm@9.1.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
