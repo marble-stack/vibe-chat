@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { WebSocket } from "ws";
-import { db, messages } from "../db/index.js";
+import { db, messages, users } from "../db/index.js";
+import { eq } from "drizzle-orm";
 
 // Map of channelId -> Set of connected WebSockets
 const channelConnections = new Map<string, Set<WebSocket>>();
@@ -95,6 +96,12 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
         replyToId,
       }).returning();
 
+      // Get sender's display name for clients that may not have it cached
+      const sender = await db.query.users.findFirst({
+        where: eq(users.id, user.userId),
+        columns: { displayName: true },
+      });
+
       // Broadcast to all users in channel
       const channelSockets = channelConnections.get(channelId);
       if (channelSockets) {
@@ -104,6 +111,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
             id: savedMessage.id,
             channelId,
             senderId: user.userId,
+            senderDisplayName: sender?.displayName,
             ciphertext,
             replyToId,
             createdAt: savedMessage.createdAt.toISOString(),

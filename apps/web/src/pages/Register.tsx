@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
+import { generateIdentityKeys } from "../lib/crypto";
+import { storeIdentityKeys } from "../lib/keyStore";
 
 export function Register() {
   const [email, setEmail] = useState("");
@@ -16,23 +18,18 @@ export function Register() {
     setLoading(true);
 
     try {
-      // TODO: Generate real Signal Protocol keys with libsignal
-      // For now, using placeholder keys - will be replaced with real crypto
-      const placeholderKeys = {
-        identityKeyPublic: btoa(crypto.randomUUID()),
-        signedPreKeyPublic: btoa(crypto.randomUUID()),
-        signedPreKeySignature: btoa(crypto.randomUUID()),
-        preKeys: Array.from({ length: 10 }, (_, i) => ({
-          keyId: String(i),
-          publicKey: btoa(crypto.randomUUID()),
-        })),
-      };
+      // Generate real cryptographic keys using Web Crypto API
+      const { keys, publicBundle } = await generateIdentityKeys();
 
       const { user } = await api.auth.register({
         email,
         displayName,
-        ...placeholderKeys,
+        ...publicBundle,
       });
+
+      // Store private keys locally in IndexedDB
+      await storeIdentityKeys(user.id, keys);
+
       setUser(user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");

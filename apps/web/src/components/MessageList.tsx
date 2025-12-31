@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useChatStore } from "../stores/chat";
+import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
+import { decryptChannelMessage } from "../lib/channelCrypto";
 
 export function MessageList() {
   const {
@@ -12,6 +14,7 @@ export function MessageList() {
     typingUsers,
     setMessages,
   } = useChatStore();
+  const user = useAuthStore((state) => state.user);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -22,19 +25,36 @@ export function MessageList() {
     ? channels[activeCommunityId]?.find((c) => c.id === activeChannelId)
     : null;
 
-  // Load messages when channel changes
+  // Load and decrypt messages when channel changes
   useEffect(() => {
-    if (!activeChannelId) return;
+    if (!activeChannelId || !user) return;
 
-    api.messages.list(activeChannelId).then(({ messages: msgs }) => {
-      // TODO: Decrypt messages
-      const decrypted = msgs.map((m) => ({
-        ...m,
-        plaintext: m.ciphertext, // Placeholder until encryption is implemented
-      }));
+    const loadMessages = async () => {
+      const { messages: msgs } = await api.messages.list(activeChannelId);
+
+      // Decrypt each message
+      const decrypted = await Promise.all(
+        msgs.map(async (m) => {
+          let plaintext = m.ciphertext;
+          try {
+            plaintext = await decryptChannelMessage(
+              activeChannelId,
+              m.ciphertext,
+              communityMembers,
+              user.id
+            );
+          } catch (err) {
+            console.error('Failed to decrypt message:', err);
+          }
+          return { ...m, plaintext };
+        })
+      );
+
       setMessages(activeChannelId, decrypted);
-    });
-  }, [activeChannelId, setMessages]);
+    };
+
+    loadMessages();
+  }, [activeChannelId, user, setMessages, communityMembers]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
