@@ -1,26 +1,48 @@
 import { useState, useRef, useEffect } from "react";
 import { useChatStore } from "../stores/chat";
+import { useAuthStore } from "../stores/auth";
 import { wsClient } from "../lib/websocket";
+import { encryptChannelMessage } from "../lib/channelCrypto";
 
 export function MessageInput() {
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const typingTimeoutRef = useRef<number | null>(null);
-  const { activeChannelId, channels, activeCommunityId } = useChatStore();
+  const { activeChannelId, channels, activeCommunityId, members } = useChatStore();
+  const user = useAuthStore((state) => state.user);
 
   const activeChannel = activeCommunityId && activeChannelId
     ? channels[activeCommunityId]?.find((c) => c.id === activeChannelId)
     : null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const communityMembers = activeCommunityId ? members[activeCommunityId] || [] : [];
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || !activeChannelId) return;
+    if (!message.trim() || !activeChannelId || !user || isSending) return;
 
-    // TODO: Encrypt message before sending
-    const ciphertext = message.trim(); // Placeholder
-
-    wsClient.sendMessage(activeChannelId, ciphertext);
+    const plaintext = message.trim();
     setMessage("");
+    setIsSending(true);
+
+    try {
+      // Encrypt message with channel key
+      const ciphertext = await encryptChannelMessage(
+        activeChannelId,
+        plaintext,
+        communityMembers,
+        user.id
+      );
+
+      wsClient.sendMessage(activeChannelId, ciphertext);
+    } catch (err) {
+      console.error('Failed to encrypt message:', err);
+      // Fallback to plaintext if encryption fails (for backward compatibility)
+      wsClient.sendMessage(activeChannelId, plaintext);
+    } finally {
+      setIsSending(false);
+    }
 
     // Stop typing indicator
     if (isTyping) {

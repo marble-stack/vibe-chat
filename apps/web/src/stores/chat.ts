@@ -43,6 +43,7 @@ interface ChatState {
   setChannels: (communityId: string, channels: Channel[]) => void;
   addChannel: (channel: Channel) => void;
   setMembers: (communityId: string, members: Member[]) => void;
+  addMemberIfMissing: (userId: string, displayName: string) => void;
   setMessages: (channelId: string, messages: Message[]) => void;
   addMessage: (message: Message) => void;
   setActiveCommunity: (communityId: string | null) => void;
@@ -85,21 +86,42 @@ export const useChatStore = create<ChatState>((set) => ({
       members: { ...state.members, [communityId]: members },
     })),
 
+  addMemberIfMissing: (userId, displayName) =>
+    set((state) => {
+      const communityId = state.activeCommunityId;
+      if (!communityId) return state;
+
+      const currentMembers = state.members[communityId] || [];
+      const exists = currentMembers.some((m) => m.id === userId);
+      if (exists) return state;
+
+      return {
+        members: {
+          ...state.members,
+          [communityId]: [...currentMembers, { id: userId, displayName }],
+        },
+      };
+    }),
+
   setMessages: (channelId, messages) =>
     set((state) => ({
       messages: { ...state.messages, [channelId]: messages },
     })),
 
   addMessage: (message) =>
-    set((state) => ({
-      messages: {
-        ...state.messages,
-        [message.channelId]: [
-          ...(state.messages[message.channelId] || []),
-          message,
-        ],
-      },
-    })),
+    set((state) => {
+      const channelMessages = state.messages[message.channelId] || [];
+      // Deduplicate - check if message already exists
+      if (channelMessages.some((m) => m.id === message.id)) {
+        return state;
+      }
+      return {
+        messages: {
+          ...state.messages,
+          [message.channelId]: [...channelMessages, message],
+        },
+      };
+    }),
 
   setActiveCommunity: (communityId) => set({ activeCommunityId: communityId }),
 
