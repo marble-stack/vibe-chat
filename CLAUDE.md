@@ -60,11 +60,15 @@ Messages use `{ type: string, payload: object }` format:
 - `typing:start` / `typing:stop` / `typing:update` - Typing indicators
 - `channel:join` / `channel:leave` - Channel subscription
 
-### Encryption (TODO)
-- Currently using placeholder encryption
-- Will integrate `@aspect-build/aspect-signal-client` (libsignal WASM)
-- Each channel has independent Sender Keys
-- Key rotation required when members leave
+### Encryption
+- Uses Web Crypto API (ECDH P-256 for key exchange, AES-GCM for messages)
+- Private keys stored locally in IndexedDB via Dexie
+- Each channel has a shared symmetric key distributed to members
+- Key files: `apps/web/src/lib/crypto.ts`, `keyStore.ts`, `channelCrypto.ts`
+
+**Known limitations:**
+- Keys are device-local; logging in on a new device requires re-registration
+- Key rotation on member leave not yet implemented
 
 ## Data Model
 
