@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { db, communities, communityMembers, channels, users } from "../db/index.js";
+import { db, communities, communityMembers, channels } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { isUserInCommunity } from "../lib/authorization.js";
@@ -17,7 +17,7 @@ const joinCommunitySchema = z.object({
 
 export const communityRoutes: FastifyPluginAsync = async (fastify) => {
   // Create community
-  fastify.post("/", async (request, reply) => {
+  fastify.post("/", async (request, _reply) => {
     const body = createCommunitySchema.parse(request.body);
 
     const inviteCode = randomBytes(8).toString("hex");

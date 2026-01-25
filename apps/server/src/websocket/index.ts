@@ -3,7 +3,7 @@ import { WebSocket } from "ws";
 import { db, messages, users, reactions } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
-import { validatePayload, type MessageType } from "./schemas.js";
+import { validatePayload } from "./schemas.js";
 import { isUserInCommunity, canUserAccessChannel } from "../lib/authorization.js";
 
 // Map of channelId -> Set of connected WebSockets
@@ -24,7 +24,7 @@ interface WsMessage {
 }
 
 export const websocketHandler: FastifyPluginAsync = async (fastify) => {
-  fastify.get("/ws", { websocket: true }, (socket, req) => {
+  fastify.get("/ws", { websocket: true }, (socket, _req) => {
     logger.debug("WebSocket client connected");
 
     socket.on("message", async (data) => {

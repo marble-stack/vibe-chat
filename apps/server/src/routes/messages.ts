@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { db, messages, reactions } from "../db/index.js";
+import { db, messages } from "../db/index.js";
 import { eq, desc } from "drizzle-orm";
 import { canUserAccessChannel } from "../lib/authorization.js";
 
@@ -60,7 +60,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify) => {
 
     const limitNum = Math.min(parseInt(limit, 10), 100);
 
-    let query = db.query.messages.findMany({
+    const query = db.query.messages.findMany({
       where: cursor
         ? (messages, { and: andOp, lt: ltOp, isNull: isNullOp }) => andOp(
             eq(messages.channelId, channelId),
