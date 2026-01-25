@@ -1,15 +1,27 @@
+import { useAuthStore } from "../stores/auth";
+
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  // Get token from auth store
+  const token = useAuthStore.getState().token;
+
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
+
+  // Add authorization header if token exists
+  if (token) {
+    (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -25,20 +37,21 @@ export const api = {
   auth: {
     register: (data: {
       email: string;
+      password: string;
       displayName: string;
       identityKeyPublic: string;
       signedPreKeyPublic: string;
       signedPreKeySignature: string;
       preKeys: { keyId: string; publicKey: string }[];
-    }) => request<{ user: { id: string; email: string; displayName: string } }>("/auth/register", {
+    }) => request<{ user: { id: string; email: string; displayName: string }; token: string }>("/auth/register", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-    login: (email: string) =>
-      request<{ user: { id: string; email: string; displayName: string } }>("/auth/login", {
+    login: (email: string, password: string) =>
+      request<{ user: { id: string; email: string; displayName: string }; token: string }>("/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, password }),
       }),
 
     getUserKeys: (userId: string) =>

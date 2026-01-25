@@ -9,6 +9,7 @@ import { messageRoutes } from "./routes/messages.js";
 import { emojiRoutes } from "./routes/emojis.js";
 import { websocketHandler } from "./websocket/index.js";
 import { logger } from "./lib/logger.js";
+import { extractToken, verifyToken } from "./lib/auth.js";
 
 const fastify = Fastify({
   logger: true,
@@ -28,6 +29,17 @@ async function main() {
     timeWindow: "1 minute", // Per minute
     // Skip rate limiting for WebSocket upgrade requests
     allowList: (req) => req.url === "/ws",
+  });
+
+  // Optional auth - parse JWT if present (doesn't require auth)
+  fastify.addHook("onRequest", async (request) => {
+    const token = extractToken(request.headers.authorization);
+    if (token) {
+      const payload = verifyToken(token);
+      if (payload) {
+        request.user = payload;
+      }
+    }
   });
 
   // REST routes
