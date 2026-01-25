@@ -20,6 +20,7 @@ interface Message {
   ciphertext: string;
   plaintext?: string; // Decrypted content
   replyToId?: string;
+  editedAt?: string | null;
   createdAt: string;
 }
 
@@ -37,6 +38,8 @@ interface ChatState {
   activeCommunityId: string | null;
   activeChannelId: string | null;
   typingUsers: Record<string, string[]>; // channelId -> userIds
+  replyingTo: Message | null; // Message being replied to
+  onlineUsers: Record<string, string[]>; // communityId -> userIds
 
   setCommunities: (communities: Community[]) => void;
   addCommunity: (community: Community) => void;
@@ -49,9 +52,16 @@ interface ChatState {
   setActiveCommunity: (communityId: string | null) => void;
   setActiveChannel: (channelId: string | null) => void;
   setTypingUser: (channelId: string, userId: string, isTyping: boolean) => void;
+  setReplyingTo: (message: Message | null) => void;
+  getMessageById: (channelId: string, messageId: string) => Message | undefined;
+  setOnlineUsers: (communityId: string, userIds: string[]) => void;
+  setUserOnline: (communityId: string, userId: string, isOnline: boolean) => void;
+  isUserOnline: (communityId: string, userId: string) => boolean;
+  updateMessage: (channelId: string, messageId: string, updates: Partial<Message>) => void;
+  deleteMessage: (channelId: string, messageId: string) => void;
 }
 
-export const useChatStore = create<ChatState>((set) => ({
+export const useChatStore = create<ChatState>((set, get) => ({
   communities: [],
   channels: {},
   messages: {},
@@ -59,6 +69,8 @@ export const useChatStore = create<ChatState>((set) => ({
   activeCommunityId: null,
   activeChannelId: null,
   typingUsers: {},
+  replyingTo: null,
+  onlineUsers: {},
 
   setCommunities: (communities) => set({ communities }),
 
@@ -135,6 +147,56 @@ export const useChatStore = create<ChatState>((set) => ({
         : current.filter((id) => id !== userId);
       return {
         typingUsers: { ...state.typingUsers, [channelId]: updated },
+      };
+    }),
+
+  setReplyingTo: (message) => set({ replyingTo: message }),
+
+  getMessageById: (channelId, messageId) => {
+    const state = get();
+    const channelMessages = state.messages[channelId] || [];
+    return channelMessages.find((m) => m.id === messageId);
+  },
+
+  setOnlineUsers: (communityId, userIds) =>
+    set((state) => ({
+      onlineUsers: { ...state.onlineUsers, [communityId]: userIds },
+    })),
+
+  setUserOnline: (communityId, userId, isOnline) =>
+    set((state) => {
+      const current = state.onlineUsers[communityId] || [];
+      const updated = isOnline
+        ? [...new Set([...current, userId])]
+        : current.filter((id) => id !== userId);
+      return {
+        onlineUsers: { ...state.onlineUsers, [communityId]: updated },
+      };
+    }),
+
+  isUserOnline: (communityId, userId) => {
+    const state = get();
+    const onlineInCommunity = state.onlineUsers[communityId] || [];
+    return onlineInCommunity.includes(userId);
+  },
+
+  updateMessage: (channelId, messageId, updates) =>
+    set((state) => {
+      const channelMessages = state.messages[channelId] || [];
+      const updatedMessages = channelMessages.map((m) =>
+        m.id === messageId ? { ...m, ...updates } : m
+      );
+      return {
+        messages: { ...state.messages, [channelId]: updatedMessages },
+      };
+    }),
+
+  deleteMessage: (channelId, messageId) =>
+    set((state) => {
+      const channelMessages = state.messages[channelId] || [];
+      const filteredMessages = channelMessages.filter((m) => m.id !== messageId);
+      return {
+        messages: { ...state.messages, [channelId]: filteredMessages },
       };
     }),
 }));

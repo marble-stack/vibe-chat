@@ -98,10 +98,32 @@ class WebSocketClient {
     this.send({ type: "channel:leave", payload: { channelId } });
   }
 
+  joinCommunity(communityId: string) {
+    this.send({ type: "community:join", payload: { communityId } });
+  }
+
+  leaveCommunity(communityId: string) {
+    this.send({ type: "community:leave", payload: { communityId } });
+  }
+
   sendMessage(channelId: string, ciphertext: string, replyToId?: string) {
     this.send({
       type: "message:send",
       payload: { channelId, ciphertext, replyToId },
+    });
+  }
+
+  editMessage(channelId: string, messageId: string, ciphertext: string) {
+    this.send({
+      type: "message:edit",
+      payload: { channelId, messageId, ciphertext },
+    });
+  }
+
+  deleteMessage(channelId: string, messageId: string) {
+    this.send({
+      type: "message:delete",
+      payload: { channelId, messageId },
     });
   }
 

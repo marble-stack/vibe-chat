@@ -22,6 +22,10 @@ export function Chat() {
     addMessage,
     addMemberIfMissing,
     setTypingUser,
+    setOnlineUsers,
+    setUserOnline,
+    updateMessage,
+    deleteMessage,
   } = useChatStore();
 
   // Ref to track current members for the WebSocket handler
@@ -118,15 +122,91 @@ export function Chat() {
       setTypingUser(channelId, userId, isTyping);
     };
 
+    // Handle presence list (initial online users when joining a community)
+    const handlePresenceList = (msg: { payload: Record<string, unknown> }) => {
+      const { communityId, onlineUserIds } = msg.payload as {
+        communityId: string;
+        onlineUserIds: string[];
+      };
+      setOnlineUsers(communityId, onlineUserIds);
+    };
+
+    // Handle presence update (user came online/offline)
+    const handlePresenceUpdate = (msg: { payload: Record<string, unknown> }) => {
+      const { communityId, userId, isOnline } = msg.payload as {
+        communityId: string;
+        userId: string;
+        isOnline: boolean;
+      };
+      setUserOnline(communityId, userId, isOnline);
+    };
+
+    // Handle message edited
+    const handleMessageEdited = async (msg: { payload: Record<string, unknown> }) => {
+      const { id, channelId, ciphertext, editedAt } = msg.payload as {
+        id: string;
+        channelId: string;
+        ciphertext: string;
+        editedAt: string;
+      };
+
+      // Get current community members for decryption
+      const currentCommunityId = activeCommunityRef.current;
+      const currentMembers = currentCommunityId
+        ? membersRef.current[currentCommunityId] || []
+        : [];
+
+      // Decrypt the updated message
+      let plaintext = ciphertext;
+      try {
+        if (user) {
+          plaintext = await decryptChannelMessage(
+            channelId,
+            ciphertext,
+            currentMembers,
+            user.id
+          );
+        }
+      } catch (err) {
+        console.error('Failed to decrypt edited message:', err);
+      }
+
+      updateMessage(channelId, id, { ciphertext, plaintext, editedAt });
+    };
+
+    // Handle message deleted
+    const handleMessageDeleted = (msg: { payload: Record<string, unknown> }) => {
+      const { id, channelId } = msg.payload as {
+        id: string;
+        channelId: string;
+      };
+      deleteMessage(channelId, id);
+    };
+
     wsClient.on("message:new", handleNewMessage);
     wsClient.on("typing:update", handleTypingUpdate);
+    wsClient.on("presence:list", handlePresenceList);
+    wsClient.on("presence:update", handlePresenceUpdate);
+    wsClient.on("message:edited", handleMessageEdited);
+    wsClient.on("message:deleted", handleMessageDeleted);
 
     return () => {
       wsClient.off("message:new", handleNewMessage);
       wsClient.off("typing:update", handleTypingUpdate);
+      wsClient.off("presence:list", handlePresenceList);
+      wsClient.off("presence:update", handlePresenceUpdate);
+      wsClient.off("message:edited", handleMessageEdited);
+      wsClient.off("message:deleted", handleMessageDeleted);
       wsClient.disconnect();
     };
-  }, [user, addMessage, setTypingUser]);
+  }, [user, addMessage, setTypingUser, setOnlineUsers, setUserOnline, updateMessage, deleteMessage]);
+
+  // Join active community for presence updates
+  useEffect(() => {
+    if (activeCommunityId) {
+      wsClient.joinCommunity(activeCommunityId);
+    }
+  }, [activeCommunityId]);
 
   // Join active channel
   useEffect(() => {
