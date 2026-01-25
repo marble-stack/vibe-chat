@@ -2,9 +2,11 @@ import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { db, users, preKeys } from "../db/index.js";
 import { eq } from "drizzle-orm";
+import { hashPassword, verifyPassword, generateToken } from "../lib/auth.js";
 
 const registerSchema = z.object({
   email: z.string().email(),
+  password: z.string().min(8).max(100),
   displayName: z.string().min(1).max(50),
   identityKeyPublic: z.string(),
   signedPreKeyPublic: z.string(),
@@ -17,6 +19,7 @@ const registerSchema = z.object({
 
 const loginSchema = z.object({
   email: z.string().email(),
+  password: z.string(),
 });
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
@@ -33,9 +36,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: "User already exists" });
     }
 
+    // Hash password
+    const passwordHash = await hashPassword(body.password);
+
     // Create user
     const [user] = await db.insert(users).values({
       email: body.email,
+      passwordHash,
       displayName: body.displayName,
       identityKeyPublic: body.identityKeyPublic,
       signedPreKeyPublic: body.signedPreKeyPublic,
@@ -53,10 +60,16 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       );
     }
 
-    return { user: { id: user.id, email: user.email, displayName: user.displayName } };
+    // Generate JWT token
+    const token = generateToken({ userId: user.id, email: user.email });
+
+    return {
+      user: { id: user.id, email: user.email, displayName: user.displayName },
+      token,
+    };
   });
 
-  // Login (simplified - in production use proper auth)
+  // Login
   fastify.post("/login", async (request, reply) => {
     const body = loginSchema.parse(request.body);
 
@@ -65,11 +78,42 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     if (!user) {
+      return reply.status(401).send({ error: "Invalid email or password" });
+    }
+
+    // Verify password
+    const isValid = await verifyPassword(body.password, user.passwordHash);
+
+    if (!isValid) {
+      return reply.status(401).send({ error: "Invalid email or password" });
+    }
+
+    // Generate JWT token
+    const token = generateToken({ userId: user.id, email: user.email });
+
+    return {
+      user: { id: user.id, email: user.email, displayName: user.displayName },
+      token,
+    };
+  });
+
+  // Get current user (requires authentication)
+  fastify.get("/me", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Not authenticated" });
+    }
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, request.user.userId),
+    });
+
+    if (!user) {
       return reply.status(404).send({ error: "User not found" });
     }
 
-    // In production: generate JWT, verify identity, etc.
-    return { user: { id: user.id, email: user.email, displayName: user.displayName } };
+    return {
+      user: { id: user.id, email: user.email, displayName: user.displayName },
+    };
   });
 
   // Get user's key bundle (for establishing encrypted session)

@@ -4,6 +4,7 @@ import { pgTable, text, timestamp, uuid, boolean, index } from "drizzle-orm/pg-c
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").unique().notNull(),
+  passwordHash: text("password_hash").notNull(),
   displayName: text("display_name").notNull(),
   avatarUrl: text("avatar_url"),
   // Signal Protocol keys (stored as base64)

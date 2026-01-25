@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, communities, communityMembers, channels, users } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
 import { randomBytes } from "crypto";
+import { isUserInCommunity } from "../lib/authorization.js";
 
 const createCommunitySchema = z.object({
   name: z.string().min(1).max(100),
@@ -43,8 +44,18 @@ export const communityRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Get user's communities
-  fastify.get("/user/:userId", async (request) => {
+  fastify.get("/user/:userId", async (request, reply) => {
     const { userId } = request.params as { userId: string };
+
+    // Authorization: require authentication
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
+    // Authorization: users can only get their own communities
+    if (request.user.userId !== userId) {
+      return reply.status(403).send({ error: "Access denied" });
+    }
 
     const memberships = await db.query.communityMembers.findMany({
       where: eq(communityMembers.userId, userId),
@@ -66,6 +77,17 @@ export const communityRoutes: FastifyPluginAsync = async (fastify) => {
   // Get community details with channels
   fastify.get("/:communityId", async (request, reply) => {
     const { communityId } = request.params as { communityId: string };
+
+    // Authorization: require authentication
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
+    // Authorization: verify user is a member of this community
+    const isMember = await isUserInCommunity(request.user.userId, communityId);
+    if (!isMember) {
+      return reply.status(403).send({ error: "Not a member of this community" });
+    }
 
     const community = await db.query.communities.findFirst({
       where: eq(communities.id, communityId),

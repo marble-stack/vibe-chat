@@ -4,6 +4,7 @@ import { db, messages, users } from "../db/index.js";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { validatePayload, type MessageType } from "./schemas.js";
+import { isUserInCommunity, canUserAccessChannel } from "../lib/authorization.js";
 
 // Map of channelId -> Set of connected WebSockets
 const channelConnections = new Map<string, Set<WebSocket>>();
@@ -78,6 +79,13 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
         return;
       }
 
+      // Authorization check: verify user is a member of this community
+      const isMember = await isUserInCommunity(user.userId, communityId);
+      if (!isMember) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Not a member of this community" } }));
+        return;
+      }
+
       // Track this socket in community connections
       if (!communityConnections.has(communityId)) {
         communityConnections.set(communityId, new Set());
@@ -139,6 +147,13 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
         return;
       }
 
+      // Authorization check: verify user can access this channel
+      const canAccess = await canUserAccessChannel(user.userId, channelId);
+      if (!canAccess) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Cannot access this channel" } }));
+        return;
+      }
+
       // Add to channel connections
       if (!channelConnections.has(channelId)) {
         channelConnections.set(channelId, new Set());
@@ -178,6 +193,13 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
 
       if (!user) {
         socket.send(JSON.stringify({ type: "error", payload: { message: "Not authenticated" } }));
+        return;
+      }
+
+      // Authorization check: verify user can access this channel
+      const canSend = await canUserAccessChannel(user.userId, channelId);
+      if (!canSend) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Cannot send messages to this channel" } }));
         return;
       }
 
