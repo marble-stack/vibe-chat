@@ -7,9 +7,9 @@ import { storeIdentityKeys } from "../lib/keyStore";
 
 export function Register() {
   const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const setAuth = useAuthStore((state) => state.setAuth);
@@ -112,6 +112,7 @@ export function Register() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full bg-background-tertiary text-text-primary rounded px-3 py-2 outline-none focus:ring-2 focus:ring-accent-primary"
               required
+              minLength={8}
             />
           </div>
 

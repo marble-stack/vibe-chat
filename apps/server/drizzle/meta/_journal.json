@@ -19,6 +19,13 @@
     {
       "idx": 2,
       "version": "7",
+      "when": 1767182899863,
+      "tag": "0001_chubby_human_cannonball",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
       "when": 1769344962223,
       "tag": "0002_absurd_shard",
       "breakpoints": true

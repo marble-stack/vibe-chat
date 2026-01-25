@@ -86,7 +86,7 @@ export async function ensureChannelKey(
 
       return { key: channelKey, isNew: false };
     }
-  } catch (err) {
+  } catch (_err) {
     logger.debug('No existing channel key found, will create new one');
   }
 
