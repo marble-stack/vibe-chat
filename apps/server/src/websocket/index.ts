@@ -7,7 +7,13 @@ import { eq } from "drizzle-orm";
 const channelConnections = new Map<string, Set<WebSocket>>();
 
 // Map of WebSocket -> user info
-const socketUsers = new Map<WebSocket, { userId: string; channelIds: Set<string> }>();
+const socketUsers = new Map<WebSocket, { userId: string; channelIds: Set<string>; communityIds: Set<string> }>();
+
+// Map of communityId -> Set of online userIds
+const communityOnlineUsers = new Map<string, Set<string>>();
+
+// Map of communityId -> Set of connected WebSockets (for presence broadcasts)
+const communityConnections = new Map<string, Set<WebSocket>>();
 
 interface WsMessage {
   type: string;
@@ -39,8 +45,58 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
     case "auth": {
       // Associate user with socket
       const { userId } = message.payload as { userId: string };
-      socketUsers.set(socket, { userId, channelIds: new Set() });
+      socketUsers.set(socket, { userId, channelIds: new Set(), communityIds: new Set() });
       socket.send(JSON.stringify({ type: "auth:success", payload: {} }));
+      break;
+    }
+
+    case "community:join": {
+      const { communityId } = message.payload as { communityId: string };
+      const user = socketUsers.get(socket);
+
+      if (!user) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Not authenticated" } }));
+        return;
+      }
+
+      // Track this socket in community connections
+      if (!communityConnections.has(communityId)) {
+        communityConnections.set(communityId, new Set());
+      }
+      communityConnections.get(communityId)!.add(socket);
+      user.communityIds.add(communityId);
+
+      // Track user as online in community
+      if (!communityOnlineUsers.has(communityId)) {
+        communityOnlineUsers.set(communityId, new Set());
+      }
+      const wasOnline = communityOnlineUsers.get(communityId)!.has(user.userId);
+      communityOnlineUsers.get(communityId)!.add(user.userId);
+
+      // Send current online users to the joining socket
+      const onlineUsers = Array.from(communityOnlineUsers.get(communityId) || []);
+      socket.send(JSON.stringify({
+        type: "presence:list",
+        payload: { communityId, onlineUserIds: onlineUsers },
+      }));
+
+      // Broadcast user came online (if they weren't already online from another tab)
+      if (!wasOnline) {
+        broadcastToCommunity(communityId, {
+          type: "presence:update",
+          payload: { communityId, userId: user.userId, isOnline: true },
+        }, socket);
+      }
+      break;
+    }
+
+    case "community:leave": {
+      const { communityId } = message.payload as { communityId: string };
+      const user = socketUsers.get(socket);
+
+      if (user) {
+        handleUserLeaveCommunity(socket, user.userId, communityId);
+      }
       break;
     }
 
@@ -127,6 +183,101 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       break;
     }
 
+    case "message:edit": {
+      const { messageId, channelId, ciphertext } = message.payload as {
+        messageId: string;
+        channelId: string;
+        ciphertext: string;
+      };
+      const user = socketUsers.get(socket);
+
+      if (!user) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Not authenticated" } }));
+        return;
+      }
+
+      // Verify the user owns this message
+      const existingMessage = await db.query.messages.findFirst({
+        where: eq(messages.id, messageId),
+      });
+
+      if (!existingMessage || existingMessage.senderId !== user.userId) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Cannot edit this message" } }));
+        return;
+      }
+
+      // Update the message
+      const [updatedMessage] = await db.update(messages)
+        .set({ ciphertext, editedAt: new Date() })
+        .where(eq(messages.id, messageId))
+        .returning();
+
+      // Broadcast to all users in channel
+      const editChannelSockets = channelConnections.get(channelId);
+      if (editChannelSockets) {
+        const broadcastMsg = JSON.stringify({
+          type: "message:edited",
+          payload: {
+            id: messageId,
+            channelId,
+            ciphertext,
+            editedAt: updatedMessage.editedAt?.toISOString(),
+          },
+        });
+
+        for (const clientSocket of editChannelSockets) {
+          if (clientSocket.readyState === WebSocket.OPEN) {
+            clientSocket.send(broadcastMsg);
+          }
+        }
+      }
+      break;
+    }
+
+    case "message:delete": {
+      const { messageId, channelId } = message.payload as {
+        messageId: string;
+        channelId: string;
+      };
+      const user = socketUsers.get(socket);
+
+      if (!user) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Not authenticated" } }));
+        return;
+      }
+
+      // Verify the user owns this message
+      const existingMsg = await db.query.messages.findFirst({
+        where: eq(messages.id, messageId),
+      });
+
+      if (!existingMsg || existingMsg.senderId !== user.userId) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Cannot delete this message" } }));
+        return;
+      }
+
+      // Soft delete the message
+      await db.update(messages)
+        .set({ deletedAt: new Date() })
+        .where(eq(messages.id, messageId));
+
+      // Broadcast to all users in channel
+      const deleteChannelSockets = channelConnections.get(channelId);
+      if (deleteChannelSockets) {
+        const broadcastMsg = JSON.stringify({
+          type: "message:deleted",
+          payload: { id: messageId, channelId },
+        });
+
+        for (const clientSocket of deleteChannelSockets) {
+          if (clientSocket.readyState === WebSocket.OPEN) {
+            clientSocket.send(broadcastMsg);
+          }
+        }
+      }
+      break;
+    }
+
     case "typing:start": {
       const { channelId } = message.payload as { channelId: string };
       const user = socketUsers.get(socket);
@@ -163,10 +314,45 @@ function handleDisconnect(socket: WebSocket) {
     for (const channelId of user.channelIds) {
       channelConnections.get(channelId)?.delete(socket);
     }
+
+    // Remove from all community connections and update presence
+    for (const communityId of user.communityIds) {
+      handleUserLeaveCommunity(socket, user.userId, communityId);
+    }
+
     socketUsers.delete(socket);
   }
 
   console.log("WebSocket client disconnected");
+}
+
+function handleUserLeaveCommunity(socket: WebSocket, userId: string, communityId: string) {
+  // Remove socket from community connections
+  communityConnections.get(communityId)?.delete(socket);
+
+  // Check if user has any other sockets in this community
+  let hasOtherConnections = false;
+  for (const [otherSocket, otherUser] of socketUsers) {
+    if (otherSocket !== socket && otherUser.userId === userId && otherUser.communityIds.has(communityId)) {
+      hasOtherConnections = true;
+      break;
+    }
+  }
+
+  // If no other connections, mark user as offline
+  if (!hasOtherConnections) {
+    communityOnlineUsers.get(communityId)?.delete(userId);
+    broadcastToCommunity(communityId, {
+      type: "presence:update",
+      payload: { communityId, userId, isOnline: false },
+    });
+  }
+
+  // Update socket's community tracking
+  const user = socketUsers.get(socket);
+  if (user) {
+    user.communityIds.delete(communityId);
+  }
 }
 
 function broadcastToChannel(channelId: string, message: WsMessage, excludeSocket?: WebSocket) {
@@ -176,6 +362,20 @@ function broadcastToChannel(channelId: string, message: WsMessage, excludeSocket
     const msgStr = JSON.stringify(message);
 
     for (const clientSocket of channelSockets) {
+      if (clientSocket !== excludeSocket && clientSocket.readyState === WebSocket.OPEN) {
+        clientSocket.send(msgStr);
+      }
+    }
+  }
+}
+
+function broadcastToCommunity(communityId: string, message: WsMessage, excludeSocket?: WebSocket) {
+  const communitySockets = communityConnections.get(communityId);
+
+  if (communitySockets) {
+    const msgStr = JSON.stringify(message);
+
+    for (const clientSocket of communitySockets) {
       if (clientSocket !== excludeSocket && clientSocket.readyState === WebSocket.OPEN) {
         clientSocket.send(msgStr);
       }

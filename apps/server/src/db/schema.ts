@@ -76,6 +76,8 @@ export const messages = pgTable("messages", {
   senderId: uuid("sender_id").references(() => users.id).notNull(),
   ciphertext: text("ciphertext").notNull(),
   replyToId: uuid("reply_to_id"),
+  editedAt: timestamp("edited_at"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   channelIdx: index("messages_channel_idx").on(table.channelId),

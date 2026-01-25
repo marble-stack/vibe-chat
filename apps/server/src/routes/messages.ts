@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { db, messages } from "../db/index.js";
-import { eq, desc, lt } from "drizzle-orm";
+import { eq, desc, lt, isNull, and } from "drizzle-orm";
 
 const sendMessageSchema = z.object({
   channelId: z.string().uuid(),
@@ -34,11 +34,15 @@ export const messageRoutes: FastifyPluginAsync = async (fastify) => {
 
     let query = db.query.messages.findMany({
       where: cursor
-        ? (messages, { and, lt: ltOp }) => and(
+        ? (messages, { and: andOp, lt: ltOp, isNull: isNullOp }) => andOp(
             eq(messages.channelId, channelId),
-            ltOp(messages.createdAt, new Date(cursor))
+            ltOp(messages.createdAt, new Date(cursor)),
+            isNullOp(messages.deletedAt)
           )
-        : eq(messages.channelId, channelId),
+        : (messages, { and: andOp, isNull: isNullOp }) => andOp(
+            eq(messages.channelId, channelId),
+            isNullOp(messages.deletedAt)
+          ),
       orderBy: desc(messages.createdAt),
       limit: limitNum,
     });
@@ -46,7 +50,10 @@ export const messageRoutes: FastifyPluginAsync = async (fastify) => {
     const channelMessages = await query;
 
     return {
-      messages: channelMessages.reverse(),
+      messages: channelMessages.reverse().map((m) => ({
+        ...m,
+        editedAt: m.editedAt?.toISOString() || null,
+      })),
       nextCursor: channelMessages.length === limitNum
         ? channelMessages[0]?.createdAt.toISOString()
         : null,
