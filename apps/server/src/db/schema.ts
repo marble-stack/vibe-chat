@@ -6,7 +6,6 @@ export const users = pgTable("users", {
   email: text("email").unique().notNull(),
   passwordHash: text("password_hash").notNull(),
   displayName: text("display_name").notNull(),
-  passwordHash: text("password_hash").notNull(),
   avatarUrl: text("avatar_url"),
   // Signal Protocol keys (stored as base64)
   identityKeyPublic: text("identity_key_public"),
