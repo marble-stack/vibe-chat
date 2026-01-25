@@ -22,6 +22,11 @@ pnpm dev:web                  # Frontend only (port 5173)
 
 # Database
 pnpm db:studio                # Open Drizzle Studio GUI
+
+# Code quality
+pnpm lint                     # Run ESLint
+pnpm format                   # Format code with Prettier
+pnpm format:check             # Check formatting
 ```
 
 ## Architecture
@@ -69,6 +74,8 @@ Messages use `{ type: string, payload: object }` format:
 **Known limitations:**
 - Keys are device-local; logging in on a new device requires re-registration
 - Key rotation on member leave not yet implemented
+- No forward secrecy - key compromise could allow decryption of past messages
+- No key verification mechanism for detecting MITM attacks
 
 ## Data Model
 
@@ -80,6 +87,20 @@ Messages use `{ type: string, payload: object }` format:
 ## Environment
 
 Copy `apps/server/.env.example` to `apps/server/.env` for local development.
+Copy `apps/web/.env.example` to `apps/web/.env` if you need to override default API/WebSocket URLs.
+
+## Security Considerations
+
+**Authentication:** The current auth system is simplified for development. Production use requires:
+- Proper password hashing (bcrypt/argon2)
+- JWT tokens with proper expiration
+- OAuth integration or other secure auth flows
+
+**Authorization:** Channel/community access checks should be implemented before production.
+
+**Rate Limiting:** API endpoints are rate-limited (100 requests/minute per IP).
+
+**WebSocket Validation:** All WebSocket messages are validated with Zod schemas.
 
 ## Current Setup Status
 

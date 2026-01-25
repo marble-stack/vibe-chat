@@ -1,0 +1,19 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+build
+
+# Generated files
+*.min.js
+*.min.css
+pnpm-lock.yaml
+
+# Database
+drizzle
+
+# Misc
+coverage
+.nyc_output

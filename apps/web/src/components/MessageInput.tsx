@@ -3,6 +3,7 @@ import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { wsClient } from "../lib/websocket";
 import { encryptChannelMessage } from "../lib/channelCrypto";
+import { logger } from "../lib/logger";
 
 export function MessageInput() {
   const [message, setMessage] = useState("");
@@ -47,7 +48,7 @@ export function MessageInput() {
 
       wsClient.sendMessage(activeChannelId, ciphertext, replyToId);
     } catch (err) {
-      console.error('Failed to encrypt message:', err);
+      logger.error('Failed to encrypt message:', err);
       // Fallback to plaintext if encryption fails (for backward compatibility)
       wsClient.sendMessage(activeChannelId, plaintext, replyToId);
     } finally {

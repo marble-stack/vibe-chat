@@ -1,12 +1,14 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
+import rateLimit from "@fastify/rate-limit";
 import { authRoutes } from "./routes/auth.js";
 import { communityRoutes } from "./routes/communities.js";
 import { channelRoutes } from "./routes/channels.js";
 import { messageRoutes } from "./routes/messages.js";
 import { emojiRoutes } from "./routes/emojis.js";
 import { websocketHandler } from "./websocket/index.js";
+import { logger } from "./lib/logger.js";
 
 const fastify = Fastify({
   logger: true,
@@ -19,6 +21,14 @@ async function main() {
     credentials: true,
   });
   await fastify.register(websocket);
+
+  // Rate limiting - protect against abuse
+  await fastify.register(rateLimit, {
+    max: 100, // Maximum 100 requests
+    timeWindow: "1 minute", // Per minute
+    // Skip rate limiting for WebSocket upgrade requests
+    allowList: (req) => req.url === "/ws",
+  });
 
   // REST routes
   await fastify.register(authRoutes, { prefix: "/api/auth" });
@@ -39,7 +49,7 @@ async function main() {
 
   try {
     await fastify.listen({ port, host });
-    console.log(`Server running at http://${host}:${port}`);
+    logger.info(`Server running at http://${host}:${port}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
