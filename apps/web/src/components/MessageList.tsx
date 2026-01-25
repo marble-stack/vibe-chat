@@ -2,9 +2,9 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
-import { decryptChannelMessage } from "../lib/channelCrypto";
-import { encryptChannelMessage } from "../lib/channelCrypto";
+import { decryptChannelMessage, encryptChannelMessage } from "../lib/channelCrypto";
 import { wsClient } from "../lib/websocket";
+import { logger } from "../lib/logger";
 
 export function MessageList() {
   const {
@@ -57,7 +57,7 @@ export function MessageList() {
               user.id
             );
           } catch (err) {
-            console.error('Failed to decrypt message:', err);
+            logger.error('Failed to decrypt message:', err);
           }
           return { ...m, plaintext };
         })
@@ -136,7 +136,7 @@ export function MessageList() {
 
       wsClient.editMessage(activeChannelId, editingMessageId, ciphertext);
     } catch (err) {
-      console.error('Failed to encrypt edited message:', err);
+      logger.error('Failed to encrypt edited message:', err);
       // Fallback to plaintext
       wsClient.editMessage(activeChannelId, editingMessageId, editText.trim());
     }

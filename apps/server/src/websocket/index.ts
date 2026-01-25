@@ -2,6 +2,8 @@ import { FastifyPluginAsync } from "fastify";
 import { WebSocket } from "ws";
 import { db, messages, users } from "../db/index.js";
 import { eq } from "drizzle-orm";
+import { logger } from "../lib/logger.js";
+import { validatePayload, type MessageType } from "./schemas.js";
 
 // Map of channelId -> Set of connected WebSockets
 const channelConnections = new Map<string, Set<WebSocket>>();
@@ -22,14 +24,14 @@ interface WsMessage {
 
 export const websocketHandler: FastifyPluginAsync = async (fastify) => {
   fastify.get("/ws", { websocket: true }, (socket, req) => {
-    console.log("WebSocket client connected");
+    logger.debug("WebSocket client connected");
 
     socket.on("message", async (data) => {
       try {
         const message: WsMessage = JSON.parse(data.toString());
         await handleMessage(socket, message);
       } catch (err) {
-        console.error("WebSocket message error:", err);
+        logger.error("WebSocket message error:", err);
         socket.send(JSON.stringify({ type: "error", payload: { message: "Invalid message format" } }));
       }
     });
@@ -41,17 +43,34 @@ export const websocketHandler: FastifyPluginAsync = async (fastify) => {
 };
 
 async function handleMessage(socket: WebSocket, message: WsMessage) {
+  // Helper to send validation error
+  const sendValidationError = () => {
+    socket.send(JSON.stringify({ type: "error", payload: { message: "Invalid payload" } }));
+  };
+
   switch (message.type) {
     case "auth": {
+      // Validate payload
+      const payload = validatePayload("auth", message.payload);
+      if (!payload) {
+        sendValidationError();
+        return;
+      }
+
       // Associate user with socket
-      const { userId } = message.payload as { userId: string };
-      socketUsers.set(socket, { userId, channelIds: new Set(), communityIds: new Set() });
+      socketUsers.set(socket, { userId: payload.userId, channelIds: new Set(), communityIds: new Set() });
       socket.send(JSON.stringify({ type: "auth:success", payload: {} }));
       break;
     }
 
     case "community:join": {
-      const { communityId } = message.payload as { communityId: string };
+      // Validate payload
+      const payload = validatePayload("community:join", message.payload);
+      if (!payload) {
+        sendValidationError();
+        return;
+      }
+      const { communityId } = payload;
       const user = socketUsers.get(socket);
 
       if (!user) {
@@ -91,17 +110,28 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
     }
 
     case "community:leave": {
-      const { communityId } = message.payload as { communityId: string };
+      // Validate payload
+      const payload = validatePayload("community:leave", message.payload);
+      if (!payload) {
+        sendValidationError();
+        return;
+      }
       const user = socketUsers.get(socket);
 
       if (user) {
-        handleUserLeaveCommunity(socket, user.userId, communityId);
+        handleUserLeaveCommunity(socket, user.userId, payload.communityId);
       }
       break;
     }
 
     case "channel:join": {
-      const { channelId } = message.payload as { channelId: string };
+      // Validate payload
+      const channelPayload = validatePayload("channel:join", message.payload);
+      if (!channelPayload) {
+        sendValidationError();
+        return;
+      }
+      const { channelId } = channelPayload;
       const user = socketUsers.get(socket);
 
       if (!user) {
@@ -121,22 +151,29 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
     }
 
     case "channel:leave": {
-      const { channelId } = message.payload as { channelId: string };
+      // Validate payload
+      const leavePayload = validatePayload("channel:leave", message.payload);
+      if (!leavePayload) {
+        sendValidationError();
+        return;
+      }
       const user = socketUsers.get(socket);
 
       if (user) {
-        channelConnections.get(channelId)?.delete(socket);
-        user.channelIds.delete(channelId);
+        channelConnections.get(leavePayload.channelId)?.delete(socket);
+        user.channelIds.delete(leavePayload.channelId);
       }
       break;
     }
 
     case "message:send": {
-      const { channelId, ciphertext, replyToId } = message.payload as {
-        channelId: string;
-        ciphertext: string;
-        replyToId?: string;
-      };
+      // Validate payload
+      const sendPayload = validatePayload("message:send", message.payload);
+      if (!sendPayload) {
+        sendValidationError();
+        return;
+      }
+      const { channelId, ciphertext, replyToId } = sendPayload;
       const user = socketUsers.get(socket);
 
       if (!user) {
@@ -184,11 +221,13 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
     }
 
     case "message:edit": {
-      const { messageId, channelId, ciphertext } = message.payload as {
-        messageId: string;
-        channelId: string;
-        ciphertext: string;
-      };
+      // Validate payload
+      const editPayload = validatePayload("message:edit", message.payload);
+      if (!editPayload) {
+        sendValidationError();
+        return;
+      }
+      const { messageId, channelId, ciphertext } = editPayload;
       const user = socketUsers.get(socket);
 
       if (!user) {
@@ -235,10 +274,13 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
     }
 
     case "message:delete": {
-      const { messageId, channelId } = message.payload as {
-        messageId: string;
-        channelId: string;
-      };
+      // Validate payload
+      const deletePayload = validatePayload("message:delete", message.payload);
+      if (!deletePayload) {
+        sendValidationError();
+        return;
+      }
+      const { messageId, channelId } = deletePayload;
       const user = socketUsers.get(socket);
 
       if (!user) {
@@ -279,29 +321,44 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
     }
 
     case "typing:start": {
-      const { channelId } = message.payload as { channelId: string };
+      // Validate payload
+      const typingStartPayload = validatePayload("typing:start", message.payload);
+      if (!typingStartPayload) {
+        sendValidationError();
+        return;
+      }
       const user = socketUsers.get(socket);
 
       if (user) {
-        broadcastToChannel(channelId, {
+        broadcastToChannel(typingStartPayload.channelId, {
           type: "typing:update",
-          payload: { channelId, userId: user.userId, isTyping: true },
+          payload: { channelId: typingStartPayload.channelId, userId: user.userId, isTyping: true },
         }, socket);
       }
       break;
     }
 
     case "typing:stop": {
-      const { channelId } = message.payload as { channelId: string };
+      // Validate payload
+      const typingStopPayload = validatePayload("typing:stop", message.payload);
+      if (!typingStopPayload) {
+        sendValidationError();
+        return;
+      }
       const user = socketUsers.get(socket);
 
       if (user) {
-        broadcastToChannel(channelId, {
+        broadcastToChannel(typingStopPayload.channelId, {
           type: "typing:update",
-          payload: { channelId, userId: user.userId, isTyping: false },
+          payload: { channelId: typingStopPayload.channelId, userId: user.userId, isTyping: false },
         }, socket);
       }
       break;
+    }
+
+    default: {
+      // Unknown message type
+      socket.send(JSON.stringify({ type: "error", payload: { message: "Unknown message type" } }));
     }
   }
 }
@@ -323,7 +380,7 @@ function handleDisconnect(socket: WebSocket) {
     socketUsers.delete(socket);
   }
 
-  console.log("WebSocket client disconnected");
+  logger.debug("WebSocket client disconnected");
 }
 
 function handleUserLeaveCommunity(socket: WebSocket, userId: string, communityId: string) {

@@ -7,6 +7,7 @@
  */
 
 import { api } from './api';
+import { logger } from './logger';
 import {
   generateChannelKey,
   exportAesKey,
@@ -86,7 +87,7 @@ export async function ensureChannelKey(
       return { key: channelKey, isNew: false };
     }
   } catch (err) {
-    console.log('No existing channel key found, will create new one');
+    logger.debug('No existing channel key found, will create new one');
   }
 
   // No key exists - we need to create and distribute one
@@ -146,7 +147,7 @@ async function distributeChannelKey(
         encryptedKey,
       });
     } catch (err) {
-      console.error(`Failed to encrypt key for member ${member.id}:`, err);
+      logger.error(`Failed to encrypt key for member ${member.id}:`, err);
     }
   }
 
@@ -188,7 +189,7 @@ export async function decryptChannelMessage(
     return await decryptMessage(ciphertext, key);
   } catch (err) {
     // If decryption fails, return placeholder
-    console.error('Failed to decrypt message:', err);
+    logger.error('Failed to decrypt message:', err);
     return '[Unable to decrypt message]';
   }
 }

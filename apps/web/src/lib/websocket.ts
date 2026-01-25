@@ -1,3 +1,5 @@
+import { logger } from './logger';
+
 type MessageHandler = (message: WsMessage) => void;
 
 interface WsMessage {
@@ -25,7 +27,7 @@ class WebSocketClient {
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
-      console.log("WebSocket connected");
+      logger.debug("WebSocket connected");
       this.reconnectAttempts = 0;
 
       // Authenticate
@@ -42,30 +44,30 @@ class WebSocketClient {
         const message: WsMessage = JSON.parse(event.data);
         this.emit(message.type, message);
       } catch (err) {
-        console.error("Failed to parse WebSocket message:", err);
+        logger.error("Failed to parse WebSocket message:", err);
       }
     };
 
     this.ws.onclose = () => {
-      console.log("WebSocket disconnected");
+      logger.debug("WebSocket disconnected");
       this.attemptReconnect();
     };
 
     this.ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
+      logger.error("WebSocket error:", error);
     };
   }
 
   private attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error("Max reconnect attempts reached");
+      logger.error("Max reconnect attempts reached");
       return;
     }
 
     this.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
 
-    console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+    logger.debug(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
     setTimeout(() => {
       if (this.userId) {

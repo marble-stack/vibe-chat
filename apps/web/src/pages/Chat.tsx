@@ -4,6 +4,7 @@ import { useChatStore } from "../stores/chat";
 import { api } from "../lib/api";
 import { wsClient } from "../lib/websocket";
 import { decryptChannelMessage } from "../lib/channelCrypto";
+import { logger } from "../lib/logger";
 import { Sidebar } from "../components/Sidebar";
 import { ChannelList } from "../components/ChannelList";
 import { MessageList } from "../components/MessageList";
@@ -97,7 +98,7 @@ export function Chat() {
           );
         }
       } catch (err) {
-        console.error('Failed to decrypt message:', err);
+        logger.error('Failed to decrypt message:', err);
         // Keep ciphertext as fallback
       }
 
@@ -168,7 +169,7 @@ export function Chat() {
           );
         }
       } catch (err) {
-        console.error('Failed to decrypt edited message:', err);
+        logger.error('Failed to decrypt edited message:', err);
       }
 
       updateMessage(channelId, id, { ciphertext, plaintext, editedAt });
