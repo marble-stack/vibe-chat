@@ -7,6 +7,7 @@ import { communityRoutes } from "./routes/communities.js";
 import { channelRoutes } from "./routes/channels.js";
 import { messageRoutes } from "./routes/messages.js";
 import { emojiRoutes } from "./routes/emojis.js";
+import { reactionRoutes } from "./routes/reactions.js";
 import { websocketHandler } from "./websocket/index.js";
 import { logger } from "./lib/logger.js";
 import { extractToken, verifyToken } from "./lib/auth.js";
@@ -48,6 +49,7 @@ async function main() {
   await fastify.register(channelRoutes, { prefix: "/api/channels" });
   await fastify.register(messageRoutes, { prefix: "/api/messages" });
   await fastify.register(emojiRoutes, { prefix: "/api/emojis" });
+  await fastify.register(reactionRoutes, { prefix: "/api/reactions" });
 
   // WebSocket
   await fastify.register(websocketHandler);

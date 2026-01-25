@@ -6,6 +6,7 @@ export const users = pgTable("users", {
   email: text("email").unique().notNull(),
   passwordHash: text("password_hash").notNull(),
   displayName: text("display_name").notNull(),
+  passwordHash: text("password_hash").notNull(),
   avatarUrl: text("avatar_url"),
   // Signal Protocol keys (stored as base64)
   identityKeyPublic: text("identity_key_public"),
@@ -96,4 +97,16 @@ export const emojis = pgTable("emojis", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   communityIdx: index("emojis_community_idx").on(table.communityId),
+}));
+
+// Message reactions
+export const reactions = pgTable("reactions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  messageId: uuid("message_id").references(() => messages.id, { onDelete: "cascade" }).notNull(),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  emoji: text("emoji").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  messageIdx: index("reactions_message_idx").on(table.messageId),
+  userMessageEmojiIdx: index("reactions_user_message_emoji_idx").on(table.userId, table.messageId, table.emoji),
 }));
