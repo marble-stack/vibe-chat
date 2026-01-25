@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { db, messages, reactions } from "../db/index.js";
-import { eq, desc, lt, isNull, and } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { canUserAccessChannel } from "../lib/authorization.js";
 
 const sendMessageSchema = z.object({
