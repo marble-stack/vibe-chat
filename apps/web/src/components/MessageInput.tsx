@@ -3,12 +3,14 @@ import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { wsClient } from "../lib/websocket";
 import { encryptChannelMessage } from "../lib/channelCrypto";
+import { hasIdentityKeys } from "../lib/keyStore";
 import { logger } from "../lib/logger";
 
 export function MessageInput() {
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [encryptionError, setEncryptionError] = useState<string | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { activeChannelId, channels, activeCommunityId, members, replyingTo, setReplyingTo } = useChatStore();
@@ -30,6 +32,17 @@ export function MessageInput() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || !activeChannelId || !user || isSending) return;
+
+    // Clear any previous error
+    setEncryptionError(null);
+
+    // Verify identity keys exist before trying to send
+    const keysExist = await hasIdentityKeys();
+    if (!keysExist) {
+      setEncryptionError('Encryption keys not ready. Please refresh the page.');
+      logger.error('Cannot send message: identity keys not found');
+      return;
+    }
 
     // Ensure members are loaded before sending to properly distribute encryption keys
     if (communityMembers.length === 0) {
@@ -60,8 +73,10 @@ export function MessageInput() {
       wsClient.sendMessage(activeChannelId, ciphertext, replyToId);
     } catch (err) {
       logger.error('Failed to encrypt message:', err);
-      // Fallback to plaintext if encryption fails (for backward compatibility)
-      wsClient.sendMessage(activeChannelId, plaintext, replyToId);
+      // Don't send plaintext - show error instead
+      setEncryptionError('Failed to encrypt message. Please try again.');
+      // Restore the message so user doesn't lose it
+      setMessage(plaintext);
     } finally {
       setIsSending(false);
     }
@@ -120,6 +135,19 @@ export function MessageInput() {
 
   return (
     <form onSubmit={handleSubmit} className="px-4 pb-6">
+      {/* Encryption error message */}
+      {encryptionError && (
+        <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-2 rounded-lg mb-2 text-sm flex items-center justify-between">
+          <span>{encryptionError}</span>
+          <button
+            type="button"
+            onClick={() => setEncryptionError(null)}
+            className="ml-2 hover:text-red-300"
+          >
+            ×
+          </button>
+        </div>
+      )}
       {/* Reply preview bar */}
       {replyingTo && (
         <div className="bg-background-tertiary rounded-t-lg border-b border-background-primary px-4 py-2 flex items-center gap-2">
