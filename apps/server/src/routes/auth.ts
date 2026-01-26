@@ -171,10 +171,26 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: "User not found" });
     }
 
-    // Get one prekey (and remove it - one-time use)
-    const [preKey] = await db.delete(preKeys)
-      .where(eq(preKeys.userId, userId))
-      .returning();
+    // Atomically fetch and delete one prekey using a transaction
+    // This prevents concurrent requests from using the same prekey
+    const preKey = await db.transaction(async (tx) => {
+      // Select one prekey with FOR UPDATE to lock the row
+      const [selectedPreKey] = await tx
+        .select()
+        .from(preKeys)
+        .where(eq(preKeys.userId, userId))
+        .limit(1)
+        .for("update", { skipLocked: true });
+
+      if (!selectedPreKey) {
+        return null;
+      }
+
+      // Delete only this specific prekey
+      await tx.delete(preKeys).where(eq(preKeys.id, selectedPreKey.id));
+
+      return selectedPreKey;
+    });
 
     return {
       identityKey: user.identityKeyPublic,

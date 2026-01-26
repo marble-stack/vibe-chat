@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { db, channels, senderKeys } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
+import { canUserAccessChannel } from "../lib/authorization.js";
 
 const createChannelSchema = z.object({
   communityId: z.string().uuid(),
@@ -50,8 +51,24 @@ export const channelRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Distribute sender key to channel members
-  fastify.post("/sender-keys", async (request) => {
+  fastify.post("/sender-keys", async (request, reply) => {
+    // Authorization: require authentication
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
     const body = distributeSenderKeySchema.parse(request.body);
+
+    // Authorization: can only distribute keys for yourself
+    if (request.user.userId !== body.userId) {
+      return reply.status(403).send({ error: "Cannot distribute sender keys for another userId" });
+    }
+
+    // Authorization: must be a member of the channel's community
+    const canAccess = await canUserAccessChannel(request.user.userId, body.channelId);
+    if (!canAccess) {
+      return reply.status(403).send({ error: "Not a member of this channel's community" });
+    }
 
     // Delete existing sender keys from this user for this channel
     await db.delete(senderKeys).where(
@@ -79,8 +96,19 @@ export const channelRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Get sender keys for a channel (for a specific user)
-  fastify.get("/:channelId/sender-keys/:userId", async (request) => {
+  fastify.get("/:channelId/sender-keys/:userId", async (request, reply) => {
+    // Authorization: require authentication
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
     const { channelId, userId } = request.params as { channelId: string; userId: string };
+
+    // Authorization: must be a member of the channel's community
+    const canAccess = await canUserAccessChannel(request.user.userId, channelId);
+    if (!canAccess) {
+      return reply.status(403).send({ error: "Not a member of this channel's community" });
+    }
 
     const keys = await db.query.senderKeys.findMany({
       where: and(
