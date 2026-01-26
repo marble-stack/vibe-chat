@@ -29,15 +29,26 @@ import {
 /**
  * Get or create a channel key for sending messages
  * Returns the key and whether it was newly created
+ *
+ * @param createIfMissing - If true, create a new key when none exists (use for sending).
+ *                          If false, throw an error when no key exists (use for receiving).
  */
 export async function ensureChannelKey(
   channelId: string,
   members: { id: string; displayName: string }[],
-  currentUserId: string
+  currentUserId: string,
+  createIfMissing: boolean = true
 ): Promise<{ key: CryptoKey; isNew: boolean }> {
   // Check if we already have the channel key locally
   const existingKey = await getChannelKey(channelId);
   if (existingKey) {
+    // When sending (createIfMissing=true), redistribute key to all current members
+    // in case new members joined. This ensures new members can decrypt messages.
+    if (createIfMissing) {
+      distributeChannelKey(channelId, existingKey, members, currentUserId).catch((err) => {
+        logger.error('Failed to redistribute channel key:', err);
+      });
+    }
     return { key: existingKey, isNew: false };
   }
 
@@ -87,10 +98,16 @@ export async function ensureChannelKey(
       return { key: channelKey, isNew: false };
     }
   } catch (_err) {
-    logger.debug('No existing channel key found, will create new one');
+    logger.debug('No existing channel key found');
   }
 
-  // No key exists - we need to create and distribute one
+  // No key exists on server for this user
+  if (!createIfMissing) {
+    // For decryption, don't create a new key - throw error so caller can handle gracefully
+    throw new Error('No channel key available. Waiting for key distribution from another member.');
+  }
+
+  // For sending: create and distribute a new key
   const channelKey = await generateChannelKey();
   const keyBase64 = await exportAesKey(channelKey);
 
@@ -185,7 +202,10 @@ export async function decryptChannelMessage(
   currentUserId: string
 ): Promise<string> {
   try {
-    const { key } = await ensureChannelKey(channelId, members, currentUserId);
+    // Pass createIfMissing=false - don't create new keys when decrypting
+    // If no key is available, fail gracefully rather than creating a key
+    // that can't decrypt existing messages
+    const { key } = await ensureChannelKey(channelId, members, currentUserId, false);
     return await decryptMessage(ciphertext, key);
   } catch (err) {
     // If decryption fails, return placeholder
