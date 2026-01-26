@@ -109,9 +109,14 @@ export function Chat() {
 
       // Get current community members for decryption
       const currentCommunityId = activeCommunityRef.current;
-      const currentMembers = currentCommunityId
+      let currentMembers = currentCommunityId
         ? membersRef.current[currentCommunityId] || []
         : [];
+
+      // Ensure current user is in members list for key distribution/retrieval
+      if (user && !currentMembers.some(m => m.id === user.id)) {
+        currentMembers = [...currentMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+      }
 
       // Decrypt the message
       let plaintext = payload.ciphertext;
@@ -180,9 +185,14 @@ export function Chat() {
 
       // Get current community members for decryption
       const currentCommunityId = activeCommunityRef.current;
-      const currentMembers = currentCommunityId
+      let currentMembers = currentCommunityId
         ? membersRef.current[currentCommunityId] || []
         : [];
+
+      // Ensure current user is in members list for key distribution/retrieval
+      if (user && !currentMembers.some(m => m.id === user.id)) {
+        currentMembers = [...currentMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+      }
 
       // Decrypt the updated message
       let plaintext = ciphertext;

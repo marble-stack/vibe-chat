@@ -31,6 +31,17 @@ export function MessageInput() {
     e.preventDefault();
     if (!message.trim() || !activeChannelId || !user || isSending) return;
 
+    // Ensure members are loaded before sending to properly distribute encryption keys
+    if (communityMembers.length === 0) {
+      logger.warn('Members not loaded yet, cannot encrypt message properly');
+      return;
+    }
+
+    // Ensure current user is in the members list for proper key distribution
+    const membersWithSelf = communityMembers.some(m => m.id === user.id)
+      ? communityMembers
+      : [...communityMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+
     const plaintext = message.trim();
     const replyToId = replyingTo?.id;
     setMessage("");
@@ -42,7 +53,7 @@ export function MessageInput() {
       const ciphertext = await encryptChannelMessage(
         activeChannelId,
         plaintext,
-        communityMembers,
+        membersWithSelf,
         user.id
       );
 
@@ -161,6 +172,17 @@ export function MessageInput() {
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+
+        <button
+          type="submit"
+          disabled={!message.trim() || isSending || communityMembers.length === 0}
+          className="text-text-muted hover:text-accent-primary p-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          title={communityMembers.length === 0 ? "Loading..." : "Send message"}
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
           </svg>
         </button>
       </div>
