@@ -114,7 +114,7 @@ export const api = {
       }),
 
     getSenderKeys: (channelId: string, userId: string) =>
-      request<{ senderKeys: { userId: string; distributionId: string; encryptedKey: string }[] }>(
+      request<{ senderKeys: { userId: string; distributionId: string; encryptedKey: string; senderPublicKey?: string }[] }>(
         `/channels/${channelId}/sender-keys/${userId}`
       ),
 
@@ -122,6 +122,7 @@ export const api = {
       channelId: string;
       userId: string;
       distributionId: string;
+      senderPublicKey?: string;
       encryptedKeys: { forUserId: string; encryptedKey: string }[];
     }) =>
       request<{ success: boolean }>("/channels/sender-keys", {

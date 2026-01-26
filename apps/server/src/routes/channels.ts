@@ -12,6 +12,8 @@ const distributeSenderKeySchema = z.object({
   channelId: z.string().uuid(),
   userId: z.string().uuid(),
   distributionId: z.string(),
+  // Sender's public key at the time of distribution (for decryption after key rotation)
+  senderPublicKey: z.string().optional(),
   // Array of { forUserId, encryptedKey } - key encrypted for each recipient
   encryptedKeys: z.array(z.object({
     forUserId: z.string().uuid(),
@@ -68,6 +70,7 @@ export const channelRoutes: FastifyPluginAsync = async (fastify) => {
           distributionId: body.distributionId,
           encryptedKey: ek.encryptedKey,
           forUserId: ek.forUserId,
+          senderPublicKey: body.senderPublicKey,
         }))
       );
     }

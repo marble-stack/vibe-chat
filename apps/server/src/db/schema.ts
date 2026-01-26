@@ -65,6 +65,8 @@ export const senderKeys = pgTable("sender_keys", {
   // Encrypted sender key (encrypted to each recipient)
   encryptedKey: text("encrypted_key").notNull(),
   forUserId: uuid("for_user_id").references(() => users.id).notNull(),
+  // Sender's public key at the time of distribution (for decryption after key rotation)
+  senderPublicKey: text("sender_public_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   channelUserIdx: index("sender_keys_channel_user_idx").on(table.channelId, table.forUserId),
