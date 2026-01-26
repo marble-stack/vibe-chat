@@ -8,7 +8,7 @@ interface ChannelListProps {
   onOpenSidebar?: () => void;
 }
 
-export function ChannelList({ showOnMobile = true, onOpenSidebar: _onOpenSidebar }: ChannelListProps) {
+export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListProps) {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const {
@@ -51,6 +51,18 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar: _onOpenSidebar
   if (!activeCommunityId) {
     return (
       <div className={`w-full md:w-60 bg-background-secondary flex flex-col ${showOnMobile ? 'flex' : 'hidden md:flex'}`}>
+        {/* Mobile header with hamburger menu */}
+        <div className="h-12 px-4 flex items-center border-b border-background-tertiary shadow-sm md:hidden">
+          <button
+            onClick={onOpenSidebar}
+            className="p-1 -ml-1 text-text-muted hover:text-text-primary"
+            title="Open sidebar"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
         <div className="flex-1 flex items-center justify-center text-text-muted">
           Select a community
         </div>
