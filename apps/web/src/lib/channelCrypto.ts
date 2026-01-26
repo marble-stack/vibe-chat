@@ -68,22 +68,24 @@ export async function ensureChannelKey(
       // We have a sender key from another user - decrypt it
       const senderKey = senderKeys[0]; // Take the first available
 
-      // Get the sender's public key
-      let senderPublicKey = await getUserKey(senderKey.userId);
-
-      if (!senderPublicKey) {
-        // Fetch sender's public key from server
-        const userKeys = await api.auth.getUserKeys(senderKey.userId);
-        senderPublicKey = {
-          userId: senderKey.userId,
-          identityKeyPublic: userKeys.identityKey,
-          signedPreKeyPublic: userKeys.signedPreKey.publicKey,
-        };
-        await storeUserKey(
-          senderKey.userId,
-          userKeys.identityKey,
-          userKeys.signedPreKey.publicKey
-        );
+      // Use stored sender public key if available (for keys distributed after this fix)
+      // Fall back to fetching from server for backward compatibility
+      let senderPublicKeyValue = senderKey.senderPublicKey;
+      if (!senderPublicKeyValue) {
+        // Try local cache first
+        const cachedKey = await getUserKey(senderKey.userId);
+        if (cachedKey) {
+          senderPublicKeyValue = cachedKey.identityKeyPublic;
+        } else {
+          // Fetch sender's public key from server
+          const userKeys = await api.auth.getUserKeys(senderKey.userId);
+          senderPublicKeyValue = userKeys.identityKey;
+          await storeUserKey(
+            senderKey.userId,
+            userKeys.identityKey,
+            userKeys.signedPreKey.publicKey
+          );
+        }
       }
 
       // Decrypt the channel key
@@ -91,7 +93,7 @@ export async function ensureChannelKey(
       const channelKey = await decryptChannelKey(
         senderKey.encryptedKey,
         privateKey,
-        senderPublicKey.identityKeyPublic
+        senderPublicKeyValue
       );
 
       // Store locally
@@ -175,6 +177,8 @@ async function distributeChannelKey(
       channelId,
       userId: currentUserId,
       distributionId: crypto.randomUUID(),
+      // Include sender's public key for decryption after key rotation
+      senderPublicKey: identityKeys.identityKeyPair.publicKey,
       encryptedKeys,
     });
   }
@@ -230,13 +234,18 @@ export async function decryptChannelMessage(
       // Try each sender key until one works
       for (const senderKey of senderKeys) {
         try {
-          // Always fetch fresh public key from server
-          const userKeys = await api.auth.getUserKeys(senderKey.userId);
+          // Use stored sender public key if available (for keys distributed after this fix)
+          // Fall back to fetching from server for backward compatibility
+          let senderPublicKey = senderKey.senderPublicKey;
+          if (!senderPublicKey) {
+            const userKeys = await api.auth.getUserKeys(senderKey.userId);
+            senderPublicKey = userKeys.identityKey;
+          }
 
           const channelKey = await decryptChannelKey(
             senderKey.encryptedKey,
             privateKey,
-            userKeys.identityKey
+            senderPublicKey
           );
 
           // Store the working key locally

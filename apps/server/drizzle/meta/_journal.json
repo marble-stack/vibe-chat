@@ -29,6 +29,13 @@
       "when": 1769344962223,
       "tag": "0002_absurd_shard",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1737907200000,
+      "tag": "0003_add_sender_public_key",
+      "breakpoints": true
     }
   ]
 }
