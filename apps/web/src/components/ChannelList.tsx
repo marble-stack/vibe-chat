@@ -150,7 +150,7 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar: _onOpenSidebar
       {/* Create channel modal */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCreate(false)}>
-          <div className="bg-background-secondary rounded-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-background-secondary rounded-lg p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-bold text-text-primary mb-4">Create Channel</h2>
             <div className="flex items-center gap-2 bg-background-tertiary rounded px-3 py-2 mb-4">
               <span className="text-text-muted text-lg">#</span>
@@ -184,7 +184,7 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar: _onOpenSidebar
       {/* Invite modal */}
       {showInvite && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowInvite(false)}>
-          <div className="bg-background-secondary rounded-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-background-secondary rounded-lg p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-bold text-text-primary mb-4">Invite Friends</h2>
             <p className="text-text-secondary mb-4">Share this invite code:</p>
             <div className="flex items-center gap-2 bg-background-tertiary rounded px-3 py-2 mb-4">

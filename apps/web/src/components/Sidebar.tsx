@@ -98,7 +98,7 @@ export function Sidebar({ showMobile, onClose }: SidebarProps) {
       {/* Create modal */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCreate(false)}>
-          <div className="bg-background-secondary rounded-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-background-secondary rounded-lg p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-bold text-text-primary mb-4">Create a Community</h2>
             <input
               type="text"
@@ -129,7 +129,7 @@ export function Sidebar({ showMobile, onClose }: SidebarProps) {
       {/* Join modal */}
       {showJoin && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowJoin(false)}>
-          <div className="bg-background-secondary rounded-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-background-secondary rounded-lg p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-bold text-text-primary mb-4">Join a Community</h2>
             <input
               type="text"
