@@ -142,18 +142,16 @@ async function distributeChannelKey(
 
   for (const member of members) {
     try {
-      // Get or fetch member's public key
-      let memberKey = await getUserKey(member.id);
-
-      if (!memberKey) {
-        const userKeys = await api.auth.getUserKeys(member.id);
-        memberKey = {
-          userId: member.id,
-          identityKeyPublic: userKeys.identityKey,
-          signedPreKeyPublic: userKeys.signedPreKey.publicKey,
-        };
-        await storeUserKey(member.id, userKeys.identityKey, userKeys.signedPreKey.publicKey);
-      }
+      // Always fetch fresh keys from server to handle key regeneration
+      // Users may have regenerated their keys on a new device
+      const userKeys = await api.auth.getUserKeys(member.id);
+      const memberKey = {
+        userId: member.id,
+        identityKeyPublic: userKeys.identityKey,
+        signedPreKeyPublic: userKeys.signedPreKey.publicKey,
+      };
+      // Update local cache with fresh keys
+      await storeUserKey(member.id, userKeys.identityKey, userKeys.signedPreKey.publicKey);
 
       // Encrypt channel key for this member
       const encryptedKey = await encryptChannelKeyForRecipient(
