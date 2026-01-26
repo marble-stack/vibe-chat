@@ -199,7 +199,7 @@ export async function encryptChannelMessage(
 export async function decryptChannelMessage(
   channelId: string,
   ciphertext: string,
-  members: { id: string; displayName: string }[],
+  _members: { id: string; displayName: string }[],
   currentUserId: string
 ): Promise<string> {
   // Check if we have identity keys - if not, encryption is not set up
