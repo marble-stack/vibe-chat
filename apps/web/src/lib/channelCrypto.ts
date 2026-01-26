@@ -44,10 +44,13 @@ export async function ensureChannelKey(
   if (existingKey) {
     // When sending (createIfMissing=true), redistribute key to all current members
     // in case new members joined. This ensures new members can decrypt messages.
-    if (createIfMissing) {
-      distributeChannelKey(channelId, existingKey, members, currentUserId).catch((err) => {
+    if (createIfMissing && members.length > 0) {
+      try {
+        await distributeChannelKey(channelId, existingKey, members, currentUserId);
+      } catch (err) {
         logger.error('Failed to redistribute channel key:', err);
-      });
+        // Continue anyway - we still have the key locally
+      }
     }
     return { key: existingKey, isNew: false };
   }

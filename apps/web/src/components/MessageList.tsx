@@ -54,6 +54,11 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     const loadMessages = async () => {
       const { messages: msgs } = await api.messages.list(activeChannelId);
 
+      // Ensure current user is in members list for key distribution/retrieval
+      const membersForDecryption = communityMembers.some(m => m.id === user.id)
+        ? communityMembers
+        : [...communityMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+
       // Decrypt each message
       const decrypted = await Promise.all(
         msgs.map(async (m) => {
@@ -62,7 +67,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
             plaintext = await decryptChannelMessage(
               activeChannelId,
               m.ciphertext,
-              communityMembers,
+              membersForDecryption,
               user.id
             );
           } catch (err) {
