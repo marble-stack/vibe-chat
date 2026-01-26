@@ -60,6 +60,24 @@ export const api = {
         signedPreKey: { publicKey: string; signature: string };
         preKey: { keyId: string; publicKey: string } | null;
       }>(`/auth/users/${userId}/keys`),
+
+    updateKeys: (data: {
+      identityKeyPublic: string;
+      signedPreKeyPublic: string;
+      signedPreKeySignature: string;
+      preKeys: { keyId: string; publicKey: string }[];
+    }, token: string) =>
+      fetch(`${API_BASE}/auth/keys`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      }).then(res => {
+        if (!res.ok) throw new Error("Failed to update keys");
+        return res.json();
+      }),
   },
 
   communities: {

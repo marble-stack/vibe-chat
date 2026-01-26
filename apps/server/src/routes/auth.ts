@@ -22,6 +22,16 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
+const updateKeysSchema = z.object({
+  identityKeyPublic: z.string(),
+  signedPreKeyPublic: z.string(),
+  signedPreKeySignature: z.string(),
+  preKeys: z.array(z.object({
+    keyId: z.string(),
+    publicKey: z.string(),
+  })),
+});
+
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
   // Register new user
   fastify.post("/register", async (request, reply) => {
@@ -114,6 +124,39 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       user: { id: user.id, email: user.email, displayName: user.displayName },
     };
+  });
+
+  // Update user's encryption keys (for device recovery/new device)
+  fastify.put("/keys", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Not authenticated" });
+    }
+
+    const body = updateKeysSchema.parse(request.body);
+
+    // Update user's keys
+    await db.update(users)
+      .set({
+        identityKeyPublic: body.identityKeyPublic,
+        signedPreKeyPublic: body.signedPreKeyPublic,
+        signedPreKeySignature: body.signedPreKeySignature,
+      })
+      .where(eq(users.id, request.user.userId));
+
+    // Delete old prekeys and insert new ones
+    await db.delete(preKeys).where(eq(preKeys.userId, request.user.userId));
+
+    if (body.preKeys.length > 0) {
+      await db.insert(preKeys).values(
+        body.preKeys.map((pk) => ({
+          userId: request.user!.userId,
+          keyId: pk.keyId,
+          publicKey: pk.publicKey,
+        }))
+      );
+    }
+
+    return { success: true };
   });
 
   // Get user's key bundle (for establishing encrypted session)
