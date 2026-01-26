@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
+import { generateIdentityKeys } from "../lib/crypto";
+import { storeIdentityKeys, hasIdentityKeys } from "../lib/keyStore";
 
 export function Login() {
   const [email, setEmail] = useState("");
@@ -17,6 +19,21 @@ export function Login() {
 
     try {
       const { user, token } = await api.auth.login(email, password);
+
+      // Check if we have identity keys locally
+      const hasKeys = await hasIdentityKeys();
+      if (!hasKeys) {
+        // Regenerate keys for this device and update on server
+        // Note: This means old messages encrypted for the old keys won't be decryptable
+        const { keys, publicBundle } = await generateIdentityKeys();
+
+        // Update keys on server
+        await api.auth.updateKeys(publicBundle, token);
+
+        // Store new keys locally
+        await storeIdentityKeys(user.id, keys);
+      }
+
       setAuth(user, token);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

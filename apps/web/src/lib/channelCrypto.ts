@@ -204,15 +204,32 @@ export async function decryptChannelMessage(
   members: { id: string; displayName: string }[],
   currentUserId: string
 ): Promise<string> {
+  // Check if we have identity keys - if not, encryption is not set up
+  const identityKeys = await getIdentityKeys();
+  if (!identityKeys) {
+    logger.warn('No identity keys found - encryption not set up for this device');
+    return '[Encryption not set up - please re-register]';
+  }
+
   try {
-    // Pass createIfMissing=false - don't create new keys when decrypting
-    // If no key is available, fail gracefully rather than creating a key
-    // that can't decrypt existing messages
+    // First try to get the key without creating one
     const { key } = await ensureChannelKey(channelId, members, currentUserId, false);
     return await decryptMessage(ciphertext, key);
   } catch (err) {
-    // If decryption fails, return placeholder
     logger.error('Failed to decrypt message:', err);
+
+    // If we don't have a key, try to create one so future messages work
+    // This won't help decrypt THIS message (it was encrypted with a different key)
+    // but it will allow the channel to function going forward
+    try {
+      if (members.length > 0) {
+        await ensureChannelKey(channelId, members, currentUserId, true);
+        logger.info('Created channel key for future messages');
+      }
+    } catch (keyErr) {
+      logger.error('Failed to create channel key:', keyErr);
+    }
+
     return '[Unable to decrypt message]';
   }
 }
