@@ -8,7 +8,7 @@ interface ChannelListProps {
   onOpenSidebar?: () => void;
 }
 
-export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListProps) {
+export function ChannelList({ showOnMobile = true, onOpenSidebar: _onOpenSidebar }: ChannelListProps) {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const {
