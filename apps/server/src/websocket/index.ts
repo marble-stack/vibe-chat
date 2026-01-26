@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { validatePayload } from "./schemas.js";
 import { isUserInCommunity, canUserAccessChannel } from "../lib/authorization.js";
+import { verifyToken } from "../lib/auth.js";
 
 // Map of channelId -> Set of connected WebSockets
 const channelConnections = new Map<string, Set<WebSocket>>();
@@ -58,9 +59,16 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
         return;
       }
 
-      // Associate user with socket
-      socketUsers.set(socket, { userId: payload.userId, channelIds: new Set(), communityIds: new Set() });
-      socket.send(JSON.stringify({ type: "auth:success", payload: {} }));
+      // Verify JWT token and extract userId
+      const tokenPayload = verifyToken(payload.token);
+      if (!tokenPayload) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Invalid or expired token" } }));
+        return;
+      }
+
+      // Associate user with socket using verified userId from token
+      socketUsers.set(socket, { userId: tokenPayload.userId, channelIds: new Set(), communityIds: new Set() });
+      socket.send(JSON.stringify({ type: "auth:success", payload: { userId: tokenPayload.userId } }));
       break;
     }
 

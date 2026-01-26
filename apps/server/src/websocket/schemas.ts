@@ -6,9 +6,9 @@ export const baseMessageSchema = z.object({
   payload: z.record(z.unknown()),
 });
 
-// Auth message
+// Auth message - requires JWT token, userId is extracted server-side
 export const authPayloadSchema = z.object({
-  userId: z.string().uuid(),
+  token: z.string().min(1),
 });
 
 // Community messages
