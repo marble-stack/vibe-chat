@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
 import { generateIdentityKeys } from "../lib/crypto";
-import { storeIdentityKeys } from "../lib/keyStore";
+import { storeIdentityKeys, clearAllKeys } from "../lib/keyStore";
 
 export function Login() {
   const [email, setEmail] = useState("");
@@ -20,8 +20,11 @@ export function Login() {
     try {
       const { user, token } = await api.auth.login(email, password);
 
-      // Always regenerate keys on login to ensure local keys match server
-      // This handles cases where IndexedDB was partially cleared or keys got out of sync
+      // Clear all old keys to ensure clean state
+      // Old channel keys might be corrupted or from a different session
+      await clearAllKeys();
+
+      // Generate fresh identity keys
       const { keys, publicBundle } = await generateIdentityKeys();
 
       // Update keys on server
