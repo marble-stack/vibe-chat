@@ -97,27 +97,27 @@ export function Sidebar({ showMobile, onClose }: SidebarProps) {
 
       {/* Create modal */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCreate(false)}>
-          <div className="bg-background-secondary rounded-lg p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-text-primary mb-4">Create a Community</h2>
+        <div className="fixed left-0 top-0 w-screen h-screen bg-black/50 flex items-center justify-center z-[100]" onClick={() => setShowCreate(false)}>
+          <div className="bg-background-secondary rounded-lg p-8 w-[90vw] max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold text-text-primary mb-6">Create a Community</h2>
             <input
               type="text"
               placeholder="Community name"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="w-full bg-background-tertiary text-text-primary rounded px-3 py-2 mb-4 outline-none focus:ring-2 focus:ring-accent-primary"
+              className="w-full bg-background-primary border border-text-muted/30 text-text-primary placeholder:text-text-muted rounded px-4 py-3 mb-6 text-lg outline-none focus:ring-2 focus:ring-accent-primary"
               autoFocus
             />
-            <div className="flex gap-2 justify-end">
+            <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setShowCreate(false)}
-                className="px-4 py-2 text-text-secondary hover:underline"
+                className="px-5 py-2.5 text-text-secondary hover:text-text-primary transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreate}
-                className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-white rounded"
+                className="px-5 py-2.5 bg-accent-primary hover:bg-accent-hover text-white rounded font-medium"
               >
                 Create
               </button>
@@ -128,27 +128,27 @@ export function Sidebar({ showMobile, onClose }: SidebarProps) {
 
       {/* Join modal */}
       {showJoin && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowJoin(false)}>
-          <div className="bg-background-secondary rounded-lg p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-text-primary mb-4">Join a Community</h2>
+        <div className="fixed left-0 top-0 w-screen h-screen bg-black/50 flex items-center justify-center z-[100]" onClick={() => setShowJoin(false)}>
+          <div className="bg-background-secondary rounded-lg p-8 w-[90vw] max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold text-text-primary mb-6">Join a Community</h2>
             <input
               type="text"
               placeholder="Invite code"
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value)}
-              className="w-full bg-background-tertiary text-text-primary rounded px-3 py-2 mb-4 outline-none focus:ring-2 focus:ring-accent-primary"
+              className="w-full bg-background-primary border border-text-muted/30 text-text-primary placeholder:text-text-muted rounded px-4 py-3 mb-6 text-lg outline-none focus:ring-2 focus:ring-accent-primary"
               autoFocus
             />
-            <div className="flex gap-2 justify-end">
+            <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setShowJoin(false)}
-                className="px-4 py-2 text-text-secondary hover:underline"
+                className="px-5 py-2.5 text-text-secondary hover:text-text-primary transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleJoin}
-                className="px-4 py-2 bg-accent-primary hover:bg-accent-hover text-white rounded"
+                className="px-5 py-2.5 bg-accent-primary hover:bg-accent-hover text-white rounded font-medium"
               >
                 Join
               </button>
