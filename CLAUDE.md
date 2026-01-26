@@ -104,31 +104,26 @@ Copy `apps/web/.env.example` to `apps/web/.env` if you need to override default 
 
 ## Current Status
 
-**Database**: Neon PostgreSQL is configured and ready (connection string in `apps/server/.env`)
+**Deployed and Live on Railway**
 
-**What's Next**: Deploy to Railway
+- **Database**: Neon PostgreSQL (connection string in `apps/server/.env`)
+- **Backend**: Deployed on Railway with Redis
+- **Frontend**: Deployed on Railway
 
-### Railway Deployment Steps
-1. Install Railway CLI: `npm install -g @railway/cli`
-2. Login to Railway: `railway login`
-3. Create project: `railway init`
-4. Add Redis in Railway dashboard (New → Database → Redis)
-5. Set environment variables in Railway dashboard:
-   - `DATABASE_URL` = your Neon URL (copy from apps/server/.env)
-   - `REDIS_URL` = provided by Railway Redis
-   - `PORT` = 3000
-   - `HOST` = 0.0.0.0
-   - `CORS_ORIGIN` = your frontend URL (set after deploying frontend)
-6. Create Railway config files for server and web apps
-7. Deploy backend and frontend
-8. Test the deployed app
-
-### After Deployment - Test These Features
+### Working Features
 - User registration and login
-- Community creation
+- Community creation and joining (via invite codes)
 - Channel creation within communities
 - Real-time messaging via WebSockets
 - Emoji reactions
+
+### Recent Fixes (Jan 2025)
+- Fixed modal positioning for create/join community on mobile and laptop screens
+- Fixed @fastify/rate-limit compatibility with Fastify 4.x
+- Fixed production migrations for Railway deployment
+
+### Workflow Note
+Always push changes after making edits so Railway auto-deploys.
 
 ## Local Development (Alternative)
 
