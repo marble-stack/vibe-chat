@@ -21,7 +21,11 @@
       "Bash(powershell -command:*)",
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: Vibe Chat E2E encrypted messaging app\n\n- Fastify + WebSocket backend with Drizzle ORM\n- React + Vite frontend with Zustand state management\n- Docker Compose setup for PostgreSQL + Redis\n- Community/Channel/Message data model\n- Real-time messaging via WebSocket\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git rebase:*)"
+      "Bash(git push:*)",
+      "Bash(railway:*)",
+      "Bash(git commit:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)"
     ]
   }
 }

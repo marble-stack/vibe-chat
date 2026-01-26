@@ -3,13 +3,9 @@ import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
 
-interface ChannelListProps {
-  showOnMobile: boolean;
-  onOpenSidebar: () => void;
-}
-
-export function ChannelList({ showOnMobile, onOpenSidebar }: ChannelListProps) {
+export function ChannelList() {
   const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
   const {
     communities,
     channels,
@@ -49,26 +45,38 @@ export function ChannelList({ showOnMobile, onOpenSidebar }: ChannelListProps) {
 
   if (!activeCommunityId) {
     return (
-      <div className={`w-60 bg-background-secondary flex items-center justify-center text-text-muted ${showOnMobile ? 'flex' : 'hidden md:flex'}`}>
-        Select a community
+      <div className="w-60 bg-background-secondary flex flex-col">
+        <div className="flex-1 flex items-center justify-center text-text-muted">
+          Select a community
+        </div>
+        {/* User info */}
+        <div className="h-14 px-2 flex items-center gap-2 bg-background-tertiary/50">
+          <div className="w-8 h-8 rounded-full bg-accent-primary flex items-center justify-center text-white text-sm font-medium">
+            {user?.displayName.charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-text-primary truncate">
+              {user?.displayName}
+            </div>
+          </div>
+          <button
+            onClick={logout}
+            className="p-1.5 text-text-muted hover:text-text-primary hover:bg-background-primary/50 rounded transition-colors"
+            title="Log out"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={`w-60 bg-background-secondary flex flex-col ${showOnMobile ? 'flex' : 'hidden md:flex'}`}>
+    <div className="w-60 bg-background-secondary flex flex-col">
       {/* Community header */}
       <div className="h-12 px-4 flex items-center justify-between border-b border-background-tertiary shadow-sm">
-        {/* Hamburger menu button - only on mobile */}
-        <button
-          onClick={onOpenSidebar}
-          className="text-text-muted hover:text-text-primary md:hidden mr-2"
-          title="Open sidebar"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
         <span className="font-semibold text-text-primary truncate">
           {activeCommunity?.name}
         </span>
@@ -123,6 +131,15 @@ export function ChannelList({ showOnMobile, onOpenSidebar }: ChannelListProps) {
             {user?.displayName}
           </div>
         </div>
+        <button
+          onClick={logout}
+          className="p-1.5 text-text-muted hover:text-text-primary hover:bg-background-primary/50 rounded transition-colors"
+          title="Log out"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
       </div>
 
       {/* Create channel modal */}

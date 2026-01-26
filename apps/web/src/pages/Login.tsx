@@ -29,7 +29,14 @@ export function Login() {
     <div className="min-h-screen bg-background-tertiary flex items-center justify-center p-4">
       <div className="bg-background-secondary rounded-lg p-8 w-full max-w-md">
         <h1 className="text-2xl font-bold text-text-primary mb-2">Welcome back!</h1>
-        <p className="text-text-secondary mb-6">We're so excited to see you again!</p>
+        <p className="text-text-secondary mb-4">We're so excited to see you again!</p>
+
+        <Link
+          to="/register"
+          className="block w-full text-center py-2 mb-6 border border-accent-primary text-accent-primary hover:bg-accent-primary/10 rounded transition-colors"
+        >
+          New here? Create an account
+        </Link>
 
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
@@ -71,12 +78,6 @@ export function Login() {
           </button>
         </form>
 
-        <p className="text-text-secondary text-sm mt-4">
-          Need an account?{" "}
-          <Link to="/register" className="text-accent-primary hover:underline">
-            Register
-          </Link>
-        </p>
       </div>
     </div>
   );

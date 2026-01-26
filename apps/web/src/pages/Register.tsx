@@ -58,7 +58,14 @@ export function Register() {
     <div className="min-h-screen bg-background-tertiary flex items-center justify-center p-4">
       <div className="bg-background-secondary rounded-lg p-8 w-full max-w-md">
         <h1 className="text-2xl font-bold text-text-primary mb-2">Create an account</h1>
-        <p className="text-text-secondary mb-6">Join Vibe Chat today</p>
+        <p className="text-text-secondary mb-4">Join Vibe Chat today</p>
+
+        <Link
+          to="/login"
+          className="block w-full text-center py-2 mb-6 border border-accent-primary text-accent-primary hover:bg-accent-primary/10 rounded transition-colors"
+        >
+          Already have an account? Log in
+        </Link>
 
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
@@ -129,12 +136,6 @@ export function Register() {
           </button>
         </form>
 
-        <p className="text-text-secondary text-sm mt-4">
-          Already have an account?{" "}
-          <Link to="/login" className="text-accent-primary hover:underline">
-            Log In
-          </Link>
-        </p>
       </div>
     </div>
   );

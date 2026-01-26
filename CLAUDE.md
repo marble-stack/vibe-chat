@@ -102,15 +102,37 @@ Copy `apps/web/.env.example` to `apps/web/.env` if you need to override default 
 
 **WebSocket Validation:** All WebSocket messages are validated with Zod schemas.
 
-## Current Setup Status
+## Current Status
 
-**Next step:** Install Docker Desktop for Windows, then run the setup commands.
+**Database**: Neon PostgreSQL is configured and ready (connection string in `apps/server/.env`)
 
-Docker is required for the PostgreSQL and Redis containers. If you don't want to use Docker, alternatives are:
-1. Install PostgreSQL and Redis locally on Windows and update `.env` connection strings
-2. Use a cloud-hosted PostgreSQL (Supabase, Neon, Railway) and update `DATABASE_URL`
+**What's Next**: Deploy to Railway
 
-**After Docker is installed, run:**
+### Railway Deployment Steps
+1. Install Railway CLI: `npm install -g @railway/cli`
+2. Login to Railway: `railway login`
+3. Create project: `railway init`
+4. Add Redis in Railway dashboard (New → Database → Redis)
+5. Set environment variables in Railway dashboard:
+   - `DATABASE_URL` = your Neon URL (copy from apps/server/.env)
+   - `REDIS_URL` = provided by Railway Redis
+   - `PORT` = 3000
+   - `HOST` = 0.0.0.0
+   - `CORS_ORIGIN` = your frontend URL (set after deploying frontend)
+6. Create Railway config files for server and web apps
+7. Deploy backend and frontend
+8. Test the deployed app
+
+### After Deployment - Test These Features
+- User registration and login
+- Community creation
+- Channel creation within communities
+- Real-time messaging via WebSockets
+- Emoji reactions
+
+## Local Development (Alternative)
+
+If you want to run locally instead of deploying:
 ```bash
 docker compose up -d          # Start PostgreSQL + Redis
 pnpm install                  # Install dependencies
