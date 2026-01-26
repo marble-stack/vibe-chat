@@ -5,7 +5,7 @@ buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @vibe-chat/serve
 
 [deploy]
 # Run migrations then start the server
-startCommand = "pnpm --filter @vibe-chat/server db:migrate:prod && node apps/server/dist/index.js"
+startCommand = "node apps/server/dist/index.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"
