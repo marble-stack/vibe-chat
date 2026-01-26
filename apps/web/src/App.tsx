@@ -6,6 +6,17 @@ import { Chat } from "./pages/Chat";
 
 function App() {
   const user = useAuthStore((state) => state.user);
+  const hasHydrated = useAuthStore((state) => state._hasHydrated);
+
+  // Show loading while auth store is rehydrating from localStorage
+  // This prevents incorrect redirects on mobile before auth is restored
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen bg-background-tertiary flex items-center justify-center">
+        <div className="text-text-secondary">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <Routes>
