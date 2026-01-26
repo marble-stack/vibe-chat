@@ -13,6 +13,7 @@ import { MemberList } from "../components/MemberList";
 
 export function Chat() {
   const user = useAuthStore((state) => state.user);
+  const hasHydrated = useAuthStore((state) => state._hasHydrated);
   const {
     activeCommunityId,
     activeChannelId,
@@ -48,14 +49,30 @@ export function Chat() {
     activeCommunityRef.current = activeCommunityId;
   }, [members, activeCommunityId]);
 
-  // Load communities on mount
+  // Load communities on mount (wait for auth store to rehydrate first)
   useEffect(() => {
-    if (!user) return;
+    if (!user || !hasHydrated) return;
 
-    api.communities.list(user.id).then(({ communities }) => {
-      setCommunities(communities);
-    });
-  }, [user, setCommunities]);
+    const loadCommunities = async () => {
+      try {
+        const { communities } = await api.communities.list(user.id);
+        setCommunities(communities);
+      } catch (err) {
+        logger.error('Failed to load communities:', err);
+        // Retry once after a short delay (helps with mobile auth timing)
+        setTimeout(async () => {
+          try {
+            const { communities } = await api.communities.list(user.id);
+            setCommunities(communities);
+          } catch (retryErr) {
+            logger.error('Failed to load communities on retry:', retryErr);
+          }
+        }, 500);
+      }
+    };
+
+    loadCommunities();
+  }, [user, hasHydrated, setCommunities]);
 
   // Load community details when active community changes
   useEffect(() => {
