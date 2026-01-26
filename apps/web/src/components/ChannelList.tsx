@@ -50,7 +50,7 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar: _onOpenSidebar
 
   if (!activeCommunityId) {
     return (
-      <div className={`w-60 bg-background-secondary flex flex-col ${showOnMobile ? 'flex' : 'hidden md:flex'}`}>
+      <div className={`w-full md:w-60 bg-background-secondary flex flex-col ${showOnMobile ? 'flex' : 'hidden md:flex'}`}>
         <div className="flex-1 flex items-center justify-center text-text-muted">
           Select a community
         </div>
@@ -79,7 +79,7 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar: _onOpenSidebar
   }
 
   return (
-    <div className={`w-60 bg-background-secondary flex flex-col ${showOnMobile ? 'flex' : 'hidden md:flex'}`}>
+    <div className={`w-full md:w-60 bg-background-secondary flex flex-col ${showOnMobile ? 'flex' : 'hidden md:flex'}`}>
       {/* Community header */}
       <div className="h-12 px-4 flex items-center justify-between border-b border-background-tertiary shadow-sm">
         <span className="font-semibold text-text-primary truncate">
