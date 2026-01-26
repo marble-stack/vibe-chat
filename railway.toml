@@ -1,11 +1,11 @@
 [build]
 builder = "NIXPACKS"
-# Install all dependencies, build the server, and run migrations
-buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @vibe-chat/server build && pnpm --filter @vibe-chat/server db:migrate"
+# Install all dependencies and build the server
+buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @vibe-chat/server build"
 
 [deploy]
-# Start command runs from the monorepo root, so specify the path to the built server
-startCommand = "node apps/server/dist/index.js"
+# Run migrations then start the server
+startCommand = "pnpm --filter @vibe-chat/server db:migrate:prod && node apps/server/dist/index.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"
