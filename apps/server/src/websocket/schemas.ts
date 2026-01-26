@@ -52,6 +52,20 @@ export const typingPayloadSchema = z.object({
   channelId: z.string().uuid(),
 });
 
+// Reaction payloads
+export const reactionAddPayloadSchema = z.object({
+  messageId: z.string().uuid(),
+  channelId: z.string().uuid(),
+  emoji: z.string().min(1).max(200), // Allow emojis and custom emoji IDs
+});
+
+export const reactionRemovePayloadSchema = z.object({
+  reactionId: z.string().uuid(),
+  channelId: z.string().uuid(),
+  messageId: z.string().uuid(),
+  emoji: z.string().min(1).max(200),
+});
+
 // Message type to schema mapping
 export const payloadSchemas = {
   auth: authPayloadSchema,
@@ -64,6 +78,8 @@ export const payloadSchemas = {
   "message:delete": messageDeletePayloadSchema,
   "typing:start": typingPayloadSchema,
   "typing:stop": typingPayloadSchema,
+  "reaction:add": reactionAddPayloadSchema,
+  "reaction:remove": reactionRemovePayloadSchema,
 } as const;
 
 export type MessageType = keyof typeof payloadSchemas;

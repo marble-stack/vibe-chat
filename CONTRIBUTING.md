@@ -144,13 +144,59 @@ vibe-chat/
 
 ## Testing
 
-Currently, the project needs test coverage. Contributions adding tests are especially welcome!
+This project uses **Test-Driven Development (TDD)**. All contributions must include tests.
 
-Areas needing tests:
-- Crypto functions (unit tests)
-- API routes (integration tests)
-- WebSocket handlers (integration tests)
-- React components (component tests)
+### Running Tests
+
+```bash
+# Run all tests
+pnpm test
+
+# Watch mode for development
+pnpm test:watch
+
+# With coverage report
+pnpm test:coverage
+
+# Server tests only
+pnpm --filter server test
+
+# Web tests only
+pnpm --filter web test
+```
+
+### TDD Workflow
+
+1. **Write a failing test** that describes the desired behavior
+2. **Write minimal code** to make the test pass
+3. **Refactor** while keeping tests green
+
+### Test Structure
+
+```
+apps/server/src/__tests__/
+├── db/            # Database operation tests
+├── lib/           # Unit tests for utilities (auth, etc.)
+├── routes/        # API endpoint integration tests
+└── websocket/     # WebSocket handler tests
+
+apps/web/src/__tests__/
+├── lib/           # Crypto and utility tests
+└── components/    # Component tests (planned)
+```
+
+### Coverage Requirements
+
+- Security-critical code (crypto, auth): **80% minimum**
+- Overall coverage: **70% minimum**
+- All new code must include tests
+
+### Security Code Requirements
+
+For security-sensitive code (auth, crypto, WebSocket):
+- 100% test coverage for new code paths
+- Input validation with Zod schemas
+- Authorization checks for all user data access
 
 ## Security
 

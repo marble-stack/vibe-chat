@@ -97,6 +97,39 @@ vibe-chat/
     └── shared/           # Shared TypeScript types
 ```
 
+## Testing
+
+This project uses Vitest for testing with strict coverage requirements.
+
+### Running Tests
+
+| Command | Description |
+|---------|-------------|
+| `pnpm test` | Run all tests once |
+| `pnpm test:watch` | Run in watch mode |
+| `pnpm test:coverage` | Generate coverage report |
+| `pnpm --filter server test` | Server tests only |
+| `pnpm --filter web test` | Frontend tests only |
+
+### Test Structure
+
+```
+apps/server/src/__tests__/
+├── db/            # Database operation tests
+├── lib/           # Unit tests for utilities (auth, etc.)
+├── routes/        # API endpoint integration tests
+└── websocket/     # WebSocket handler tests
+
+apps/web/src/__tests__/
+├── lib/           # Crypto and utility tests
+└── placeholder.test.ts
+```
+
+### Coverage Requirements
+- Security-critical code (crypto, auth): 80% minimum
+- Overall coverage: 70% minimum
+- All new code must include tests
+
 ## Available Scripts
 
 ### Root
@@ -107,6 +140,7 @@ vibe-chat/
 | `pnpm dev:web` | Start frontend only |
 | `pnpm build` | Build all packages |
 | `pnpm lint` | Run linting across all packages |
+| `pnpm test` | Run all tests |
 | `pnpm db:migrate` | Run database migrations |
 
 ### Server (`apps/server`)
