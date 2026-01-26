@@ -1,6 +1,11 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const migrationsFolder = path.resolve(__dirname, "../../drizzle");
 
 const connectionString = process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/vibechat";
 
@@ -8,8 +13,8 @@ const client = postgres(connectionString, { max: 1 });
 const db = drizzle(client);
 
 async function main() {
-  console.log("Running migrations...");
-  await migrate(db, { migrationsFolder: "./drizzle" });
+  console.log("Running migrations from:", migrationsFolder);
+  await migrate(db, { migrationsFolder });
   console.log("Migrations complete!");
   await client.end();
 }
