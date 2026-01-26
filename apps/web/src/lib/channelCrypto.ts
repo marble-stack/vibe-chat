@@ -209,27 +209,53 @@ export async function decryptChannelMessage(
     return '[Encryption not set up - please re-register]';
   }
 
-  try {
-    // First try to get the key without creating one
-    const { key } = await ensureChannelKey(channelId, members, currentUserId, false);
-    return await decryptMessage(ciphertext, key);
-  } catch (err) {
-    logger.error('Failed to decrypt message:', err);
-
-    // If we don't have a key, try to create one so future messages work
-    // This won't help decrypt THIS message (it was encrypted with a different key)
-    // but it will allow the channel to function going forward
+  // First try with local key if we have one
+  const localKey = await getChannelKey(channelId);
+  if (localKey) {
     try {
-      if (members.length > 0) {
-        await ensureChannelKey(channelId, members, currentUserId, true);
-        logger.info('Created channel key for future messages');
-      }
-    } catch (keyErr) {
-      logger.error('Failed to create channel key:', keyErr);
+      return await decryptMessage(ciphertext, localKey);
+    } catch {
+      // Local key didn't work - might be stale, try fetching fresh key from server
+      logger.debug('Local key failed to decrypt, trying to fetch fresh key from server');
     }
-
-    return '[Unable to decrypt message]';
   }
+
+  // Try to fetch fresh key from server
+  try {
+    const { senderKeys } = await api.channels.getSenderKeys(channelId, currentUserId);
+
+    if (senderKeys.length > 0) {
+      const privateKey = await importPrivateKey(identityKeys.identityKeyPair.privateKey);
+
+      // Try each sender key until one works
+      for (const senderKey of senderKeys) {
+        try {
+          // Always fetch fresh public key from server
+          const userKeys = await api.auth.getUserKeys(senderKey.userId);
+
+          const channelKey = await decryptChannelKey(
+            senderKey.encryptedKey,
+            privateKey,
+            userKeys.identityKey
+          );
+
+          // Store the working key locally
+          const keyBase64 = await exportAesKey(channelKey);
+          await storeChannelKey(channelId, keyBase64);
+
+          // Try to decrypt the message
+          return await decryptMessage(ciphertext, channelKey);
+        } catch {
+          // This sender key didn't work, try next one
+          continue;
+        }
+      }
+    }
+  } catch (err) {
+    logger.error('Failed to fetch keys from server:', err);
+  }
+
+  return '[Unable to decrypt message]';
 }
 
 /**
