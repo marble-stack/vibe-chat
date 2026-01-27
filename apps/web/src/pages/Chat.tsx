@@ -13,6 +13,7 @@ import { MemberList } from "../components/MemberList";
 
 export function Chat() {
   const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
   const hasHydrated = useAuthStore((state) => state._hasHydrated);
   const {
     activeCommunityId,
@@ -86,9 +87,9 @@ export function Chat() {
 
   // Connect WebSocket
   useEffect(() => {
-    if (!user) return;
+    if (!user || !token) return;
 
-    wsClient.connect(user.id);
+    wsClient.connect(user.id, token);
 
     // Handle incoming messages
     const handleNewMessage = async (msg: { payload: Record<string, unknown> }) => {
@@ -262,7 +263,7 @@ export function Chat() {
       wsClient.off("reaction:removed", handleReactionRemoved);
       wsClient.disconnect();
     };
-  }, [user, addMessage, setTypingUser, setOnlineUsers, setUserOnline, updateMessage, deleteMessage, addReaction, removeReaction, addMemberIfMissing]);
+  }, [user, token, addMessage, setTypingUser, setOnlineUsers, setUserOnline, updateMessage, deleteMessage, addReaction, removeReaction, addMemberIfMissing]);
 
   // Join active community for presence updates
   useEffect(() => {
