@@ -30,6 +30,7 @@ interface Message {
   editedAt?: string | null;
   createdAt: string;
   reactions?: Reaction[];
+  decryptionFailed?: boolean; // True if decryption failed for this message
 }
 
 interface Member {

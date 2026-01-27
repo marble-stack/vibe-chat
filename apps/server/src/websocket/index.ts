@@ -5,18 +5,14 @@ import { eq, and } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { validatePayload } from "./schemas.js";
 import { isUserInCommunity, canUserAccessChannel } from "../lib/authorization.js";
-
-// Map of channelId -> Set of connected WebSockets
-const channelConnections = new Map<string, Set<WebSocket>>();
-
-// Map of WebSocket -> user info
-const socketUsers = new Map<WebSocket, { userId: string; channelIds: Set<string>; communityIds: Set<string> }>();
-
-// Map of communityId -> Set of online userIds
-const communityOnlineUsers = new Map<string, Set<string>>();
-
-// Map of communityId -> Set of connected WebSockets (for presence broadcasts)
-const communityConnections = new Map<string, Set<WebSocket>>();
+import { verifyToken } from "../lib/auth.js";
+import {
+  channelConnections,
+  socketUsers,
+  communityOnlineUsers,
+  communityConnections,
+  cleanupEmptyMaps,
+} from "./connectionMaps.js";
 
 interface WsMessage {
   type: string;
@@ -58,9 +54,16 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
         return;
       }
 
-      // Associate user with socket
-      socketUsers.set(socket, { userId: payload.userId, channelIds: new Set(), communityIds: new Set() });
-      socket.send(JSON.stringify({ type: "auth:success", payload: {} }));
+      // Verify JWT token and extract userId
+      const tokenPayload = verifyToken(payload.token);
+      if (!tokenPayload) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Invalid or expired token" } }));
+        return;
+      }
+
+      // Associate user with socket using verified userId from token
+      socketUsers.set(socket, { userId: tokenPayload.userId, channelIds: new Set(), communityIds: new Set() });
+      socket.send(JSON.stringify({ type: "auth:success", payload: { userId: tokenPayload.userId } }));
       break;
     }
 
@@ -379,11 +382,13 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
     }
 
     case "reaction:add": {
-      const { messageId, channelId, emoji } = message.payload as {
-        messageId: string;
-        channelId: string;
-        emoji: string;
-      };
+      // Validate payload
+      const reactionPayload = validatePayload("reaction:add", message.payload);
+      if (!reactionPayload) {
+        sendValidationError();
+        return;
+      }
+      const { messageId, channelId, emoji } = reactionPayload;
       const user = socketUsers.get(socket);
 
       if (!user) {
@@ -425,12 +430,13 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
     }
 
     case "reaction:remove": {
-      const { reactionId, channelId, messageId, emoji } = message.payload as {
-        reactionId: string;
-        channelId: string;
-        messageId: string;
-        emoji: string;
-      };
+      // Validate payload
+      const removePayload = validatePayload("reaction:remove", message.payload);
+      if (!removePayload) {
+        sendValidationError();
+        return;
+      }
+      const { reactionId, channelId, messageId, emoji } = removePayload;
       const user = socketUsers.get(socket);
 
       if (!user) {
@@ -476,6 +482,9 @@ function handleDisconnect(socket: WebSocket) {
 
     socketUsers.delete(socket);
   }
+
+  // Clean up empty Sets to prevent memory leaks
+  cleanupEmptyMaps();
 
   logger.debug("WebSocket client disconnected");
 }

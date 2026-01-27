@@ -1,7 +1,8 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { db, channels, senderKeys } from "../db/index.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
+import { canUserAccessChannel } from "../lib/authorization.js";
 
 const createChannelSchema = z.object({
   communityId: z.string().uuid(),
@@ -50,37 +51,64 @@ export const channelRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Distribute sender key to channel members
-  fastify.post("/sender-keys", async (request) => {
+  fastify.post("/sender-keys", async (request, reply) => {
+    // Authorization: require authentication
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
     const body = distributeSenderKeySchema.parse(request.body);
 
-    // Delete existing sender keys from this user for this channel
-    await db.delete(senderKeys).where(
-      and(
-        eq(senderKeys.channelId, body.channelId),
-        eq(senderKeys.userId, body.userId)
-      )
-    );
+    // Authorization: can only distribute keys for yourself
+    if (request.user.userId !== body.userId) {
+      return reply.status(403).send({ error: "Cannot distribute sender keys for another userId" });
+    }
 
-    // Insert new sender keys
+    // Authorization: must be a member of the channel's community
+    const canAccess = await canUserAccessChannel(request.user.userId, body.channelId);
+    if (!canAccess) {
+      return reply.status(403).send({ error: "Not a member of this channel's community" });
+    }
+
+    // Upsert sender keys - update if exists, insert if new
+    // This is atomic and handles new members joining after initial key distribution
     if (body.encryptedKeys.length > 0) {
-      await db.insert(senderKeys).values(
-        body.encryptedKeys.map((ek) => ({
+      for (const ek of body.encryptedKeys) {
+        await db.insert(senderKeys).values({
           channelId: body.channelId,
           userId: body.userId,
           distributionId: body.distributionId,
           encryptedKey: ek.encryptedKey,
           forUserId: ek.forUserId,
           senderPublicKey: body.senderPublicKey,
-        }))
-      );
+        }).onConflictDoUpdate({
+          target: [senderKeys.channelId, senderKeys.userId, senderKeys.forUserId],
+          set: {
+            encryptedKey: sql`excluded.encrypted_key`,
+            senderPublicKey: sql`excluded.sender_public_key`,
+            distributionId: sql`excluded.distribution_id`,
+          },
+        });
+      }
     }
 
     return { success: true };
   });
 
   // Get sender keys for a channel (for a specific user)
-  fastify.get("/:channelId/sender-keys/:userId", async (request) => {
+  fastify.get("/:channelId/sender-keys/:userId", async (request, reply) => {
+    // Authorization: require authentication
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
     const { channelId, userId } = request.params as { channelId: string; userId: string };
+
+    // Authorization: must be a member of the channel's community
+    const canAccess = await canUserAccessChannel(request.user.userId, channelId);
+    if (!canAccess) {
+      return reply.status(403).send({ error: "Not a member of this channel's community" });
+    }
 
     const keys = await db.query.senderKeys.findMany({
       where: and(

@@ -3,8 +3,32 @@ import jwt from "jsonwebtoken";
 import type { FastifyRequest, FastifyReply } from "fastify";
 
 const SALT_ROUNDS = 12;
-const JWT_SECRET = process.env.JWT_SECRET || "change-this-in-production-use-env-var";
 const JWT_EXPIRES_IN = "7d";
+
+// JWT_SECRET is required - no fallback default
+// Only allow missing JWT_SECRET in test environment when explicitly set
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+
+  if (!secret) {
+    // In test environment, check if it was set by the test setup
+    if (process.env.NODE_ENV === "test") {
+      throw new Error(
+        "JWT_SECRET environment variable is required. " +
+        "For tests, set JWT_SECRET in your test setup file."
+      );
+    }
+
+    throw new Error(
+      "JWT_SECRET environment variable is required. " +
+      "Please set a secure JWT_SECRET in your environment."
+    );
+  }
+
+  return secret;
+}
+
+const JWT_SECRET = getJwtSecret();
 
 export interface JwtPayload {
   userId: string;

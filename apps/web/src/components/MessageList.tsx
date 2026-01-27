@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { decryptChannelMessage, encryptChannelMessage } from "../lib/channelCrypto";
 import { wsClient } from "../lib/websocket";
 import { logger } from "../lib/logger";
+import { DecryptionErrorMessage } from "./DecryptionErrorMessage";
 
 interface MessageListProps {
   onOpenSidebar: () => void;
@@ -62,7 +63,8 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
       // Decrypt each message
       const decrypted = await Promise.all(
         msgs.map(async (m) => {
-          let plaintext = m.ciphertext;
+          let plaintext: string | undefined;
+          let decryptionFailed = false;
           try {
             plaintext = await decryptChannelMessage(
               activeChannelId,
@@ -72,8 +74,9 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
             );
           } catch (err) {
             logger.error('Failed to decrypt message:', err);
+            decryptionFailed = true;
           }
-          return { ...m, plaintext };
+          return { ...m, plaintext, decryptionFailed };
         })
       );
 
@@ -324,6 +327,8 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                         Save
                       </button>
                     </div>
+                  ) : message.decryptionFailed ? (
+                    <DecryptionErrorMessage />
                   ) : (
                     <p className="text-text-primary break-words">
                       {message.plaintext || message.ciphertext}
