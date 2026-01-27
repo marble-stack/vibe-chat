@@ -142,8 +142,11 @@ export async function ensureChannelKey(
     if (err instanceof Error && err.message.includes("Syncing")) {
       throw err;
     }
-    // Otherwise, just log and continue to key creation
-    logger.debug("Could not check for existing channel keys:", err);
+    // For any other error (e.g., network error), do NOT proceed to create a new key
+    // as this could cause key fragmentation. Instead, throw an error to prevent sending.
+    // The user can retry when the network is available.
+    logger.error("Could not check for existing channel keys:", err);
+    throw new Error("Could not verify channel key status. Please try again.");
   }
 
   // No key exists on server for this user

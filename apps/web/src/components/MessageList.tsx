@@ -74,6 +74,14 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
               user.id,
               m.senderId
             );
+            // Check if decryption returned an error string (not an exception)
+            if (
+              plaintext === "[Syncing keys...]" ||
+              plaintext === "[Unable to decrypt message]" ||
+              plaintext === "[Encryption not set up - please re-register]"
+            ) {
+              decryptionFailed = true;
+            }
           } catch (err) {
             logger.error("Failed to decrypt message:", err);
             decryptionFailed = true;
@@ -354,7 +362,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                       </button>
                     </div>
                   ) : message.decryptionFailed ? (
-                    <DecryptionErrorMessage />
+                    <DecryptionErrorMessage errorType={message.plaintext} />
                   ) : (
                     <p className="text-text-primary break-words">
                       {message.plaintext || message.ciphertext}
