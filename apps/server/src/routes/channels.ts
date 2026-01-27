@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { db, channels, senderKeys } from "../db/index.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { canUserAccessChannel } from "../lib/authorization.js";
 
 const createChannelSchema = z.object({
@@ -70,26 +70,26 @@ export const channelRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(403).send({ error: "Not a member of this channel's community" });
     }
 
-    // Delete existing sender keys from this user for this channel
-    await db.delete(senderKeys).where(
-      and(
-        eq(senderKeys.channelId, body.channelId),
-        eq(senderKeys.userId, body.userId)
-      )
-    );
-
-    // Insert new sender keys
+    // Upsert sender keys - update if exists, insert if new
+    // This is atomic and handles new members joining after initial key distribution
     if (body.encryptedKeys.length > 0) {
-      await db.insert(senderKeys).values(
-        body.encryptedKeys.map((ek) => ({
+      for (const ek of body.encryptedKeys) {
+        await db.insert(senderKeys).values({
           channelId: body.channelId,
           userId: body.userId,
           distributionId: body.distributionId,
           encryptedKey: ek.encryptedKey,
           forUserId: ek.forUserId,
           senderPublicKey: body.senderPublicKey,
-        }))
-      );
+        }).onConflictDoUpdate({
+          target: [senderKeys.channelId, senderKeys.userId, senderKeys.forUserId],
+          set: {
+            encryptedKey: sql`excluded.encrypted_key`,
+            senderPublicKey: sql`excluded.sender_public_key`,
+            distributionId: sql`excluded.distribution_id`,
+          },
+        });
+      }
     }
 
     return { success: true };

@@ -8,6 +8,7 @@ vi.mock('../../db/index.js', () => ({
     insert: vi.fn().mockReturnValue({
       values: vi.fn().mockReturnValue({
         returning: vi.fn().mockResolvedValue([{ id: 'channel-123' }]),
+        onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
       }),
     }),
     delete: vi.fn().mockReturnValue({
