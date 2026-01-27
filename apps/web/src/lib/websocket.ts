@@ -15,10 +15,13 @@ class WebSocketClient {
   private userId: string | null = null;
   private token: string | null = null;
   private joinedChannels: Set<string> = new Set();
+  private authenticated = false;
+  private pendingMessages: WsMessage[] = [];
 
   connect(userId: string, token: string) {
     this.userId = userId;
     this.token = token;
+    this.authenticated = false;
 
     // Use environment variable if available, otherwise fall back to window.location
     const wsUrl = import.meta.env.VITE_WS_URL || (() => {
@@ -32,18 +35,51 @@ class WebSocketClient {
       logger.debug("WebSocket connected");
       this.reconnectAttempts = 0;
 
-      // Authenticate with JWT token
-      this.send({ type: "auth", payload: { token } });
-
-      // Rejoin channels
-      for (const channelId of this.joinedChannels) {
-        this.send({ type: "channel:join", payload: { channelId } });
+      // Authenticate with JWT token - send directly to avoid queueing
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: "auth", payload: { token } }));
       }
     };
 
     this.ws.onmessage = (event) => {
       try {
         const message: WsMessage = JSON.parse(event.data);
+
+        // Handle authentication success
+        if (message.type === "auth:success") {
+          logger.debug("WebSocket authenticated");
+          this.authenticated = true;
+
+          // Rejoin channels after auth succeeds
+          for (const channelId of this.joinedChannels) {
+            this.send({ type: "channel:join", payload: { channelId } });
+          }
+
+          // Send any queued messages
+          while (this.pendingMessages.length > 0) {
+            const pending = this.pendingMessages.shift();
+            if (pending) {
+              this.send(pending);
+            }
+          }
+        }
+
+        // Handle errors from server
+        if (message.type === "error") {
+          const errorMsg = (message.payload?.message as string) || "Unknown error";
+          logger.error("WebSocket server error:", errorMsg);
+
+          // Emit error for UI to handle
+          this.emit("error", message);
+
+          // If auth failed, clear authenticated state
+          if (errorMsg.includes("token") || errorMsg.includes("authenticated")) {
+            this.authenticated = false;
+            // Emit auth failure for UI to handle (e.g., force re-login)
+            this.emit("auth:failed", message);
+          }
+        }
+
         this.emit(message.type, message);
       } catch (err) {
         logger.error("Failed to parse WebSocket message:", err);
@@ -52,6 +88,7 @@ class WebSocketClient {
 
     this.ws.onclose = () => {
       logger.debug("WebSocket disconnected");
+      this.authenticated = false;
       this.attemptReconnect();
     };
 
@@ -84,12 +121,29 @@ class WebSocketClient {
       this.ws = null;
     }
     this.joinedChannels.clear();
+    this.authenticated = false;
+    this.pendingMessages = [];
   }
 
-  send(message: WsMessage) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(message));
+  send(message: WsMessage): boolean {
+    if (this.ws?.readyState !== WebSocket.OPEN) {
+      logger.warn("WebSocket not connected, queueing message:", message.type);
+      this.pendingMessages.push(message);
+      return false;
     }
+
+    if (!this.authenticated && message.type !== "auth") {
+      logger.warn("WebSocket not authenticated, queueing message:", message.type);
+      this.pendingMessages.push(message);
+      return false;
+    }
+
+    this.ws.send(JSON.stringify(message));
+    return true;
+  }
+
+  isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN && this.authenticated;
   }
 
   joinChannel(channelId: string) {
@@ -110,8 +164,8 @@ class WebSocketClient {
     this.send({ type: "community:leave", payload: { communityId } });
   }
 
-  sendMessage(channelId: string, ciphertext: string, replyToId?: string) {
-    this.send({
+  sendMessage(channelId: string, ciphertext: string, replyToId?: string): boolean {
+    return this.send({
       type: "message:send",
       payload: { channelId, ciphertext, replyToId },
     });
