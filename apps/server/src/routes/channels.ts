@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, channels, senderKeys } from "../db/index.js";
 import { eq, and, sql } from "drizzle-orm";
 import { canUserAccessChannel } from "../lib/authorization.js";
+import { sendToUser } from "../websocket/connectionMaps.js";
 
 const createChannelSchema = z.object({
   communityId: z.string().uuid(),
@@ -88,6 +89,14 @@ export const channelRoutes: FastifyPluginAsync = async (fastify) => {
             senderPublicKey: sql`excluded.sender_public_key`,
             distributionId: sql`excluded.distribution_id`,
           },
+        });
+      }
+
+      // Notify recipients via WebSocket that a key is now available for them
+      for (const ek of body.encryptedKeys) {
+        sendToUser(ek.forUserId, {
+          type: 'key:available',
+          payload: { channelId: body.channelId, fromUserId: body.userId },
         });
       }
     }

@@ -117,6 +117,7 @@ Messages use `{ type: string, payload: object }` format:
 - `reaction:add` / `reaction:added` - Add emoji reactions
 - `reaction:remove` / `reaction:removed` - Remove emoji reactions
 - `key:request` / `key:requested` - Channel key redistribution requests
+- `key:available` - Notifies user that a channel key has been distributed to them
 
 ### Encryption
 - Uses Web Crypto API (ECDH P-256 for key exchange, AES-GCM for messages)
@@ -128,8 +129,10 @@ Messages use `{ type: string, payload: object }` format:
 **Key sync flow:**
 1. User A sends first message → creates channel key, distributes to current members
 2. User B joins later → sees "[Syncing keys...]" → requests key via WebSocket
-3. User A receives `key:requested` → redistributes key to all members including B
-4. User B receives key → can now decrypt all messages
+3. User A receives `key:requested` → redistributes key to all members including B via REST API
+4. Server sends `key:available` to User B via WebSocket after storing the key
+5. User B receives `key:available` → re-decrypts all pending messages
+6. Fallback: If key owner is offline, client polls for keys every 5 seconds
 
 **Known limitations:**
 - Keys are device-local; logging in on a new device requires re-registration

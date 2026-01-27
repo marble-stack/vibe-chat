@@ -3,6 +3,17 @@ import { WebSocket } from "ws";
 // Map of channelId -> Set of connected WebSockets
 export const channelConnections = new Map<string, Set<WebSocket>>();
 
+/**
+ * Send a message to all connected sockets for a specific user
+ */
+export function sendToUser(userId: string, message: object): void {
+  for (const [socket, user] of socketUsers) {
+    if (user.userId === userId && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(message));
+    }
+  }
+}
+
 // Map of WebSocket -> user info
 export const socketUsers = new Map<WebSocket, { userId: string; channelIds: Set<string>; communityIds: Set<string> }>();
 

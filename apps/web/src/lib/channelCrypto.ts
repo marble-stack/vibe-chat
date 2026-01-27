@@ -346,3 +346,75 @@ export async function decryptChannelMessage(
 export async function canEncryptInChannel(channelId: string): Promise<boolean> {
   return await hasChannelKey(channelId);
 }
+
+/**
+ * Clear a pending key request (called when key is received)
+ */
+export function clearPendingKeyRequest(channelId: string, userId: string): void {
+  const requestKey = `${channelId}:${userId}`;
+  pendingKeyRequests.delete(requestKey);
+}
+
+/**
+ * Try to fetch and store a channel key from the server.
+ * Returns true if a new key was successfully fetched.
+ * This is used for polling when the key owner may have been offline.
+ */
+export async function tryFetchChannelKey(
+  channelId: string,
+  currentUserId: string
+): Promise<boolean> {
+  // Check if we already have the key
+  if (await hasChannelKey(channelId)) {
+    return false;
+  }
+
+  const identityKeys = await getIdentityKeys();
+  if (!identityKeys) {
+    return false;
+  }
+
+  try {
+    const { senderKeys } = await api.channels.getSenderKeys(channelId, currentUserId);
+
+    if (senderKeys.length > 0) {
+      const senderKey = senderKeys[0];
+      const privateKey = await importPrivateKey(identityKeys.identityKeyPair.privateKey);
+
+      let senderPublicKeyValue = senderKey.senderPublicKey;
+      if (!senderPublicKeyValue) {
+        const cachedKey = await getUserKey(senderKey.userId);
+        if (cachedKey) {
+          senderPublicKeyValue = cachedKey.identityKeyPublic;
+        } else {
+          const userKeys = await api.auth.getUserKeys(senderKey.userId);
+          senderPublicKeyValue = userKeys.identityKey;
+          await storeUserKey(
+            senderKey.userId,
+            userKeys.identityKey,
+            userKeys.signedPreKey.publicKey
+          );
+        }
+      }
+
+      const channelKey = await decryptChannelKey(
+        senderKey.encryptedKey,
+        privateKey,
+        senderPublicKeyValue
+      );
+
+      const keyBase64 = await exportAesKey(channelKey);
+      await storeChannelKey(channelId, keyBase64);
+
+      // Clear pending request since we got the key
+      clearPendingKeyRequest(channelId, senderKey.userId);
+
+      logger.debug(`Successfully fetched channel key for ${channelId}`);
+      return true;
+    }
+  } catch (err) {
+    logger.debug('Failed to fetch channel key:', err);
+  }
+
+  return false;
+}

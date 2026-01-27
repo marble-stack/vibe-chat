@@ -4,7 +4,7 @@ import { useAuthStore } from "../stores/auth";
 import { useChatStore } from "../stores/chat";
 import { api } from "../lib/api";
 import { wsClient } from "../lib/websocket";
-import { decryptChannelMessage, distributeChannelKey } from "../lib/channelCrypto";
+import { decryptChannelMessage, distributeChannelKey, tryFetchChannelKey } from "../lib/channelCrypto";
 import { getChannelKey } from "../lib/keyStore";
 import { clearAllKeys } from "../lib/keyStore";
 import { logger } from "../lib/logger";
@@ -301,6 +301,57 @@ export function Chat() {
       }
     };
 
+    // Handle key available notification - re-decrypt failed messages
+    const handleKeyAvailable = async (msg: { payload: Record<string, unknown> }) => {
+      const { channelId } = msg.payload as { channelId: string; fromUserId: string };
+
+      if (!user) return;
+
+      logger.debug(`Key available for channel ${channelId}`);
+
+      // Get current messages for this channel
+      const channelMsgs = useChatStore.getState().messages[channelId] || [];
+      const failedMsgs = channelMsgs.filter(
+        m => m.plaintext === '[Syncing keys...]' ||
+             m.plaintext === '[Unable to decrypt message]' ||
+             m.decryptionFailed
+      );
+
+      if (failedMsgs.length === 0) return;
+
+      logger.debug(`Re-decrypting ${failedMsgs.length} failed messages`);
+
+      // Get current community members for decryption
+      const currentCommunityId = activeCommunityRef.current;
+      let currentMembers = currentCommunityId
+        ? membersRef.current[currentCommunityId] || []
+        : [];
+
+      // Ensure current user is in members list
+      if (!currentMembers.some(m => m.id === user.id)) {
+        currentMembers = [...currentMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+      }
+
+      // Re-decrypt each failed message
+      for (const failedMsg of failedMsgs) {
+        try {
+          const plaintext = await decryptChannelMessage(
+            channelId,
+            failedMsg.ciphertext,
+            currentMembers,
+            user.id,
+            failedMsg.senderId
+          );
+          // Only update if decryption succeeded (not still syncing)
+          if (plaintext !== '[Syncing keys...]' && plaintext !== '[Unable to decrypt message]') {
+            updateMessage(channelId, failedMsg.id, { plaintext, decryptionFailed: false });
+          }
+        } catch {
+          // Still can't decrypt, leave as is
+        }
+      }
+    };
+
     wsClient.on("message:new", handleNewMessage);
     wsClient.on("auth:failed", handleAuthFailed);
     wsClient.on("typing:update", handleTypingUpdate);
@@ -311,6 +362,7 @@ export function Chat() {
     wsClient.on("reaction:added", handleReactionAdded);
     wsClient.on("reaction:removed", handleReactionRemoved);
     wsClient.on("key:requested", handleKeyRequested);
+    wsClient.on("key:available", handleKeyAvailable);
 
     return () => {
       wsClient.off("message:new", handleNewMessage);
@@ -323,6 +375,7 @@ export function Chat() {
       wsClient.off("reaction:added", handleReactionAdded);
       wsClient.off("reaction:removed", handleReactionRemoved);
       wsClient.off("key:requested", handleKeyRequested);
+      wsClient.off("key:available", handleKeyAvailable);
       wsClient.disconnect();
     };
   }, [user, token, logout, navigate, addMessage, setTypingUser, setOnlineUsers, setUserOnline, updateMessage, deleteMessage, addReaction, removeReaction, addMemberIfMissing]);
@@ -340,6 +393,72 @@ export function Chat() {
       wsClient.joinChannel(activeChannelId);
     }
   }, [activeChannelId]);
+
+  // Polling fallback for key sync when key owner might be offline
+  useEffect(() => {
+    if (!user || !activeChannelId) return;
+
+    const pollForKeys = async () => {
+      // Check if there are any messages stuck in syncing state for the active channel
+      const channelMsgs = useChatStore.getState().messages[activeChannelId] || [];
+      const hasSyncingMessages = channelMsgs.some(
+        m => m.plaintext === '[Syncing keys...]' ||
+             m.plaintext === '[Unable to decrypt message]' ||
+             m.decryptionFailed
+      );
+
+      if (!hasSyncingMessages) return;
+
+      // Try to fetch the key from server (in case key owner came online and distributed)
+      const keyFound = await tryFetchChannelKey(activeChannelId, user.id);
+      if (keyFound) {
+        logger.debug('Polling found new key, re-decrypting messages');
+
+        // Get current community members for decryption
+        const currentCommunityId = activeCommunityRef.current;
+        let currentMembers = currentCommunityId
+          ? membersRef.current[currentCommunityId] || []
+          : [];
+
+        // Ensure current user is in members list
+        if (!currentMembers.some(m => m.id === user.id)) {
+          currentMembers = [...currentMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+        }
+
+        // Re-decrypt failed messages
+        const failedMsgs = useChatStore.getState().messages[activeChannelId]?.filter(
+          m => m.plaintext === '[Syncing keys...]' ||
+               m.plaintext === '[Unable to decrypt message]' ||
+               m.decryptionFailed
+        ) || [];
+
+        for (const failedMsg of failedMsgs) {
+          try {
+            const plaintext = await decryptChannelMessage(
+              activeChannelId,
+              failedMsg.ciphertext,
+              currentMembers,
+              user.id,
+              failedMsg.senderId
+            );
+            if (plaintext !== '[Syncing keys...]' && plaintext !== '[Unable to decrypt message]') {
+              updateMessage(activeChannelId, failedMsg.id, { plaintext, decryptionFailed: false });
+            }
+          } catch {
+            // Still can't decrypt
+          }
+        }
+      }
+    };
+
+    // Poll every 5 seconds
+    const intervalId = setInterval(pollForKeys, 5000);
+
+    // Also poll immediately on channel change
+    pollForKeys();
+
+    return () => clearInterval(intervalId);
+  }, [user, activeChannelId, updateMessage]);
 
   return (
     <div className="h-screen flex bg-background-primary">
