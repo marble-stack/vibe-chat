@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { resetJwtSecretCache } from '../../lib/auth.js';
 
 describe('Auth Module - JWT Secret Security', () => {
   const originalEnv = process.env;
@@ -6,12 +7,15 @@ describe('Auth Module - JWT Secret Security', () => {
   beforeEach(() => {
     // Reset module cache for fresh imports
     vi.resetModules();
+    // Reset the cached JWT secret
+    resetJwtSecretCache();
     // Clone environment
     process.env = { ...originalEnv };
   });
 
   afterEach(() => {
     process.env = originalEnv;
+    resetJwtSecretCache();
   });
 
   describe('JWT_SECRET Configuration', () => {
@@ -20,8 +24,10 @@ describe('Auth Module - JWT Secret Security', () => {
       delete process.env.JWT_SECRET;
       process.env.NODE_ENV = 'production';
 
-      // Import should throw
-      await expect(import('../../lib/auth.js')).rejects.toThrow('JWT_SECRET');
+      // With lazy evaluation, import succeeds but calling functions throws
+      const auth = await import('../../lib/auth.js');
+      expect(() => auth.generateToken({ userId: 'test', email: 'test@test.com' }))
+        .toThrow('JWT_SECRET');
     });
 
     it('should throw if JWT_SECRET is not set in non-test environments', async () => {
@@ -29,8 +35,10 @@ describe('Auth Module - JWT Secret Security', () => {
       delete process.env.JWT_SECRET;
       process.env.NODE_ENV = 'development';
 
-      // Import should throw
-      await expect(import('../../lib/auth.js')).rejects.toThrow('JWT_SECRET');
+      // With lazy evaluation, import succeeds but calling functions throws
+      const auth = await import('../../lib/auth.js');
+      expect(() => auth.generateToken({ userId: 'test', email: 'test@test.com' }))
+        .toThrow('JWT_SECRET');
     });
 
     it('should use environment JWT_SECRET when provided', async () => {
@@ -67,8 +75,11 @@ describe('Auth Module - JWT Secret Security', () => {
       delete process.env.JWT_SECRET;
       process.env.NODE_ENV = 'production';
 
-      // The module should throw, not use a default
-      await expect(import('../../lib/auth.js')).rejects.toThrow();
+      // With lazy evaluation, import succeeds but calling functions throws
+      const auth = await import('../../lib/auth.js');
+      // The function should throw, not use a default
+      expect(() => auth.generateToken({ userId: 'test', email: 'test@test.com' }))
+        .toThrow();
     });
   });
 
