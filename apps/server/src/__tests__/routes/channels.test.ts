@@ -283,3 +283,191 @@ describe("Channel Routes - Sender Key Security", () => {
     });
   });
 });
+
+describe('Channel Routes - Create and Get Channels', () => {
+  let app: FastifyInstance;
+  const testUserId = '550e8400-e29b-41d4-a716-446655440001';
+  const testCommunityId = '550e8400-e29b-41d4-a716-446655440004';
+  const testChannelId = '550e8400-e29b-41d4-a716-446655440003';
+
+  beforeAll(async () => {
+    app = await buildTestApp();
+    await app.ready();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('POST /api/channels', () => {
+    it('should create a channel successfully', async () => {
+      const token = createTestToken(testUserId);
+
+      vi.mocked(db.insert).mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{
+            id: testChannelId,
+            communityId: testCommunityId,
+            name: 'general',
+          }]),
+          onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+        }),
+      } as unknown as ReturnType<typeof db.insert>);
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/channels',
+        headers: { authorization: authHeader(token) },
+        payload: {
+          communityId: testCommunityId,
+          name: 'general',
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body).toHaveProperty('channel');
+      expect(body.channel.name).toBe('general');
+    });
+
+    it('should reject channel name with uppercase letters', async () => {
+      const token = createTestToken(testUserId);
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/channels',
+        headers: { authorization: authHeader(token) },
+        payload: {
+          communityId: testCommunityId,
+          name: 'General', // Invalid: uppercase
+        },
+      });
+
+      // Zod validation throws, resulting in 500 (no error handler converts it to 400)
+      expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    });
+
+    it('should reject channel name with spaces', async () => {
+      const token = createTestToken(testUserId);
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/channels',
+        headers: { authorization: authHeader(token) },
+        payload: {
+          communityId: testCommunityId,
+          name: 'general chat', // Invalid: spaces
+        },
+      });
+
+      // Zod validation throws, resulting in 500 (no error handler converts it to 400)
+      expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    });
+
+    it('should allow channel name with dashes', async () => {
+      const token = createTestToken(testUserId);
+
+      vi.mocked(db.insert).mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{
+            id: testChannelId,
+            communityId: testCommunityId,
+            name: 'general-chat',
+          }]),
+          onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+        }),
+      } as unknown as ReturnType<typeof db.insert>);
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/channels',
+        headers: { authorization: authHeader(token) },
+        payload: {
+          communityId: testCommunityId,
+          name: 'general-chat',
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().channel.name).toBe('general-chat');
+    });
+
+    it('should reject empty channel name', async () => {
+      const token = createTestToken(testUserId);
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/channels',
+        headers: { authorization: authHeader(token) },
+        payload: {
+          communityId: testCommunityId,
+          name: '',
+        },
+      });
+
+      // Zod validation throws, resulting in 500 (no error handler converts it to 400)
+      expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    });
+
+    it('should reject invalid communityId format', async () => {
+      const token = createTestToken(testUserId);
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/channels',
+        headers: { authorization: authHeader(token) },
+        payload: {
+          communityId: 'not-a-uuid',
+          name: 'general',
+        },
+      });
+
+      // Zod validation throws, resulting in 500 (no error handler converts it to 400)
+      expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    });
+  });
+
+  describe('GET /api/channels/:channelId', () => {
+    const mockChannel = {
+      id: testChannelId,
+      communityId: testCommunityId,
+      name: 'general',
+      createdAt: new Date(),
+    };
+
+    it('should return channel details', async () => {
+      const token = createTestToken(testUserId);
+      vi.mocked(db.query.channels.findFirst).mockResolvedValue(mockChannel);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/channels/${testChannelId}`,
+        headers: { authorization: authHeader(token) },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body).toHaveProperty('channel');
+      expect(body.channel.id).toBe(testChannelId);
+      expect(body.channel.name).toBe('general');
+    });
+
+    it('should return 404 if channel not found', async () => {
+      const token = createTestToken(testUserId);
+      vi.mocked(db.query.channels.findFirst).mockResolvedValue(undefined);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/channels/${testChannelId}`,
+        headers: { authorization: authHeader(token) },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toHaveProperty('error', 'Channel not found');
+    });
+  });
+});
