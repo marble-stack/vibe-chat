@@ -305,7 +305,8 @@ export async function decryptChannelMessage(
   }
 
   // Could not decrypt - request key from the sender if we know who they are
-  if (senderId && senderId !== currentUserId) {
+  // Note: We request even for our own messages, as another device may have the key
+  if (senderId) {
     const requestKey = `${channelId}:${senderId}`;
     if (!pendingKeyRequests.has(requestKey)) {
       pendingKeyRequests.add(requestKey);

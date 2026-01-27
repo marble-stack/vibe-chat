@@ -410,43 +410,46 @@ export function Chat() {
       if (!hasSyncingMessages) return;
 
       // Try to fetch the key from server (in case key owner came online and distributed)
+      // Returns true if a NEW key was fetched, false if key already existed or not found
       const keyFound = await tryFetchChannelKey(activeChannelId, user.id);
       if (keyFound) {
-        logger.debug('Polling found new key, re-decrypting messages');
+        logger.debug('Polling found new key');
+      }
 
-        // Get current community members for decryption
-        const currentCommunityId = activeCommunityRef.current;
-        let currentMembers = currentCommunityId
-          ? membersRef.current[currentCommunityId] || []
-          : [];
+      // Always try to re-decrypt if we have syncing messages
+      // The key might have been stored by key:available handler (tryFetchChannelKey returns false if key exists)
+      // Get current community members for decryption
+      const currentCommunityId = activeCommunityRef.current;
+      let currentMembers = currentCommunityId
+        ? membersRef.current[currentCommunityId] || []
+        : [];
 
-        // Ensure current user is in members list
-        if (!currentMembers.some(m => m.id === user.id)) {
-          currentMembers = [...currentMembers, { id: user.id, displayName: user.displayName || 'Me' }];
-        }
+      // Ensure current user is in members list
+      if (!currentMembers.some(m => m.id === user.id)) {
+        currentMembers = [...currentMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+      }
 
-        // Re-decrypt failed messages
-        const failedMsgs = useChatStore.getState().messages[activeChannelId]?.filter(
-          m => m.plaintext === '[Syncing keys...]' ||
-               m.plaintext === '[Unable to decrypt message]' ||
-               m.decryptionFailed
-        ) || [];
+      // Re-decrypt failed messages
+      const failedMsgs = useChatStore.getState().messages[activeChannelId]?.filter(
+        m => m.plaintext === '[Syncing keys...]' ||
+             m.plaintext === '[Unable to decrypt message]' ||
+             m.decryptionFailed
+      ) || [];
 
-        for (const failedMsg of failedMsgs) {
-          try {
-            const plaintext = await decryptChannelMessage(
-              activeChannelId,
-              failedMsg.ciphertext,
-              currentMembers,
-              user.id,
-              failedMsg.senderId
-            );
-            if (plaintext !== '[Syncing keys...]' && plaintext !== '[Unable to decrypt message]') {
-              updateMessage(activeChannelId, failedMsg.id, { plaintext, decryptionFailed: false });
-            }
-          } catch {
-            // Still can't decrypt
+      for (const failedMsg of failedMsgs) {
+        try {
+          const plaintext = await decryptChannelMessage(
+            activeChannelId,
+            failedMsg.ciphertext,
+            currentMembers,
+            user.id,
+            failedMsg.senderId
+          );
+          if (plaintext !== '[Syncing keys...]' && plaintext !== '[Unable to decrypt message]') {
+            updateMessage(activeChannelId, failedMsg.id, { plaintext, decryptionFailed: false });
           }
+        } catch {
+          // Still can't decrypt
         }
       }
     };
