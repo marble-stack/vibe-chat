@@ -8,6 +8,7 @@
 
 import { api } from './api';
 import { logger } from './logger';
+import { wsClient } from './websocket';
 import {
   generateChannelKey,
   exportAesKey,
@@ -25,6 +26,9 @@ import {
   storeUserKey,
   getUserKey,
 } from './keyStore';
+
+// Track pending key requests to avoid duplicate requests
+const pendingKeyRequests = new Set<string>();
 
 /**
  * Get or create a channel key for sending messages
@@ -103,7 +107,41 @@ export async function ensureChannelKey(
       return { key: channelKey, isNew: false };
     }
   } catch (_err) {
-    logger.debug('No existing channel key found');
+    logger.debug('No existing channel key found for current user');
+  }
+
+  // No key exists on server for this user - check if ANY key exists in the channel
+  try {
+    const { senderKeyOwners } = await api.channels.getSenderKeyOwners(channelId);
+
+    if (senderKeyOwners.length > 0) {
+      // A key exists but we don't have it - request redistribution via WebSocket
+      const keyOwner = senderKeyOwners[0];
+      const requestKey = `${channelId}:${keyOwner.userId}`;
+
+      if (!pendingKeyRequests.has(requestKey)) {
+        pendingKeyRequests.add(requestKey);
+        logger.debug(`Requesting key redistribution from ${keyOwner.userId} for channel ${channelId}`);
+        wsClient.requestKey(channelId, keyOwner.userId);
+
+        // Remove from pending after 30 seconds to allow retry
+        setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+      }
+
+      if (!createIfMissing) {
+        throw new Error('Syncing keys...');
+      }
+
+      // For sending: wait briefly for key redistribution, then retry
+      throw new Error('Syncing channel key. Please try again in a moment.');
+    }
+  } catch (err) {
+    // If this is our "syncing keys" error, re-throw it
+    if (err instanceof Error && err.message.includes('Syncing')) {
+      throw err;
+    }
+    // Otherwise, just log and continue to key creation
+    logger.debug('Could not check for existing channel keys:', err);
   }
 
   // No key exists on server for this user
@@ -112,7 +150,7 @@ export async function ensureChannelKey(
     throw new Error('No channel key available. Waiting for key distribution from another member.');
   }
 
-  // For sending: create and distribute a new key
+  // For sending: create and distribute a new key (only if NO key exists at all)
   const channelKey = await generateChannelKey();
   const keyBase64 = await exportAesKey(channelKey);
 
@@ -127,8 +165,9 @@ export async function ensureChannelKey(
 
 /**
  * Distribute a channel key to all members
+ * Exported so it can be called when we receive a key:requested message
  */
-async function distributeChannelKey(
+export async function distributeChannelKey(
   channelId: string,
   channelKey: CryptoKey,
   members: { id: string }[],
@@ -204,7 +243,8 @@ export async function decryptChannelMessage(
   channelId: string,
   ciphertext: string,
   _members: { id: string; displayName: string }[],
-  currentUserId: string
+  currentUserId: string,
+  senderId?: string
 ): Promise<string> {
   // Check if we have identity keys - if not, encryption is not set up
   const identityKeys = await getIdentityKeys();
@@ -262,6 +302,39 @@ export async function decryptChannelMessage(
     }
   } catch (err) {
     logger.error('Failed to fetch keys from server:', err);
+  }
+
+  // Could not decrypt - request key from the sender if we know who they are
+  if (senderId && senderId !== currentUserId) {
+    const requestKey = `${channelId}:${senderId}`;
+    if (!pendingKeyRequests.has(requestKey)) {
+      pendingKeyRequests.add(requestKey);
+      logger.debug(`Requesting key from sender ${senderId} for channel ${channelId}`);
+      wsClient.requestKey(channelId, senderId);
+
+      // Remove from pending after 30 seconds to allow retry
+      setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+    }
+    return '[Syncing keys...]';
+  }
+
+  // Check if ANY key exists in the channel and request it
+  try {
+    const { senderKeyOwners } = await api.channels.getSenderKeyOwners(channelId);
+    if (senderKeyOwners.length > 0) {
+      const keyOwner = senderKeyOwners[0];
+      const requestKey = `${channelId}:${keyOwner.userId}`;
+      if (!pendingKeyRequests.has(requestKey)) {
+        pendingKeyRequests.add(requestKey);
+        logger.debug(`Requesting key redistribution from ${keyOwner.userId}`);
+        wsClient.requestKey(channelId, keyOwner.userId);
+
+        setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+      }
+      return '[Syncing keys...]';
+    }
+  } catch {
+    // Ignore error checking for key owners
   }
 
   return '[Unable to decrypt message]';

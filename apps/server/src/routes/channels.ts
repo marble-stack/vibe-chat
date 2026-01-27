@@ -95,6 +95,48 @@ export const channelRoutes: FastifyPluginAsync = async (fastify) => {
     return { success: true };
   });
 
+  // Get all users who have distributed sender keys in a channel
+  // This tells clients if ANY key exists, even if not distributed to them yet
+  fastify.get("/:channelId/sender-keys/owners", async (request, reply) => {
+    // Authorization: require authentication
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
+    const { channelId } = request.params as { channelId: string };
+
+    // Authorization: must be a member of the channel's community
+    const canAccess = await canUserAccessChannel(request.user.userId, channelId);
+    if (!canAccess) {
+      return reply.status(403).send({ error: "Not a member of this channel's community" });
+    }
+
+    // Get distinct userIds who have distributed keys in this channel
+    // We use sql to get distinct userId values
+    const keys = await db.query.senderKeys.findMany({
+      where: eq(senderKeys.channelId, channelId),
+      columns: {
+        userId: true,
+        senderPublicKey: true,
+      },
+    });
+
+    // Deduplicate by userId (each user may have multiple entries for different recipients)
+    const ownerMap = new Map<string, string | null>();
+    for (const key of keys) {
+      if (!ownerMap.has(key.userId)) {
+        ownerMap.set(key.userId, key.senderPublicKey);
+      }
+    }
+
+    const senderKeyOwners = Array.from(ownerMap.entries()).map(([userId, senderPublicKey]) => ({
+      userId,
+      senderPublicKey,
+    }));
+
+    return { senderKeyOwners };
+  });
+
   // Get sender keys for a channel (for a specific user)
   fastify.get("/:channelId/sender-keys/:userId", async (request, reply) => {
     // Authorization: require authentication

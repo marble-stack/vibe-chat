@@ -118,6 +118,11 @@ export const api = {
         `/channels/${channelId}/sender-keys/${userId}`
       ),
 
+    getSenderKeyOwners: (channelId: string) =>
+      request<{ senderKeyOwners: { userId: string; senderPublicKey?: string | null }[] }>(
+        `/channels/${channelId}/sender-keys/owners`
+      ),
+
     distributeSenderKey: (data: {
       channelId: string;
       userId: string;

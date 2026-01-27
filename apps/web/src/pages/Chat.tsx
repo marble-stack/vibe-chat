@@ -4,7 +4,8 @@ import { useAuthStore } from "../stores/auth";
 import { useChatStore } from "../stores/chat";
 import { api } from "../lib/api";
 import { wsClient } from "../lib/websocket";
-import { decryptChannelMessage } from "../lib/channelCrypto";
+import { decryptChannelMessage, distributeChannelKey } from "../lib/channelCrypto";
+import { getChannelKey } from "../lib/keyStore";
 import { clearAllKeys } from "../lib/keyStore";
 import { logger } from "../lib/logger";
 import { Sidebar } from "../components/Sidebar";
@@ -131,7 +132,8 @@ export function Chat() {
             payload.channelId,
             payload.ciphertext,
             currentMembers,
-            user.id
+            user.id,
+            payload.senderId
           );
         }
       } catch (err) {
@@ -256,6 +258,49 @@ export function Chat() {
       navigate("/login");
     };
 
+    // Handle key redistribution request - another user needs our channel key
+    const handleKeyRequested = async (msg: { payload: Record<string, unknown> }) => {
+      const { channelId, requestingUserId } = msg.payload as {
+        channelId: string;
+        requestingUserId: string;
+      };
+
+      logger.debug(`Key redistribution requested by ${requestingUserId} for channel ${channelId}`);
+
+      if (!user) return;
+
+      // Get our local channel key
+      const channelKey = await getChannelKey(channelId);
+      if (!channelKey) {
+        logger.debug('No local channel key to redistribute');
+        return;
+      }
+
+      // Get current community members including the requester
+      const currentCommunityId = activeCommunityRef.current;
+      let currentMembers = currentCommunityId
+        ? membersRef.current[currentCommunityId] || []
+        : [];
+
+      // Ensure the requester is in the list
+      if (!currentMembers.some(m => m.id === requestingUserId)) {
+        currentMembers = [...currentMembers, { id: requestingUserId, displayName: 'Unknown' }];
+      }
+
+      // Ensure current user is in members list
+      if (!currentMembers.some(m => m.id === user.id)) {
+        currentMembers = [...currentMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+      }
+
+      // Redistribute the key to all members (including the requester)
+      try {
+        await distributeChannelKey(channelId, channelKey, currentMembers, user.id);
+        logger.debug(`Redistributed key to ${currentMembers.length} members`);
+      } catch (err) {
+        logger.error('Failed to redistribute key:', err);
+      }
+    };
+
     wsClient.on("message:new", handleNewMessage);
     wsClient.on("auth:failed", handleAuthFailed);
     wsClient.on("typing:update", handleTypingUpdate);
@@ -265,6 +310,7 @@ export function Chat() {
     wsClient.on("message:deleted", handleMessageDeleted);
     wsClient.on("reaction:added", handleReactionAdded);
     wsClient.on("reaction:removed", handleReactionRemoved);
+    wsClient.on("key:requested", handleKeyRequested);
 
     return () => {
       wsClient.off("message:new", handleNewMessage);
@@ -276,6 +322,7 @@ export function Chat() {
       wsClient.off("message:deleted", handleMessageDeleted);
       wsClient.off("reaction:added", handleReactionAdded);
       wsClient.off("reaction:removed", handleReactionRemoved);
+      wsClient.off("key:requested", handleKeyRequested);
       wsClient.disconnect();
     };
   }, [user, token, logout, navigate, addMessage, setTypingUser, setOnlineUsers, setUserOnline, updateMessage, deleteMessage, addReaction, removeReaction, addMemberIfMissing]);

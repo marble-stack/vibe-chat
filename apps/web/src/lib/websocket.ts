@@ -201,6 +201,10 @@ class WebSocketClient {
     this.send({ type: "reaction:remove", payload: { reactionId, channelId, messageId, emoji } });
   }
 
+  requestKey(channelId: string, fromUserId: string) {
+    this.send({ type: "key:request", payload: { channelId, fromUserId } });
+  }
+
   on(type: string, handler: MessageHandler) {
     if (!this.handlers.has(type)) {
       this.handlers.set(type, new Set());

@@ -70,7 +70,8 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
               activeChannelId,
               m.ciphertext,
               membersForDecryption,
-              user.id
+              user.id,
+              m.senderId
             );
           } catch (err) {
             logger.error('Failed to decrypt message:', err);

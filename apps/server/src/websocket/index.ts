@@ -467,6 +467,47 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       break;
     }
 
+    case "key:request": {
+      // Validate payload
+      const keyRequestPayload = validatePayload("key:request", message.payload);
+      if (!keyRequestPayload) {
+        sendValidationError();
+        return;
+      }
+      const { channelId, fromUserId } = keyRequestPayload;
+      const user = socketUsers.get(socket);
+
+      if (!user) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Not authenticated" } }));
+        return;
+      }
+
+      // Authorization check: verify user can access this channel
+      const canAccess = await canUserAccessChannel(user.userId, channelId);
+      if (!canAccess) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Cannot access this channel" } }));
+        return;
+      }
+
+      // Find the target user's socket(s) and send them a key:requested message
+      // They should redistribute their key to include the requesting user
+      for (const [targetSocket, targetUser] of socketUsers) {
+        if (targetUser.userId === fromUserId && targetSocket.readyState === WebSocket.OPEN) {
+          targetSocket.send(JSON.stringify({
+            type: "key:requested",
+            payload: {
+              channelId,
+              requestingUserId: user.userId,
+            },
+          }));
+        }
+      }
+
+      // Acknowledge the request was sent
+      socket.send(JSON.stringify({ type: "key:request:sent", payload: { channelId, fromUserId } }));
+      break;
+    }
+
     default: {
       // Unknown message type
       socket.send(JSON.stringify({ type: "error", payload: { message: "Unknown message type" } }));
