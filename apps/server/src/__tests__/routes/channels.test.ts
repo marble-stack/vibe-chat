@@ -37,8 +37,14 @@ vi.mock('../../lib/authorization.js', () => ({
   isUserInCommunity: vi.fn(),
 }));
 
+// Mock WebSocket connection maps
+vi.mock('../../websocket/connectionMaps.js', () => ({
+  sendToUser: vi.fn(),
+}));
+
 import { db } from '../../db/index.js';
 import { canUserAccessChannel } from '../../lib/authorization.js';
+import { sendToUser } from '../../websocket/connectionMaps.js';
 
 describe('Channel Routes - Sender Key Security', () => {
   let app: FastifyInstance;
@@ -154,6 +160,70 @@ describe('Channel Routes - Sender Key Security', () => {
       });
 
       expect(response.statusCode).toBe(403);
+    });
+
+    it('should send key:available WebSocket notification to recipients', async () => {
+      const token = createTestToken(testUserId);
+      const thirdUserId = '550e8400-e29b-41d4-a716-446655440004';
+
+      vi.mocked(canUserAccessChannel).mockResolvedValue(true);
+
+      const bodyWithMultipleRecipients = {
+        channelId: testChannelId,
+        userId: testUserId,
+        distributionId: 'dist-456',
+        encryptedKeys: [
+          { forUserId: otherUserId, encryptedKey: 'encrypted-key-1' },
+          { forUserId: thirdUserId, encryptedKey: 'encrypted-key-2' },
+        ],
+      };
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/channels/sender-keys',
+        headers: {
+          authorization: authHeader(token),
+        },
+        payload: bodyWithMultipleRecipients,
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      // Verify sendToUser was called for each recipient
+      expect(sendToUser).toHaveBeenCalledTimes(2);
+      expect(sendToUser).toHaveBeenCalledWith(otherUserId, {
+        type: 'key:available',
+        payload: { channelId: testChannelId, fromUserId: testUserId },
+      });
+      expect(sendToUser).toHaveBeenCalledWith(thirdUserId, {
+        type: 'key:available',
+        payload: { channelId: testChannelId, fromUserId: testUserId },
+      });
+    });
+
+    it('should not send key:available if no encrypted keys provided', async () => {
+      const token = createTestToken(testUserId);
+
+      vi.mocked(canUserAccessChannel).mockResolvedValue(true);
+
+      const bodyWithNoKeys = {
+        channelId: testChannelId,
+        userId: testUserId,
+        distributionId: 'dist-789',
+        encryptedKeys: [],
+      };
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/channels/sender-keys',
+        headers: {
+          authorization: authHeader(token),
+        },
+        payload: bodyWithNoKeys,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(sendToUser).not.toHaveBeenCalled();
     });
   });
 
