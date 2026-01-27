@@ -52,6 +52,7 @@ pnpm test:ci
 ```
 
 ### Test Structure
+
 ```
 apps/server/src/__tests__/
 ├── db/            # Database operation tests
@@ -65,11 +66,13 @@ apps/web/src/__tests__/
 ```
 
 ### Coverage Requirements
+
 - Security-critical code (crypto, auth): 80% minimum
 - Overall coverage: 70% minimum
 - All new code must include tests
 
 ### TDD Workflow
+
 1. Write failing test first
 2. Implement minimal code to pass
 3. Refactor while keeping tests green
@@ -101,23 +104,46 @@ vibe-chat/
 ## Key Patterns
 
 ### Database (Drizzle ORM)
+
 - Schema defined in `apps/server/src/db/schema.ts`
 - Run `pnpm db:generate` after schema changes to create migrations
 - Use `db.query.*` for type-safe queries
 
 ### WebSocket Protocol
+
 Messages use `{ type: string, payload: object }` format:
+
 - `message:send` / `message:new` - Chat messages
+- `message:edit` / `message:edited` - Edit messages
+- `message:delete` / `message:deleted` - Delete messages
 - `typing:start` / `typing:stop` / `typing:update` - Typing indicators
 - `channel:join` / `channel:leave` - Channel subscription
+- `community:join` / `community:leave` - Community subscription (for presence)
+- `presence:list` / `presence:update` - Online status
+- `reaction:add` / `reaction:added` - Add emoji reactions
+- `reaction:remove` / `reaction:removed` - Remove emoji reactions
+- `key:request` / `key:requested` - Channel key redistribution requests
+- `key:available` - Notifies user that a channel key has been distributed to them
 
 ### Encryption
+
 - Uses Web Crypto API (ECDH P-256 for key exchange, AES-GCM for messages)
 - Private keys stored locally in IndexedDB via Dexie
-- Each channel has a shared symmetric key distributed to members
+- Each channel has ONE canonical shared symmetric key (first user to message creates it)
+- Key redistribution: When a new user joins, they request the key via WebSocket and the key owner redistributes it
 - Key files: `apps/web/src/lib/crypto.ts`, `keyStore.ts`, `channelCrypto.ts`
 
+**Key sync flow:**
+
+1. User A sends first message → creates channel key, distributes to current members
+2. User B joins later → sees "[Syncing keys...]" → requests key via WebSocket
+3. User A receives `key:requested` → redistributes key to all members including B via REST API
+4. Server sends `key:available` to User B via WebSocket after storing the key
+5. User B receives `key:available` → re-decrypts all pending messages
+6. Fallback: If key owner is offline, client polls for keys every 5 seconds
+
 **Known limitations:**
+
 - Keys are device-local; logging in on a new device requires re-registration
 - Key rotation on member leave not yet implemented
 - No forward secrecy - key compromise could allow decryption of past messages
@@ -140,17 +166,20 @@ Copy `apps/web/.env.example` to `apps/web/.env` if you need to override default 
 ### Implemented Security Features
 
 **Authentication:**
+
 - JWT-based authentication with required secret (no fallback defaults)
 - Token verification on all protected endpoints
 - WebSocket connections require valid JWT token
 
 **Authorization:**
+
 - Channel access checks on message send/receive
 - Community membership verification
 - Sender key distribution requires authentication and channel membership
 - REST endpoints verify user ownership where applicable
 
 **Input Validation:**
+
 - All WebSocket messages validated with Zod schemas
 - REST API payloads validated with Zod
 - UUID format validation on all ID parameters
@@ -160,11 +189,13 @@ Copy `apps/web/.env.example` to `apps/web/.env` if you need to override default 
 ### Security Improvements Needed for Production
 
 **Authentication:**
+
 - Proper password hashing (bcrypt/argon2) - currently simplified
 - OAuth integration for social login
 - Session management and refresh tokens
 
 **Encryption:**
+
 - Key rotation on member leave not yet implemented
 - No forward secrecy - key compromise could expose past messages
 - No key verification mechanism for MITM detection
@@ -178,19 +209,28 @@ Copy `apps/web/.env.example` to `apps/web/.env` if you need to override default 
 - **Frontend**: Deployed on Railway
 
 ### Working Features
+
 - User registration and login
 - Community creation and joining (via invite codes)
 - Channel creation within communities
 - Real-time messaging via WebSockets
+- Message editing and deletion
 - Emoji reactions
+- Typing indicators
+- Online presence tracking
+- End-to-end encryption with automatic key sync for new members
 
-### Recent Fixes (Jan 2025)
+### Recent Fixes (Jan 2026)
+
 - Fixed modal positioning for create/join community on mobile and laptop screens
 - Fixed @fastify/rate-limit compatibility with Fastify 4.x
 - Fixed production migrations for Railway deployment
+- Fixed multi-user message decryption (single canonical channel key)
+- Added key redistribution protocol for users joining after channel key creation
 
 ### Security Improvements (Jan 2026)
-- Added comprehensive test suite (98+ tests) with TDD approach
+
+- Added comprehensive test suite (114 tests) with TDD approach
 - JWT authentication required on WebSocket connections
 - Authorization checks on all REST endpoints (emojis, reactions, channels)
 - Sender key distribution security with auth + membership verification
@@ -198,13 +238,16 @@ Copy `apps/web/.env.example` to `apps/web/.env` if you need to override default 
 - WebSocket message validation with Zod schemas for all message types
 - Database operation safety helpers
 - Memory leak prevention in WebSocket connection management
+- Single canonical channel key enforcement to prevent key fragmentation
 
 ### Workflow Note
+
 Always push changes after making edits so Railway auto-deploys.
 
 ## Local Development (Alternative)
 
 If you want to run locally instead of deploying:
+
 ```bash
 docker compose up -d          # Start PostgreSQL + Redis
 pnpm install                  # Install dependencies

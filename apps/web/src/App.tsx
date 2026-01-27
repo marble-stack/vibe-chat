@@ -27,7 +27,7 @@ function App() {
       try {
         const hasKeys = await hasIdentityKeys();
         if (!hasKeys) {
-          logger.info('Identity keys missing - regenerating...');
+          logger.info("Identity keys missing - regenerating...");
 
           // Generate fresh identity keys
           const { keys, publicBundle } = await generateIdentityKeys();
@@ -38,10 +38,10 @@ function App() {
           // Store new keys locally
           await storeIdentityKeys(user.id, keys);
 
-          logger.info('Identity keys regenerated successfully');
+          logger.info("Identity keys regenerated successfully");
         }
       } catch (err) {
-        logger.error('Failed to ensure identity keys:', err);
+        logger.error("Failed to ensure identity keys:", err);
       } finally {
         setKeysInitialized(true);
       }
@@ -66,18 +66,9 @@ function App() {
         path="/"
         element={user ? <Navigate to="/chat" replace /> : <Navigate to="/login" replace />}
       />
-      <Route
-        path="/login"
-        element={user ? <Navigate to="/chat" replace /> : <Login />}
-      />
-      <Route
-        path="/register"
-        element={user ? <Navigate to="/chat" replace /> : <Register />}
-      />
-      <Route
-        path="/chat/*"
-        element={user ? <Chat /> : <Navigate to="/login" replace />}
-      />
+      <Route path="/login" element={user ? <Navigate to="/chat" replace /> : <Login />} />
+      <Route path="/register" element={user ? <Navigate to="/chat" replace /> : <Register />} />
+      <Route path="/chat/*" element={user ? <Chat /> : <Navigate to="/login" replace />} />
       <Route
         path="/invite/:inviteCode"
         element={user ? <Chat /> : <Navigate to="/login" replace />}

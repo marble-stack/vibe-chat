@@ -18,7 +18,9 @@
     "Phase 4.2: Database operation safety",
     "Phase 4.3: Memory leak prevention",
     "Phase 6.1: Stale closure verification (already correct)",
-    "Phase 7: Documentation updates"
+    "Phase 7: Documentation updates",
+    "Fix: Single canonical channel key enforcement",
+    "Fix: Key redistribution protocol for late joiners"
   ],
   "startedAt": "2026-01-26",
   "lastUpdated": "2026-01-26",
@@ -29,8 +31,8 @@
   "phase6Complete": true,
   "phase7Complete": true,
   "testResults": {
-    "server": 76,
-    "web": 22,
-    "total": 98
+    "server": 86,
+    "web": 28,
+    "total": 114
   }
 }

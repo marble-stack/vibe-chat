@@ -6,8 +6,9 @@
  * to members encrypted with their public keys.
  */
 
-import { api } from './api';
-import { logger } from './logger';
+import { api } from "./api";
+import { logger } from "./logger";
+import { wsClient } from "./websocket";
 import {
   generateChannelKey,
   exportAesKey,
@@ -16,7 +17,7 @@ import {
   encryptChannelKeyForRecipient,
   decryptChannelKey,
   importPrivateKey,
-} from './crypto';
+} from "./crypto";
 import {
   getChannelKey,
   storeChannelKey,
@@ -24,7 +25,10 @@ import {
   getIdentityKeys,
   storeUserKey,
   getUserKey,
-} from './keyStore';
+} from "./keyStore";
+
+// Track pending key requests to avoid duplicate requests
+const pendingKeyRequests = new Set<string>();
 
 /**
  * Get or create a channel key for sending messages
@@ -48,7 +52,7 @@ export async function ensureChannelKey(
       try {
         await distributeChannelKey(channelId, existingKey, members, currentUserId);
       } catch (err) {
-        logger.error('Failed to redistribute channel key:', err);
+        logger.error("Failed to redistribute channel key:", err);
         // Continue anyway - we still have the key locally
       }
     }
@@ -58,7 +62,7 @@ export async function ensureChannelKey(
   // Try to fetch channel key from server (someone else may have distributed one)
   const identityKeys = await getIdentityKeys();
   if (!identityKeys) {
-    throw new Error('No identity keys found. Please log in again.');
+    throw new Error("No identity keys found. Please log in again.");
   }
 
   try {
@@ -103,16 +107,52 @@ export async function ensureChannelKey(
       return { key: channelKey, isNew: false };
     }
   } catch (_err) {
-    logger.debug('No existing channel key found');
+    logger.debug("No existing channel key found for current user");
+  }
+
+  // No key exists on server for this user - check if ANY key exists in the channel
+  try {
+    const { senderKeyOwners } = await api.channels.getSenderKeyOwners(channelId);
+
+    if (senderKeyOwners.length > 0) {
+      // A key exists but we don't have it - request redistribution via WebSocket
+      const keyOwner = senderKeyOwners[0];
+      const requestKey = `${channelId}:${keyOwner.userId}`;
+
+      if (!pendingKeyRequests.has(requestKey)) {
+        pendingKeyRequests.add(requestKey);
+        logger.debug(
+          `Requesting key redistribution from ${keyOwner.userId} for channel ${channelId}`
+        );
+        wsClient.requestKey(channelId, keyOwner.userId);
+
+        // Remove from pending after 30 seconds to allow retry
+        setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+      }
+
+      if (!createIfMissing) {
+        throw new Error("Syncing keys...");
+      }
+
+      // For sending: wait briefly for key redistribution, then retry
+      throw new Error("Syncing channel key. Please try again in a moment.");
+    }
+  } catch (err) {
+    // If this is our "syncing keys" error, re-throw it
+    if (err instanceof Error && err.message.includes("Syncing")) {
+      throw err;
+    }
+    // Otherwise, just log and continue to key creation
+    logger.debug("Could not check for existing channel keys:", err);
   }
 
   // No key exists on server for this user
   if (!createIfMissing) {
     // For decryption, don't create a new key - throw error so caller can handle gracefully
-    throw new Error('No channel key available. Waiting for key distribution from another member.');
+    throw new Error("No channel key available. Waiting for key distribution from another member.");
   }
 
-  // For sending: create and distribute a new key
+  // For sending: create and distribute a new key (only if NO key exists at all)
   const channelKey = await generateChannelKey();
   const keyBase64 = await exportAesKey(channelKey);
 
@@ -127,22 +167,39 @@ export async function ensureChannelKey(
 
 /**
  * Distribute a channel key to all members
+ * Exported so it can be called when we receive a key:requested message
+ *
+ * IMPORTANT: This function fetches fresh members from the API to ensure
+ * new members who joined after the UI loaded will receive the key.
  */
-async function distributeChannelKey(
+export async function distributeChannelKey(
   channelId: string,
   channelKey: CryptoKey,
-  members: { id: string }[],
+  _members: { id: string }[], // Deprecated: members are now fetched from API
   currentUserId: string
 ): Promise<void> {
   const identityKeys = await getIdentityKeys();
   if (!identityKeys) {
-    throw new Error('No identity keys found');
+    throw new Error("No identity keys found");
+  }
+
+  // Fetch fresh member list from API to ensure new members are included
+  // This fixes the stale member list issue where new members wouldn't receive keys
+  let freshMembers: { id: string }[];
+  try {
+    const { members } = await api.channels.getMembers(channelId);
+    freshMembers = members;
+    logger.debug(`Fetched ${freshMembers.length} fresh members for key distribution`);
+  } catch (err) {
+    logger.error("Failed to fetch fresh members, using provided list:", err);
+    // Fall back to provided members if API fails (better than nothing)
+    freshMembers = _members;
   }
 
   const privateKey = await importPrivateKey(identityKeys.identityKeyPair.privateKey);
   const encryptedKeys: { forUserId: string; encryptedKey: string }[] = [];
 
-  for (const member of members) {
+  for (const member of freshMembers) {
     try {
       // Always fetch fresh keys from server to handle key regeneration
       // Users may have regenerated their keys on a new device
@@ -171,17 +228,19 @@ async function distributeChannelKey(
     }
   }
 
-  // Send to server
-  if (encryptedKeys.length > 0) {
-    await api.channels.distributeSenderKey({
-      channelId,
-      userId: currentUserId,
-      distributionId: crypto.randomUUID(),
-      // Include sender's public key for decryption after key rotation
-      senderPublicKey: identityKeys.identityKeyPair.publicKey,
-      encryptedKeys,
-    });
+  // Send to server - throw error if no keys could be encrypted
+  if (encryptedKeys.length === 0) {
+    throw new Error("Failed to encrypt key for any members");
   }
+
+  await api.channels.distributeSenderKey({
+    channelId,
+    userId: currentUserId,
+    distributionId: crypto.randomUUID(),
+    // Include sender's public key for decryption after key rotation
+    senderPublicKey: identityKeys.identityKeyPair.publicKey,
+    encryptedKeys,
+  });
 }
 
 /**
@@ -204,13 +263,14 @@ export async function decryptChannelMessage(
   channelId: string,
   ciphertext: string,
   _members: { id: string; displayName: string }[],
-  currentUserId: string
+  currentUserId: string,
+  senderId?: string
 ): Promise<string> {
   // Check if we have identity keys - if not, encryption is not set up
   const identityKeys = await getIdentityKeys();
   if (!identityKeys) {
-    logger.warn('No identity keys found - encryption not set up for this device');
-    return '[Encryption not set up - please re-register]';
+    logger.warn("No identity keys found - encryption not set up for this device");
+    return "[Encryption not set up - please re-register]";
   }
 
   // First try with local key if we have one
@@ -220,7 +280,7 @@ export async function decryptChannelMessage(
       return await decryptMessage(ciphertext, localKey);
     } catch {
       // Local key didn't work - might be stale, try fetching fresh key from server
-      logger.debug('Local key failed to decrypt, trying to fetch fresh key from server');
+      logger.debug("Local key failed to decrypt, trying to fetch fresh key from server");
     }
   }
 
@@ -261,10 +321,44 @@ export async function decryptChannelMessage(
       }
     }
   } catch (err) {
-    logger.error('Failed to fetch keys from server:', err);
+    logger.error("Failed to fetch keys from server:", err);
   }
 
-  return '[Unable to decrypt message]';
+  // Could not decrypt - request key from the sender if we know who they are
+  // Note: We request even for our own messages, as another device may have the key
+  if (senderId) {
+    const requestKey = `${channelId}:${senderId}`;
+    if (!pendingKeyRequests.has(requestKey)) {
+      pendingKeyRequests.add(requestKey);
+      logger.debug(`Requesting key from sender ${senderId} for channel ${channelId}`);
+      wsClient.requestKey(channelId, senderId);
+
+      // Remove from pending after 30 seconds to allow retry
+      setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+    }
+    return "[Syncing keys...]";
+  }
+
+  // Check if ANY key exists in the channel and request it
+  try {
+    const { senderKeyOwners } = await api.channels.getSenderKeyOwners(channelId);
+    if (senderKeyOwners.length > 0) {
+      const keyOwner = senderKeyOwners[0];
+      const requestKey = `${channelId}:${keyOwner.userId}`;
+      if (!pendingKeyRequests.has(requestKey)) {
+        pendingKeyRequests.add(requestKey);
+        logger.debug(`Requesting key redistribution from ${keyOwner.userId}`);
+        wsClient.requestKey(channelId, keyOwner.userId);
+
+        setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+      }
+      return "[Syncing keys...]";
+    }
+  } catch {
+    // Ignore error checking for key owners
+  }
+
+  return "[Unable to decrypt message]";
 }
 
 /**
@@ -272,4 +366,76 @@ export async function decryptChannelMessage(
  */
 export async function canEncryptInChannel(channelId: string): Promise<boolean> {
   return await hasChannelKey(channelId);
+}
+
+/**
+ * Clear a pending key request (called when key is received)
+ */
+export function clearPendingKeyRequest(channelId: string, userId: string): void {
+  const requestKey = `${channelId}:${userId}`;
+  pendingKeyRequests.delete(requestKey);
+}
+
+/**
+ * Try to fetch and store a channel key from the server.
+ * Returns true if a new key was successfully fetched.
+ * This is used for polling when the key owner may have been offline.
+ */
+export async function tryFetchChannelKey(
+  channelId: string,
+  currentUserId: string
+): Promise<boolean> {
+  // Check if we already have the key
+  if (await hasChannelKey(channelId)) {
+    return false;
+  }
+
+  const identityKeys = await getIdentityKeys();
+  if (!identityKeys) {
+    return false;
+  }
+
+  try {
+    const { senderKeys } = await api.channels.getSenderKeys(channelId, currentUserId);
+
+    if (senderKeys.length > 0) {
+      const senderKey = senderKeys[0];
+      const privateKey = await importPrivateKey(identityKeys.identityKeyPair.privateKey);
+
+      let senderPublicKeyValue = senderKey.senderPublicKey;
+      if (!senderPublicKeyValue) {
+        const cachedKey = await getUserKey(senderKey.userId);
+        if (cachedKey) {
+          senderPublicKeyValue = cachedKey.identityKeyPublic;
+        } else {
+          const userKeys = await api.auth.getUserKeys(senderKey.userId);
+          senderPublicKeyValue = userKeys.identityKey;
+          await storeUserKey(
+            senderKey.userId,
+            userKeys.identityKey,
+            userKeys.signedPreKey.publicKey
+          );
+        }
+      }
+
+      const channelKey = await decryptChannelKey(
+        senderKey.encryptedKey,
+        privateKey,
+        senderPublicKeyValue
+      );
+
+      const keyBase64 = await exportAesKey(channelKey);
+      await storeChannelKey(channelId, keyBase64);
+
+      // Clear pending request since we got the key
+      clearPendingKeyRequest(channelId, senderKey.userId);
+
+      logger.debug(`Successfully fetched channel key for ${channelId}`);
+      return true;
+    }
+  } catch (err) {
+    logger.debug("Failed to fetch channel key:", err);
+  }
+
+  return false;
 }

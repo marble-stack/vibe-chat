@@ -107,6 +107,7 @@ type(scope): description
 ```
 
 Types:
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -116,6 +117,7 @@ Types:
 - `chore`: Maintenance tasks
 
 Examples:
+
 ```
 feat(auth): add password reset functionality
 fix(websocket): handle disconnection gracefully
@@ -194,6 +196,7 @@ apps/web/src/__tests__/
 ### Security Code Requirements
 
 For security-sensitive code (auth, crypto, WebSocket):
+
 - 100% test coverage for new code paths
 - Input validation with Zod schemas
 - Authorization checks for all user data access

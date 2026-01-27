@@ -6,29 +6,43 @@ const SALT_ROUNDS = 12;
 const JWT_EXPIRES_IN = "7d";
 
 // JWT_SECRET is required - no fallback default
-// Only allow missing JWT_SECRET in test environment when explicitly set
+// Use lazy evaluation to allow environment to be fully loaded before checking
+let cachedJwtSecret: string | null = null;
+
 function getJwtSecret(): string {
+  // Return cached value if already retrieved
+  if (cachedJwtSecret) {
+    return cachedJwtSecret;
+  }
+
   const secret = process.env.JWT_SECRET;
 
   if (!secret) {
-    // In test environment, check if it was set by the test setup
+    // In test environment, provide a more specific error message
     if (process.env.NODE_ENV === "test") {
       throw new Error(
         "JWT_SECRET environment variable is required. " +
-        "For tests, set JWT_SECRET in your test setup file."
+          "For tests, set JWT_SECRET in your test setup file."
       );
     }
 
     throw new Error(
       "JWT_SECRET environment variable is required. " +
-      "Please set a secure JWT_SECRET in your environment."
+        "Please set a secure JWT_SECRET in your environment."
     );
   }
 
+  // Cache the secret for subsequent calls
+  cachedJwtSecret = secret;
   return secret;
 }
 
-const JWT_SECRET = getJwtSecret();
+/**
+ * Reset the cached JWT secret (for testing purposes only)
+ */
+export function resetJwtSecretCache(): void {
+  cachedJwtSecret = null;
+}
 
 export interface JwtPayload {
   userId: string;
@@ -53,7 +67,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
  * Generate a JWT token for a user
  */
 export function generateToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_EXPIRES_IN });
 }
 
 /**
@@ -61,7 +75,7 @@ export function generateToken(payload: JwtPayload): string {
  */
 export function verifyToken(token: string): JwtPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JwtPayload;
+    return jwt.verify(token, getJwtSecret()) as JwtPayload;
   } catch {
     return null;
   }
@@ -81,10 +95,7 @@ export function extractToken(authHeader: string | undefined): string | null {
  * Authentication middleware for protected routes
  * Adds `user` to request object if authenticated
  */
-export async function authMiddleware(
-  request: FastifyRequest,
-  reply: FastifyReply
-): Promise<void> {
+export async function authMiddleware(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const token = extractToken(request.headers.authorization);
 
   if (!token) {

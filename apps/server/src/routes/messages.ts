@@ -32,12 +32,15 @@ export const messageRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(403).send({ error: "Cannot send messages as another user" });
     }
 
-    const [message] = await db.insert(messages).values({
-      channelId: body.channelId,
-      senderId: body.senderId,
-      ciphertext: body.ciphertext,
-      replyToId: body.replyToId,
-    }).returning();
+    const [message] = await db
+      .insert(messages)
+      .values({
+        channelId: body.channelId,
+        senderId: body.senderId,
+        ciphertext: body.ciphertext,
+        replyToId: body.replyToId,
+      })
+      .returning();
 
     return { message };
   });
@@ -62,15 +65,14 @@ export const messageRoutes: FastifyPluginAsync = async (fastify) => {
 
     const query = db.query.messages.findMany({
       where: cursor
-        ? (messages, { and: andOp, lt: ltOp, isNull: isNullOp }) => andOp(
-            eq(messages.channelId, channelId),
-            ltOp(messages.createdAt, new Date(cursor)),
-            isNullOp(messages.deletedAt)
-          )
-        : (messages, { and: andOp, isNull: isNullOp }) => andOp(
-            eq(messages.channelId, channelId),
-            isNullOp(messages.deletedAt)
-          ),
+        ? (messages, { and: andOp, lt: ltOp, isNull: isNullOp }) =>
+            andOp(
+              eq(messages.channelId, channelId),
+              ltOp(messages.createdAt, new Date(cursor)),
+              isNullOp(messages.deletedAt)
+            )
+        : (messages, { and: andOp, isNull: isNullOp }) =>
+            andOp(eq(messages.channelId, channelId), isNullOp(messages.deletedAt)),
       orderBy: desc(messages.createdAt),
       limit: limitNum,
     });
@@ -78,34 +80,44 @@ export const messageRoutes: FastifyPluginAsync = async (fastify) => {
     const channelMessages = await query;
 
     // Get reactions for all messages
-    const messageIds = channelMessages.map(m => m.id);
-    const messageReactions = messageIds.length > 0
-      ? await db.query.reactions.findMany({
-          where: (reactions, { inArray }) => inArray(reactions.messageId, messageIds),
-        })
-      : [];
+    const messageIds = channelMessages.map((m) => m.id);
+    const messageReactions =
+      messageIds.length > 0
+        ? await db.query.reactions.findMany({
+            where: (reactions, { inArray }) => inArray(reactions.messageId, messageIds),
+          })
+        : [];
 
     // Group reactions by message and emoji
-    const reactionsByMessage = messageReactions.reduce((acc, reaction) => {
-      if (!acc[reaction.messageId]) {
-        acc[reaction.messageId] = {};
-      }
-      if (!acc[reaction.messageId][reaction.emoji]) {
-        acc[reaction.messageId][reaction.emoji] = {
-          emoji: reaction.emoji,
-          count: 0,
-          userIds: [],
-          reactionIds: {},
-        };
-      }
-      acc[reaction.messageId][reaction.emoji].count++;
-      acc[reaction.messageId][reaction.emoji].userIds.push(reaction.userId);
-      acc[reaction.messageId][reaction.emoji].reactionIds[reaction.userId] = reaction.id;
-      return acc;
-    }, {} as Record<string, Record<string, { emoji: string; count: number; userIds: string[]; reactionIds: Record<string, string> }>>);
+    const reactionsByMessage = messageReactions.reduce(
+      (acc, reaction) => {
+        if (!acc[reaction.messageId]) {
+          acc[reaction.messageId] = {};
+        }
+        if (!acc[reaction.messageId][reaction.emoji]) {
+          acc[reaction.messageId][reaction.emoji] = {
+            emoji: reaction.emoji,
+            count: 0,
+            userIds: [],
+            reactionIds: {},
+          };
+        }
+        acc[reaction.messageId][reaction.emoji].count++;
+        acc[reaction.messageId][reaction.emoji].userIds.push(reaction.userId);
+        acc[reaction.messageId][reaction.emoji].reactionIds[reaction.userId] = reaction.id;
+        return acc;
+      },
+      {} as Record<
+        string,
+        Record<
+          string,
+          { emoji: string; count: number; userIds: string[]; reactionIds: Record<string, string> }
+        >
+      >
+    );
 
     // Add reactions to messages and include editedAt
-    const messagesWithReactions = channelMessages.map(msg => ({
+    const messagesWithReactions = channelMessages.map((msg) => ({
       ...msg,
       editedAt: msg.editedAt?.toISOString() || null,
       reactions: Object.values(reactionsByMessage[msg.id] || {}),
@@ -113,9 +125,8 @@ export const messageRoutes: FastifyPluginAsync = async (fastify) => {
 
     return {
       messages: messagesWithReactions.reverse(),
-      nextCursor: channelMessages.length === limitNum
-        ? channelMessages[0]?.createdAt.toISOString()
-        : null,
+      nextCursor:
+        channelMessages.length === limitNum ? channelMessages[0]?.createdAt.toISOString() : null,
     };
   });
 };

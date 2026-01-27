@@ -8,7 +8,7 @@
 // Utility functions for encoding/decoding
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
-  let binary = '';
+  let binary = "";
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
@@ -26,7 +26,7 @@ export function base64ToArrayBuffer(base64: string): ArrayBuffer {
 
 // Key pair interface
 export interface KeyPairData {
-  publicKey: string;  // Base64 encoded
+  publicKey: string; // Base64 encoded
   privateKey: string; // Base64 encoded (JWK format for storage)
 }
 
@@ -41,18 +41,17 @@ export interface IdentityKeys {
  * Generate an ECDH key pair for key exchange
  */
 export async function generateKeyPair(): Promise<CryptoKeyPair> {
-  return await crypto.subtle.generateKey(
-    { name: 'ECDH', namedCurve: 'P-256' },
-    true,
-    ['deriveKey', 'deriveBits']
-  );
+  return await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, [
+    "deriveKey",
+    "deriveBits",
+  ]);
 }
 
 /**
  * Export a public key to base64 for transmission
  */
 export async function exportPublicKey(publicKey: CryptoKey): Promise<string> {
-  const exported = await crypto.subtle.exportKey('spki', publicKey);
+  const exported = await crypto.subtle.exportKey("spki", publicKey);
   return arrayBufferToBase64(exported);
 }
 
@@ -60,7 +59,7 @@ export async function exportPublicKey(publicKey: CryptoKey): Promise<string> {
  * Export a private key to JWK for storage
  */
 export async function exportPrivateKey(privateKey: CryptoKey): Promise<string> {
-  const exported = await crypto.subtle.exportKey('jwk', privateKey);
+  const exported = await crypto.subtle.exportKey("jwk", privateKey);
   return JSON.stringify(exported);
 }
 
@@ -70,9 +69,9 @@ export async function exportPrivateKey(privateKey: CryptoKey): Promise<string> {
 export async function importPublicKey(publicKeyBase64: string): Promise<CryptoKey> {
   const keyData = base64ToArrayBuffer(publicKeyBase64);
   return await crypto.subtle.importKey(
-    'spki',
+    "spki",
     keyData,
-    { name: 'ECDH', namedCurve: 'P-256' },
+    { name: "ECDH", namedCurve: "P-256" },
     true,
     []
   );
@@ -83,13 +82,10 @@ export async function importPublicKey(publicKeyBase64: string): Promise<CryptoKe
  */
 export async function importPrivateKey(privateKeyJwk: string): Promise<CryptoKey> {
   const jwk = JSON.parse(privateKeyJwk);
-  return await crypto.subtle.importKey(
-    'jwk',
-    jwk,
-    { name: 'ECDH', namedCurve: 'P-256' },
-    true,
-    ['deriveKey', 'deriveBits']
-  );
+  return await crypto.subtle.importKey("jwk", jwk, { name: "ECDH", namedCurve: "P-256" }, true, [
+    "deriveKey",
+    "deriveBits",
+  ]);
 }
 
 /**
@@ -100,11 +96,11 @@ export async function deriveSharedKey(
   publicKey: CryptoKey
 ): Promise<CryptoKey> {
   return await crypto.subtle.deriveKey(
-    { name: 'ECDH', public: publicKey },
+    { name: "ECDH", public: publicKey },
     privateKey,
-    { name: 'AES-GCM', length: 256 },
+    { name: "AES-GCM", length: 256 },
     true,
-    ['encrypt', 'decrypt']
+    ["encrypt", "decrypt"]
   );
 }
 
@@ -112,18 +108,17 @@ export async function deriveSharedKey(
  * Generate a random channel key (for group encryption)
  */
 export async function generateChannelKey(): Promise<CryptoKey> {
-  return await crypto.subtle.generateKey(
-    { name: 'AES-GCM', length: 256 },
-    true,
-    ['encrypt', 'decrypt']
-  );
+  return await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, [
+    "encrypt",
+    "decrypt",
+  ]);
 }
 
 /**
  * Export an AES key to base64 for transmission
  */
 export async function exportAesKey(key: CryptoKey): Promise<string> {
-  const exported = await crypto.subtle.exportKey('raw', key);
+  const exported = await crypto.subtle.exportKey("raw", key);
   return arrayBufferToBase64(exported);
 }
 
@@ -132,23 +127,17 @@ export async function exportAesKey(key: CryptoKey): Promise<string> {
  */
 export async function importAesKey(keyBase64: string): Promise<CryptoKey> {
   const keyData = base64ToArrayBuffer(keyBase64);
-  return await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'AES-GCM', length: 256 },
-    true,
-    ['encrypt', 'decrypt']
-  );
+  return await crypto.subtle.importKey("raw", keyData, { name: "AES-GCM", length: 256 }, true, [
+    "encrypt",
+    "decrypt",
+  ]);
 }
 
 /**
  * Encrypt a message with AES-GCM
  * Returns base64 encoded: iv (12 bytes) + ciphertext
  */
-export async function encryptMessage(
-  message: string,
-  key: CryptoKey
-): Promise<string> {
+export async function encryptMessage(message: string, key: CryptoKey): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(message);
 
@@ -156,11 +145,7 @@ export async function encryptMessage(
   const iv = crypto.getRandomValues(new Uint8Array(12));
 
   // Encrypt
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    data
-  );
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, data);
 
   // Combine IV + ciphertext
   const combined = new Uint8Array(iv.length + ciphertext.byteLength);
@@ -174,10 +159,7 @@ export async function encryptMessage(
  * Decrypt a message with AES-GCM
  * Expects base64 encoded: iv (12 bytes) + ciphertext
  */
-export async function decryptMessage(
-  ciphertextBase64: string,
-  key: CryptoKey
-): Promise<string> {
+export async function decryptMessage(ciphertextBase64: string, key: CryptoKey): Promise<string> {
   const combined = new Uint8Array(base64ToArrayBuffer(ciphertextBase64));
 
   // Extract IV and ciphertext
@@ -185,11 +167,7 @@ export async function decryptMessage(
   const ciphertext = combined.slice(12);
 
   // Decrypt
-  const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    ciphertext
-  );
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
 
   const decoder = new TextDecoder();
   return decoder.decode(decrypted);
@@ -199,22 +177,17 @@ export async function decryptMessage(
  * Sign data using ECDSA (for signed pre-key)
  */
 export async function generateSigningKeyPair(): Promise<CryptoKeyPair> {
-  return await crypto.subtle.generateKey(
-    { name: 'ECDSA', namedCurve: 'P-256' },
-    true,
-    ['sign', 'verify']
-  );
+  return await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, [
+    "sign",
+    "verify",
+  ]);
 }
 
 /**
  * Sign data with private key
  */
 export async function signData(data: ArrayBuffer, privateKey: CryptoKey): Promise<string> {
-  const signature = await crypto.subtle.sign(
-    { name: 'ECDSA', hash: 'SHA-256' },
-    privateKey,
-    data
-  );
+  const signature = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, privateKey, data);
   return arrayBufferToBase64(signature);
 }
 

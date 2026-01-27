@@ -66,6 +66,12 @@ export const reactionRemovePayloadSchema = z.object({
   emoji: z.string().min(1).max(200),
 });
 
+// Key distribution request - for when a user needs a channel key
+export const keyRequestPayloadSchema = z.object({
+  channelId: z.string().uuid(),
+  fromUserId: z.string().uuid().optional(), // Deprecated - server broadcasts to all key holders
+});
+
 // Message type to schema mapping
 export const payloadSchemas = {
   auth: authPayloadSchema,
@@ -80,6 +86,7 @@ export const payloadSchemas = {
   "typing:stop": typingPayloadSchema,
   "reaction:add": reactionAddPayloadSchema,
   "reaction:remove": reactionRemovePayloadSchema,
+  "key:request": keyRequestPayloadSchema,
 } as const;
 
 export type MessageType = keyof typeof payloadSchemas;

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
 import { generateIdentityKeys } from "../lib/crypto";
-import { storeIdentityKeys, clearAllKeys } from "../lib/keyStore";
+import { storeIdentityKeys, clearAllKeys, getIdentityKeys } from "../lib/keyStore";
 
 export function Login() {
   const [email, setEmail] = useState("");
@@ -20,18 +20,21 @@ export function Login() {
     try {
       const { user, token } = await api.auth.login(email, password);
 
-      // Clear all old keys to ensure clean state
-      // Old channel keys might be corrupted or from a different session
-      await clearAllKeys();
+      // Check if we already have identity keys for this user
+      const existingKeys = await getIdentityKeys();
 
-      // Generate fresh identity keys
-      const { keys, publicBundle } = await generateIdentityKeys();
+      if (existingKeys && existingKeys.userId === user.id) {
+        // Reuse existing keys - preserves ability to decrypt old messages
+        console.log("Reusing existing identity keys for user:", user.id);
+      } else {
+        // Different user or no keys - clear and regenerate
+        console.log("Generating new identity keys for user:", user.id);
+        await clearAllKeys();
 
-      // Update keys on server
-      await api.auth.updateKeys(publicBundle, token);
-
-      // Store new keys locally
-      await storeIdentityKeys(user.id, keys);
+        const { keys, publicBundle } = await generateIdentityKeys();
+        await api.auth.updateKeys(publicBundle, token);
+        await storeIdentityKeys(user.id, keys);
+      }
 
       setAuth(user, token);
     } catch (err) {
@@ -81,9 +84,7 @@ export function Login() {
             />
           </div>
 
-          {error && (
-            <p className="text-red-400 text-sm mb-4">{error}</p>
-          )}
+          {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
           <button
             type="submit"
@@ -93,7 +94,6 @@ export function Login() {
             {loading ? "Logging in..." : "Log In"}
           </button>
         </form>
-
       </div>
     </div>
   );

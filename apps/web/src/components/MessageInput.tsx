@@ -9,14 +9,17 @@ export function MessageInput() {
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { activeChannelId, channels, activeCommunityId, members, replyingTo, setReplyingTo } = useChatStore();
+  const { activeChannelId, channels, activeCommunityId, members, replyingTo, setReplyingTo } =
+    useChatStore();
   const user = useAuthStore((state) => state.user);
 
-  const activeChannel = activeCommunityId && activeChannelId
-    ? channels[activeCommunityId]?.find((c) => c.id === activeChannelId)
-    : null;
+  const activeChannel =
+    activeCommunityId && activeChannelId
+      ? channels[activeCommunityId]?.find((c) => c.id === activeChannelId)
+      : null;
 
   const communityMembers = activeCommunityId ? members[activeCommunityId] || [] : [];
 
@@ -31,16 +34,26 @@ export function MessageInput() {
     e.preventDefault();
     if (!message.trim() || !activeChannelId || !user || isSending) return;
 
+    // Clear any previous error
+    setSendError(null);
+
+    // Check if WebSocket is connected
+    if (!wsClient.isConnected()) {
+      setSendError("Not connected. Please wait or refresh the page.");
+      return;
+    }
+
     // Ensure members are loaded before sending to properly distribute encryption keys
     if (communityMembers.length === 0) {
-      logger.warn('Members not loaded yet, cannot encrypt message properly');
+      logger.warn("Members not loaded yet, cannot encrypt message properly");
+      setSendError("Loading... please try again.");
       return;
     }
 
     // Ensure current user is in the members list for proper key distribution
-    const membersWithSelf = communityMembers.some(m => m.id === user.id)
+    const membersWithSelf = communityMembers.some((m) => m.id === user.id)
       ? communityMembers
-      : [...communityMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+      : [...communityMembers, { id: user.id, displayName: user.displayName || "Me" }];
 
     const plaintext = message.trim();
     const replyToId = replyingTo?.id;
@@ -57,11 +70,16 @@ export function MessageInput() {
         user.id
       );
 
-      wsClient.sendMessage(activeChannelId, ciphertext, replyToId);
+      const sent = wsClient.sendMessage(activeChannelId, ciphertext, replyToId);
+      if (!sent) {
+        setSendError("Message queued - connection issue. Will send when reconnected.");
+      }
     } catch (err) {
-      logger.error('Failed to encrypt message:', err);
-      // Fallback to plaintext if encryption fails (for backward compatibility)
-      wsClient.sendMessage(activeChannelId, plaintext, replyToId);
+      logger.error("Failed to encrypt message:", err);
+      // Do NOT fall back to plaintext - encryption is mandatory
+      // Restore the message so user can retry
+      setMessage(plaintext);
+      setSendError("Encryption failed. Please try again or refresh the page.");
     } finally {
       setIsSending(false);
     }
@@ -118,8 +136,23 @@ export function MessageInput() {
     }
   }, [replyingTo]);
 
+  // Clear error after a few seconds
+  useEffect(() => {
+    if (sendError) {
+      const timer = setTimeout(() => setSendError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [sendError]);
+
   return (
     <form onSubmit={handleSubmit} className="px-4 pb-6">
+      {/* Error message */}
+      {sendError && (
+        <div className="bg-red-500/20 border border-red-500/50 text-red-400 text-sm px-4 py-2 rounded-lg mb-2">
+          {sendError}
+        </div>
+      )}
+
       {/* Reply preview bar */}
       {replyingTo && (
         <div className="bg-background-tertiary rounded-t-lg border-b border-background-primary px-4 py-2 flex items-center gap-2">
@@ -139,13 +172,20 @@ export function MessageInput() {
             title="Cancel reply"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
       )}
 
-      <div className={`bg-background-tertiary flex items-center px-4 ${replyingTo ? 'rounded-b-lg' : 'rounded-lg'}`}>
+      <div
+        className={`bg-background-tertiary flex items-center px-4 ${replyingTo ? "rounded-b-lg" : "rounded-lg"}`}
+      >
         <button
           type="button"
           className="text-text-muted hover:text-text-primary p-2"
@@ -165,13 +205,14 @@ export function MessageInput() {
           className="flex-1 bg-transparent text-text-primary py-3 px-2 outline-none"
         />
 
-        <button
-          type="button"
-          className="text-text-muted hover:text-text-primary p-2"
-          title="Emoji"
-        >
+        <button type="button" className="text-text-muted hover:text-text-primary p-2" title="Emoji">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
         </button>
 
@@ -182,7 +223,12 @@ export function MessageInput() {
           title={communityMembers.length === 0 ? "Loading..." : "Send message"}
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+            />
           </svg>
         </button>
       </div>

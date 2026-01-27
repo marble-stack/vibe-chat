@@ -7,7 +7,8 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = path.resolve(__dirname, "../../drizzle");
 
-const connectionString = process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/vibechat";
+const connectionString =
+  process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/vibechat";
 
 const client = postgres(connectionString, { max: 1 });
 const db = drizzle(client);

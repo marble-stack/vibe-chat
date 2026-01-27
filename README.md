@@ -16,6 +16,7 @@ An end-to-end encrypted messaging application with Discord-style communities and
 ## Tech Stack
 
 ### Backend
+
 - **Fastify** - Fast, low-overhead web framework
 - **WebSocket (ws)** - Real-time bidirectional communication
 - **PostgreSQL** - Primary database
@@ -23,6 +24,7 @@ An end-to-end encrypted messaging application with Discord-style communities and
 - **Zod** - Runtime schema validation
 
 ### Frontend
+
 - **React 18** - UI framework
 - **Vite** - Build tool and dev server
 - **Zustand** - State management
@@ -39,28 +41,33 @@ An end-to-end encrypted messaging application with Discord-style communities and
 ## Quick Start
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/your-username/vibe-chat.git
    cd vibe-chat
    ```
 
 2. **Start the database services**
+
    ```bash
    docker compose up -d
    ```
 
 3. **Install dependencies**
+
    ```bash
    pnpm install
    ```
 
 4. **Set up environment variables**
+
    ```bash
    cp apps/server/.env.example apps/server/.env
    cp apps/web/.env.example apps/web/.env
    ```
 
 5. **Run database migrations**
+
    ```bash
    pnpm db:migrate
    ```
@@ -71,6 +78,7 @@ An end-to-end encrypted messaging application with Discord-style communities and
    ```
 
 The application will be available at:
+
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:3000
 
@@ -103,13 +111,13 @@ This project uses Vitest for testing with strict coverage requirements.
 
 ### Running Tests
 
-| Command | Description |
-|---------|-------------|
-| `pnpm test` | Run all tests once |
-| `pnpm test:watch` | Run in watch mode |
-| `pnpm test:coverage` | Generate coverage report |
-| `pnpm --filter server test` | Server tests only |
-| `pnpm --filter web test` | Frontend tests only |
+| Command                     | Description              |
+| --------------------------- | ------------------------ |
+| `pnpm test`                 | Run all tests once       |
+| `pnpm test:watch`           | Run in watch mode        |
+| `pnpm test:coverage`        | Generate coverage report |
+| `pnpm --filter server test` | Server tests only        |
+| `pnpm --filter web test`    | Frontend tests only      |
 
 ### Test Structure
 
@@ -126,6 +134,7 @@ apps/web/src/__tests__/
 ```
 
 ### Coverage Requirements
+
 - Security-critical code (crypto, auth): 80% minimum
 - Overall coverage: 70% minimum
 - All new code must include tests
@@ -133,21 +142,23 @@ apps/web/src/__tests__/
 ## Available Scripts
 
 ### Root
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start all services in development mode |
-| `pnpm dev:server` | Start backend only |
-| `pnpm dev:web` | Start frontend only |
-| `pnpm build` | Build all packages |
-| `pnpm lint` | Run linting across all packages |
-| `pnpm test` | Run all tests |
-| `pnpm db:migrate` | Run database migrations |
+
+| Command           | Description                            |
+| ----------------- | -------------------------------------- |
+| `pnpm dev`        | Start all services in development mode |
+| `pnpm dev:server` | Start backend only                     |
+| `pnpm dev:web`    | Start frontend only                    |
+| `pnpm build`      | Build all packages                     |
+| `pnpm lint`       | Run linting across all packages        |
+| `pnpm test`       | Run all tests                          |
+| `pnpm db:migrate` | Run database migrations                |
 
 ### Server (`apps/server`)
-| Command | Description |
-|---------|-------------|
+
+| Command            | Description                                 |
+| ------------------ | ------------------------------------------- |
 | `pnpm db:generate` | Generate new migrations from schema changes |
-| `pnpm db:studio` | Open Drizzle Studio GUI |
+| `pnpm db:studio`   | Open Drizzle Studio GUI                     |
 
 ## Encryption
 
@@ -169,6 +180,7 @@ Vibe Chat implements end-to-end encryption using a Signal Protocol-inspired appr
 ### Railway (Backend)
 
 The backend is configured for Railway deployment. Set these environment variables:
+
 - `DATABASE_URL` - PostgreSQL connection string (auto-provided by Railway)
 - `CORS_ORIGIN` - Your frontend URL
 - `NODE_ENV` - Set to `production`
@@ -176,6 +188,7 @@ The backend is configured for Railway deployment. Set these environment variable
 ### Vercel (Frontend)
 
 The frontend is configured for Vercel deployment. Set these environment variables:
+
 - `VITE_API_URL` - Your backend API URL
 - `VITE_WS_URL` - Your backend WebSocket URL
 
@@ -194,18 +207,18 @@ pnpm db:migrate   # Apply migrations
 
 Messages follow the format `{ type: string, payload: object }`:
 
-| Type | Direction | Description |
-|------|-----------|-------------|
-| `message:send` | Client → Server | Send a new message |
-| `message:new` | Server → Client | New message received |
-| `message:edit` | Client → Server | Edit an existing message |
-| `message:delete` | Client → Server | Delete a message |
-| `typing:start` | Client → Server | User started typing |
-| `typing:stop` | Client → Server | User stopped typing |
-| `typing:update` | Server → Client | Typing status update |
-| `channel:join` | Client → Server | Join a channel |
-| `channel:leave` | Client → Server | Leave a channel |
-| `presence:update` | Server → Client | User presence changed |
+| Type              | Direction       | Description              |
+| ----------------- | --------------- | ------------------------ |
+| `message:send`    | Client → Server | Send a new message       |
+| `message:new`     | Server → Client | New message received     |
+| `message:edit`    | Client → Server | Edit an existing message |
+| `message:delete`  | Client → Server | Delete a message         |
+| `typing:start`    | Client → Server | User started typing      |
+| `typing:stop`     | Client → Server | User stopped typing      |
+| `typing:update`   | Server → Client | Typing status update     |
+| `channel:join`    | Client → Server | Join a channel           |
+| `channel:leave`   | Client → Server | Leave a channel          |
+| `presence:update` | Server → Client | User presence changed    |
 
 ## Contributing
 

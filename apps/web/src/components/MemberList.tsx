@@ -16,7 +16,7 @@ export function MemberList() {
 
   const onlineCount = communityMembers.filter((m) => onlineUserIds.includes(m.id)).length;
 
-  const renderMember = (member: typeof communityMembers[0]) => {
+  const renderMember = (member: (typeof communityMembers)[0]) => {
     const isOnline = onlineUserIds.includes(member.id);
 
     return (
@@ -45,9 +45,7 @@ export function MemberList() {
             }`}
           />
         </div>
-        <span className="text-text-secondary truncate">
-          {member.displayName}
-        </span>
+        <span className="text-text-secondary truncate">{member.displayName}</span>
       </div>
     );
   };
@@ -64,9 +62,7 @@ export function MemberList() {
             <h3 className="text-xs font-semibold text-text-muted uppercase mb-2">
               Online — {onlineCount}
             </h3>
-            <div className="space-y-1 mb-4">
-              {onlineMembers.map(renderMember)}
-            </div>
+            <div className="space-y-1 mb-4">{onlineMembers.map(renderMember)}</div>
           </>
         )}
 
@@ -76,9 +72,7 @@ export function MemberList() {
             <h3 className="text-xs font-semibold text-text-muted uppercase mb-2">
               Offline — {offlineMembers.length}
             </h3>
-            <div className="space-y-1">
-              {offlineMembers.map(renderMember)}
-            </div>
+            <div className="space-y-1">{offlineMembers.map(renderMember)}</div>
           </>
         )}
       </div>

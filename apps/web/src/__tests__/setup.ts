@@ -1,6 +1,6 @@
-import { vi, beforeAll, afterAll, afterEach, expect } from 'vitest';
-import { cleanup } from '@testing-library/react';
-import * as matchers from '@testing-library/jest-dom/matchers';
+import { vi, beforeAll, afterAll, afterEach, expect } from "vitest";
+import { cleanup } from "@testing-library/react";
+import * as matchers from "@testing-library/jest-dom/matchers";
 
 // Extend Vitest's expect with jest-dom matchers
 expect.extend(matchers);
@@ -28,8 +28,8 @@ const cryptoMock = {
 };
 
 // Set up crypto mock if not in secure context
-if (typeof globalThis.crypto === 'undefined') {
-  Object.defineProperty(globalThis, 'crypto', {
+if (typeof globalThis.crypto === "undefined") {
+  Object.defineProperty(globalThis, "crypto", {
     value: cryptoMock,
     writable: true,
   });
@@ -41,8 +41,8 @@ const indexedDBMock = {
   deleteDatabase: vi.fn(),
 };
 
-if (typeof globalThis.indexedDB === 'undefined') {
-  Object.defineProperty(globalThis, 'indexedDB', {
+if (typeof globalThis.indexedDB === "undefined") {
+  Object.defineProperty(globalThis, "indexedDB", {
     value: indexedDBMock,
     writable: true,
   });

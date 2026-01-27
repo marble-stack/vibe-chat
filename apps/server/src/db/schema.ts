@@ -15,15 +15,21 @@ export const users = pgTable("users", {
 });
 
 // One-time prekeys for Signal Protocol
-export const preKeys = pgTable("prekeys", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").references(() => users.id).notNull(),
-  keyId: text("key_id").notNull(),
-  publicKey: text("public_key").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => ({
-  userIdx: index("prekeys_user_idx").on(table.userId),
-}));
+export const preKeys = pgTable(
+  "prekeys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    keyId: text("key_id").notNull(),
+    publicKey: text("public_key").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: index("prekeys_user_idx").on(table.userId),
+  })
+);
 
 // Communities (like Discord servers)
 export const communities = pgTable("communities", {
@@ -31,86 +37,166 @@ export const communities = pgTable("communities", {
   name: text("name").notNull(),
   iconUrl: text("icon_url"),
   inviteCode: text("invite_code").unique().notNull(),
-  createdBy: uuid("created_by").references(() => users.id).notNull(),
+  createdBy: uuid("created_by")
+    .references(() => users.id)
+    .notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Community members
-export const communityMembers = pgTable("community_members", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  communityId: uuid("community_id").references(() => communities.id).notNull(),
-  userId: uuid("user_id").references(() => users.id).notNull(),
-  joinedAt: timestamp("joined_at").defaultNow().notNull(),
-}, (table) => ({
-  communityIdx: index("community_members_community_idx").on(table.communityId),
-  userIdx: index("community_members_user_idx").on(table.userId),
-  uniqueMembership: unique("community_members_unique").on(table.communityId, table.userId),
-}));
+export const communityMembers = pgTable(
+  "community_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    communityId: uuid("community_id")
+      .references(() => communities.id)
+      .notNull(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    communityIdx: index("community_members_community_idx").on(table.communityId),
+    userIdx: index("community_members_user_idx").on(table.userId),
+    uniqueMembership: unique("community_members_unique").on(table.communityId, table.userId),
+  })
+);
 
 // Channels within communities
-export const channels = pgTable("channels", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  communityId: uuid("community_id").references(() => communities.id).notNull(),
-  name: text("name").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => ({
-  communityIdx: index("channels_community_idx").on(table.communityId),
-}));
+export const channels = pgTable(
+  "channels",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    communityId: uuid("community_id")
+      .references(() => communities.id)
+      .notNull(),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    communityIdx: index("channels_community_idx").on(table.communityId),
+  })
+);
 
 // Sender keys for channel encryption
-export const senderKeys = pgTable("sender_keys", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  channelId: uuid("channel_id").references(() => channels.id).notNull(),
-  userId: uuid("user_id").references(() => users.id).notNull(),
-  distributionId: text("distribution_id").notNull(),
-  // Encrypted sender key (encrypted to each recipient)
-  encryptedKey: text("encrypted_key").notNull(),
-  forUserId: uuid("for_user_id").references(() => users.id).notNull(),
-  // Sender's public key at the time of distribution (for decryption after key rotation)
-  senderPublicKey: text("sender_public_key"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => ({
-  channelUserIdx: index("sender_keys_channel_user_idx").on(table.channelId, table.forUserId),
-  uniqueSenderKey: unique("sender_keys_unique").on(table.channelId, table.userId, table.forUserId),
-}));
+export const senderKeys = pgTable(
+  "sender_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    channelId: uuid("channel_id")
+      .references(() => channels.id)
+      .notNull(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    distributionId: text("distribution_id").notNull(),
+    // Encrypted sender key (encrypted to each recipient)
+    encryptedKey: text("encrypted_key").notNull(),
+    forUserId: uuid("for_user_id")
+      .references(() => users.id)
+      .notNull(),
+    // Sender's public key at the time of distribution (for decryption after key rotation)
+    senderPublicKey: text("sender_public_key"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    channelUserIdx: index("sender_keys_channel_user_idx").on(table.channelId, table.forUserId),
+    uniqueSenderKey: unique("sender_keys_unique").on(
+      table.channelId,
+      table.userId,
+      table.forUserId
+    ),
+  })
+);
 
 // Messages (encrypted)
-export const messages = pgTable("messages", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  channelId: uuid("channel_id").references(() => channels.id).notNull(),
-  senderId: uuid("sender_id").references(() => users.id).notNull(),
-  ciphertext: text("ciphertext").notNull(),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- self-referencing FK requires any type in drizzle
-  replyToId: uuid("reply_to_id").references((): any => messages.id, { onDelete: "set null" }),
-  editedAt: timestamp("edited_at"),
-  deletedAt: timestamp("deleted_at"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => ({
-  channelIdx: index("messages_channel_idx").on(table.channelId),
-  createdAtIdx: index("messages_created_at_idx").on(table.createdAt),
-}));
+export const messages = pgTable(
+  "messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    channelId: uuid("channel_id")
+      .references(() => channels.id)
+      .notNull(),
+    senderId: uuid("sender_id")
+      .references(() => users.id)
+      .notNull(),
+    ciphertext: text("ciphertext").notNull(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- self-referencing FK requires any type in drizzle
+    replyToId: uuid("reply_to_id").references((): any => messages.id, { onDelete: "set null" }),
+    editedAt: timestamp("edited_at"),
+    deletedAt: timestamp("deleted_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    channelIdx: index("messages_channel_idx").on(table.channelId),
+    createdAtIdx: index("messages_created_at_idx").on(table.createdAt),
+  })
+);
 
 // Custom emojis
-export const emojis = pgTable("emojis", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  communityId: uuid("community_id").references(() => communities.id).notNull(),
-  name: text("name").notNull(),
-  fileUrl: text("file_url").notNull(),
-  animated: boolean("animated").default(false).notNull(),
-  uploadedBy: uuid("uploaded_by").references(() => users.id).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => ({
-  communityIdx: index("emojis_community_idx").on(table.communityId),
-}));
+export const emojis = pgTable(
+  "emojis",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    communityId: uuid("community_id")
+      .references(() => communities.id)
+      .notNull(),
+    name: text("name").notNull(),
+    fileUrl: text("file_url").notNull(),
+    animated: boolean("animated").default(false).notNull(),
+    uploadedBy: uuid("uploaded_by")
+      .references(() => users.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    communityIdx: index("emojis_community_idx").on(table.communityId),
+  })
+);
 
 // Message reactions
-export const reactions = pgTable("reactions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  messageId: uuid("message_id").references(() => messages.id, { onDelete: "cascade" }).notNull(),
-  userId: uuid("user_id").references(() => users.id).notNull(),
-  emoji: text("emoji").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => ({
-  messageIdx: index("reactions_message_idx").on(table.messageId),
-  userMessageEmojiIdx: index("reactions_user_message_emoji_idx").on(table.userId, table.messageId, table.emoji),
-}));
+export const reactions = pgTable(
+  "reactions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    messageId: uuid("message_id")
+      .references(() => messages.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    emoji: text("emoji").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    messageIdx: index("reactions_message_idx").on(table.messageId),
+    userMessageEmojiIdx: index("reactions_user_message_emoji_idx").on(
+      table.userId,
+      table.messageId,
+      table.emoji
+    ),
+  })
+);
+
+// Pending key requests (for offline key holders)
+export const pendingKeyRequests = pgTable(
+  "pending_key_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    channelId: uuid("channel_id")
+      .references(() => channels.id, { onDelete: "cascade" })
+      .notNull(),
+    requestingUserId: uuid("requesting_user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    channelIdx: index("pending_key_requests_channel_idx").on(table.channelId),
+    uniqueRequest: unique("pending_key_requests_unique").on(
+      table.channelId,
+      table.requestingUserId
+    ),
+  })
+);

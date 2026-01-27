@@ -10,7 +10,8 @@ interface SidebarProps {
 
 export function Sidebar({ showMobile, onClose }: SidebarProps) {
   const user = useAuthStore((state) => state.user);
-  const { communities, activeCommunityId, setActiveCommunity, setActiveChannel, addCommunity } = useChatStore();
+  const { communities, activeCommunityId, setActiveCommunity, setActiveChannel, addCommunity } =
+    useChatStore();
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [newName, setNewName] = useState("");
@@ -47,7 +48,9 @@ export function Sidebar({ showMobile, onClose }: SidebarProps) {
   return (
     <div
       className={`w-[72px] bg-background-tertiary flex flex-col items-center py-3 gap-2 transition-transform md:translate-x-0 ${
-        showMobile ? 'fixed left-0 top-0 bottom-0 z-50 translate-x-0' : 'fixed left-0 top-0 bottom-0 -translate-x-full md:relative'
+        showMobile
+          ? "fixed left-0 top-0 bottom-0 z-50 translate-x-0"
+          : "fixed left-0 top-0 bottom-0 -translate-x-full md:relative"
       }`}
     >
       {/* Communities */}
@@ -67,7 +70,11 @@ export function Sidebar({ showMobile, onClose }: SidebarProps) {
           title={community.name}
         >
           {community.iconUrl ? (
-            <img src={community.iconUrl} alt="" className="w-full h-full rounded-full object-cover" />
+            <img
+              src={community.iconUrl}
+              alt=""
+              className="w-full h-full rounded-full object-cover"
+            />
           ) : (
             community.name.charAt(0).toUpperCase()
           )}
@@ -97,8 +104,14 @@ export function Sidebar({ showMobile, onClose }: SidebarProps) {
 
       {/* Create modal */}
       {showCreate && (
-        <div className="fixed left-0 top-0 w-screen h-screen bg-black/50 flex items-center justify-center z-[100]" onClick={() => setShowCreate(false)}>
-          <div className="bg-background-secondary rounded-lg p-8 w-[90vw] max-w-lg" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed left-0 top-0 w-screen h-screen bg-black/50 flex items-center justify-center z-[100]"
+          onClick={() => setShowCreate(false)}
+        >
+          <div
+            className="bg-background-secondary rounded-lg p-8 w-[90vw] max-w-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-2xl font-bold text-text-primary mb-6">Create a Community</h2>
             <input
               type="text"
@@ -128,8 +141,14 @@ export function Sidebar({ showMobile, onClose }: SidebarProps) {
 
       {/* Join modal */}
       {showJoin && (
-        <div className="fixed left-0 top-0 w-screen h-screen bg-black/50 flex items-center justify-center z-[100]" onClick={() => setShowJoin(false)}>
-          <div className="bg-background-secondary rounded-lg p-8 w-[90vw] max-w-lg" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed left-0 top-0 w-screen h-screen bg-black/50 flex items-center justify-center z-[100]"
+          onClick={() => setShowJoin(false)}
+        >
+          <div
+            className="bg-background-secondary rounded-lg p-8 w-[90vw] max-w-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-2xl font-bold text-text-primary mb-6">Join a Community</h2>
             <input
               type="text"

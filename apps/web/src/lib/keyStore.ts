@@ -2,8 +2,8 @@
  * Key Store using Dexie (IndexedDB) for secure local key storage
  */
 
-import Dexie, { Table } from 'dexie';
-import { IdentityKeys, KeyPairData, importPrivateKey, importAesKey } from './crypto';
+import Dexie, { Table } from "dexie";
+import { IdentityKeys, KeyPairData, importPrivateKey, importAesKey } from "./crypto";
 
 // Stored identity keys for the local user
 interface StoredIdentity {
@@ -44,13 +44,13 @@ class KeyStoreDatabase extends Dexie {
   userKeys!: Table<StoredUserKey>;
 
   constructor() {
-    super('vibechat-keystore');
+    super("vibechat-keystore");
 
     this.version(1).stores({
-      identity: 'id, userId',
-      preKeys: 'id, used',
-      channelKeys: 'channelId',
-      userKeys: 'userId',
+      identity: "id, userId",
+      preKeys: "id, used",
+      channelKeys: "channelId",
+      userKeys: "userId",
     });
   }
 }
@@ -60,13 +60,10 @@ const db = new KeyStoreDatabase();
 /**
  * Store identity keys after registration
  */
-export async function storeIdentityKeys(
-  userId: string,
-  keys: IdentityKeys
-): Promise<void> {
+export async function storeIdentityKeys(userId: string, keys: IdentityKeys): Promise<void> {
   // Store main identity
   await db.identity.put({
-    id: 'local',
+    id: "local",
     userId,
     identityKeyPublic: keys.identityKeyPair.publicKey,
     identityKeyPrivate: keys.identityKeyPair.privateKey,
@@ -94,7 +91,7 @@ export async function getIdentityKeys(): Promise<{
   identityKeyPair: KeyPairData;
   signedPreKeyPair: KeyPairData;
 } | null> {
-  const identity = await db.identity.get('local');
+  const identity = await db.identity.get("local");
   if (!identity) return null;
 
   return {
@@ -114,7 +111,7 @@ export async function getIdentityKeys(): Promise<{
  * Get the identity private key for decryption
  */
 export async function getIdentityPrivateKey(): Promise<CryptoKey | null> {
-  const identity = await db.identity.get('local');
+  const identity = await db.identity.get("local");
   if (!identity) return null;
 
   return await importPrivateKey(identity.identityKeyPrivate);
@@ -123,10 +120,7 @@ export async function getIdentityPrivateKey(): Promise<CryptoKey | null> {
 /**
  * Store a channel encryption key
  */
-export async function storeChannelKey(
-  channelId: string,
-  keyBase64: string
-): Promise<void> {
+export async function storeChannelKey(channelId: string, keyBase64: string): Promise<void> {
   await db.channelKeys.put({ channelId, keyBase64 });
 }
 
@@ -167,7 +161,7 @@ export async function storeUserKey(
  * Get a user's public key
  */
 export async function getUserKey(userId: string): Promise<StoredUserKey | null> {
-  return await db.userKeys.get(userId) ?? null;
+  return (await db.userKeys.get(userId)) ?? null;
 }
 
 /**
@@ -184,6 +178,6 @@ export async function clearAllKeys(): Promise<void> {
  * Check if we have identity keys stored
  */
 export async function hasIdentityKeys(): Promise<boolean> {
-  const identity = await db.identity.get('local');
+  const identity = await db.identity.get("local");
   return identity !== null;
 }

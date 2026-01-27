@@ -53,11 +53,14 @@ export const reactionRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: "Reaction already exists" });
     }
 
-    const [reaction] = await db.insert(reactions).values({
-      messageId: body.messageId,
-      userId: body.userId,
-      emoji: body.emoji,
-    }).returning();
+    const [reaction] = await db
+      .insert(reactions)
+      .values({
+        messageId: body.messageId,
+        userId: body.userId,
+        emoji: body.emoji,
+      })
+      .returning();
 
     return { reaction };
   });

@@ -2,10 +2,7 @@ import { useAuthStore } from "../stores/auth";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
-async function request<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   // Get token from auth store
   const token = useAuthStore.getState().token;
 
@@ -43,16 +40,23 @@ export const api = {
       signedPreKeyPublic: string;
       signedPreKeySignature: string;
       preKeys: { keyId: string; publicKey: string }[];
-    }) => request<{ user: { id: string; email: string; displayName: string }; token: string }>("/auth/register", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+    }) =>
+      request<{ user: { id: string; email: string; displayName: string }; token: string }>(
+        "/auth/register",
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+        }
+      ),
 
     login: (email: string, password: string) =>
-      request<{ user: { id: string; email: string; displayName: string }; token: string }>("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      }),
+      request<{ user: { id: string; email: string; displayName: string }; token: string }>(
+        "/auth/login",
+        {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        }
+      ),
 
     getUserKeys: (userId: string) =>
       request<{
@@ -61,20 +65,23 @@ export const api = {
         preKey: { keyId: string; publicKey: string } | null;
       }>(`/auth/users/${userId}/keys`),
 
-    updateKeys: (data: {
-      identityKeyPublic: string;
-      signedPreKeyPublic: string;
-      signedPreKeySignature: string;
-      preKeys: { keyId: string; publicKey: string }[];
-    }, token: string) =>
+    updateKeys: (
+      data: {
+        identityKeyPublic: string;
+        signedPreKeyPublic: string;
+        signedPreKeySignature: string;
+        preKeys: { keyId: string; publicKey: string }[];
+      },
+      token: string
+    ) =>
       fetch(`${API_BASE}/auth/keys`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(data),
-      }).then(res => {
+      }).then((res) => {
         if (!res.ok) throw new Error("Failed to update keys");
         return res.json();
       }),
@@ -100,10 +107,13 @@ export const api = {
       }>(`/communities/${communityId}`),
 
     join: (inviteCode: string, userId: string) =>
-      request<{ community: { id: string; name: string; inviteCode: string } }>("/communities/join", {
-        method: "POST",
-        body: JSON.stringify({ inviteCode, userId }),
-      }),
+      request<{ community: { id: string; name: string; inviteCode: string } }>(
+        "/communities/join",
+        {
+          method: "POST",
+          body: JSON.stringify({ inviteCode, userId }),
+        }
+      ),
   },
 
   channels: {
@@ -114,8 +124,18 @@ export const api = {
       }),
 
     getSenderKeys: (channelId: string, userId: string) =>
-      request<{ senderKeys: { userId: string; distributionId: string; encryptedKey: string; senderPublicKey?: string }[] }>(
-        `/channels/${channelId}/sender-keys/${userId}`
+      request<{
+        senderKeys: {
+          userId: string;
+          distributionId: string;
+          encryptedKey: string;
+          senderPublicKey?: string;
+        }[];
+      }>(`/channels/${channelId}/sender-keys/${userId}`),
+
+    getSenderKeyOwners: (channelId: string) =>
+      request<{ senderKeyOwners: { userId: string; senderPublicKey?: string | null }[] }>(
+        `/channels/${channelId}/sender-keys/owners`
       ),
 
     distributeSenderKey: (data: {
@@ -129,12 +149,38 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
+
+    getPendingKeyRequests: () =>
+      request<{
+        pendingRequests: {
+          id: string;
+          channelId: string;
+          requestingUserId: string;
+          createdAt: string;
+        }[];
+      }>("/channels/pending-key-requests"),
+
+    deletePendingKeyRequest: (requestId: string) =>
+      request<{ success: boolean }>(`/channels/pending-key-requests/${requestId}`, {
+        method: "DELETE",
+      }),
+
+    getMembers: (channelId: string) =>
+      request<{ members: { id: string; displayName: string }[] }>(
+        `/channels/${channelId}/members`
+      ),
   },
 
   messages: {
     list: (channelId: string, cursor?: string) =>
       request<{
-        messages: { id: string; channelId: string; senderId: string; ciphertext: string; createdAt: string }[];
+        messages: {
+          id: string;
+          channelId: string;
+          senderId: string;
+          ciphertext: string;
+          createdAt: string;
+        }[];
         nextCursor: string | null;
       }>(`/messages/channel/${channelId}${cursor ? `?cursor=${cursor}` : ""}`),
   },
@@ -152,9 +198,12 @@ export const api = {
       animated: boolean;
       uploadedBy: string;
     }) =>
-      request<{ emoji: { id: string; name: string; fileUrl: string; animated: boolean } }>("/emojis", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
+      request<{ emoji: { id: string; name: string; fileUrl: string; animated: boolean } }>(
+        "/emojis",
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+        }
+      ),
   },
 };

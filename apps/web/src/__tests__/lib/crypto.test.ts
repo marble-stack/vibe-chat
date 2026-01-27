@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll } from "vitest";
 import {
   generateKeyPair,
   exportPublicKey,
@@ -18,31 +18,31 @@ import {
   base64ToArrayBuffer,
   encryptChannelKeyForRecipient,
   decryptChannelKey,
-} from '../../lib/crypto.js';
+} from "../../lib/crypto.js";
 
-describe('Crypto Module', () => {
+describe("Crypto Module", () => {
   // Check if Web Crypto API is available
   beforeAll(() => {
-    if (typeof crypto === 'undefined' || !crypto.subtle) {
-      console.warn('Web Crypto API not available, some tests may be skipped');
+    if (typeof crypto === "undefined" || !crypto.subtle) {
+      console.warn("Web Crypto API not available, some tests may be skipped");
     }
   });
 
-  describe('Base64 Encoding/Decoding', () => {
-    it('should encode ArrayBuffer to base64', () => {
+  describe("Base64 Encoding/Decoding", () => {
+    it("should encode ArrayBuffer to base64", () => {
       const data = new Uint8Array([72, 101, 108, 108, 111]); // "Hello"
       const base64 = arrayBufferToBase64(data.buffer);
-      expect(base64).toBe('SGVsbG8=');
+      expect(base64).toBe("SGVsbG8=");
     });
 
-    it('should decode base64 to ArrayBuffer', () => {
-      const base64 = 'SGVsbG8=';
+    it("should decode base64 to ArrayBuffer", () => {
+      const base64 = "SGVsbG8=";
       const buffer = base64ToArrayBuffer(base64);
       const data = new Uint8Array(buffer);
       expect(Array.from(data)).toEqual([72, 101, 108, 108, 111]);
     });
 
-    it('should round-trip encode/decode', () => {
+    it("should round-trip encode/decode", () => {
       const original = new Uint8Array([1, 2, 3, 4, 5, 255, 0, 128]);
       const base64 = arrayBufferToBase64(original.buffer);
       const decoded = base64ToArrayBuffer(base64);
@@ -50,19 +50,19 @@ describe('Crypto Module', () => {
     });
   });
 
-  describe('Key Generation', () => {
-    it('should generate valid ECDH P-256 key pairs', async () => {
+  describe("Key Generation", () => {
+    it("should generate valid ECDH P-256 key pairs", async () => {
       const keyPair = await generateKeyPair();
 
-      expect(keyPair).toHaveProperty('publicKey');
-      expect(keyPair).toHaveProperty('privateKey');
+      expect(keyPair).toHaveProperty("publicKey");
+      expect(keyPair).toHaveProperty("privateKey");
 
       // Verify key algorithm
-      expect(keyPair.publicKey.algorithm.name).toBe('ECDH');
-      expect(keyPair.privateKey.algorithm.name).toBe('ECDH');
+      expect(keyPair.publicKey.algorithm.name).toBe("ECDH");
+      expect(keyPair.privateKey.algorithm.name).toBe("ECDH");
     });
 
-    it('should generate unique keys each call', async () => {
+    it("should generate unique keys each call", async () => {
       const keyPair1 = await generateKeyPair();
       const keyPair2 = await generateKeyPair();
 
@@ -73,51 +73,45 @@ describe('Crypto Module', () => {
       expect(pub1).not.toBe(pub2);
     });
 
-    it('should export and import public keys correctly', async () => {
+    it("should export and import public keys correctly", async () => {
       const keyPair = await generateKeyPair();
 
       const exported = await exportPublicKey(keyPair.publicKey);
-      expect(typeof exported).toBe('string');
+      expect(typeof exported).toBe("string");
       expect(exported.length).toBeGreaterThan(0);
 
       const imported = await importPublicKey(exported);
-      expect(imported.algorithm.name).toBe('ECDH');
+      expect(imported.algorithm.name).toBe("ECDH");
     });
 
-    it('should export and import private keys correctly', async () => {
+    it("should export and import private keys correctly", async () => {
       const keyPair = await generateKeyPair();
 
       const exported = await exportPrivateKey(keyPair.privateKey);
-      expect(typeof exported).toBe('string');
+      expect(typeof exported).toBe("string");
 
       // Should be valid JSON (JWK format)
       const jwk = JSON.parse(exported);
-      expect(jwk).toHaveProperty('kty', 'EC');
-      expect(jwk).toHaveProperty('crv', 'P-256');
+      expect(jwk).toHaveProperty("kty", "EC");
+      expect(jwk).toHaveProperty("crv", "P-256");
 
       const imported = await importPrivateKey(exported);
-      expect(imported.algorithm.name).toBe('ECDH');
+      expect(imported.algorithm.name).toBe("ECDH");
     });
   });
 
-  describe('Key Exchange', () => {
-    it('should derive same shared secret in both directions', async () => {
+  describe("Key Exchange", () => {
+    it("should derive same shared secret in both directions", async () => {
       // Alice's keys
       const aliceKeyPair = await generateKeyPair();
       // Bob's keys
       const bobKeyPair = await generateKeyPair();
 
       // Alice derives shared key using her private key and Bob's public key
-      const aliceSharedKey = await deriveSharedKey(
-        aliceKeyPair.privateKey,
-        bobKeyPair.publicKey
-      );
+      const aliceSharedKey = await deriveSharedKey(aliceKeyPair.privateKey, bobKeyPair.publicKey);
 
       // Bob derives shared key using his private key and Alice's public key
-      const bobSharedKey = await deriveSharedKey(
-        bobKeyPair.privateKey,
-        aliceKeyPair.publicKey
-      );
+      const bobSharedKey = await deriveSharedKey(bobKeyPair.privateKey, aliceKeyPair.publicKey);
 
       // Export both keys to compare
       const aliceKeyExport = await exportAesKey(aliceSharedKey);
@@ -127,7 +121,7 @@ describe('Crypto Module', () => {
       expect(aliceKeyExport).toBe(bobKeyExport);
     });
 
-    it('should derive different keys for different key pairs', async () => {
+    it("should derive different keys for different key pairs", async () => {
       const alice = await generateKeyPair();
       const bob = await generateKeyPair();
       const charlie = await generateKeyPair();
@@ -145,33 +139,33 @@ describe('Crypto Module', () => {
     });
   });
 
-  describe('AES Key Management', () => {
-    it('should generate channel keys', async () => {
+  describe("AES Key Management", () => {
+    it("should generate channel keys", async () => {
       const key = await generateChannelKey();
 
-      expect(key.algorithm.name).toBe('AES-GCM');
+      expect(key.algorithm.name).toBe("AES-GCM");
       expect((key.algorithm as AesKeyAlgorithm).length).toBe(256);
     });
 
-    it('should export and import AES keys', async () => {
+    it("should export and import AES keys", async () => {
       const original = await generateChannelKey();
       const exported = await exportAesKey(original);
       const imported = await importAesKey(exported);
 
-      expect(imported.algorithm.name).toBe('AES-GCM');
+      expect(imported.algorithm.name).toBe("AES-GCM");
 
       // Verify the key works by encrypting/decrypting
-      const testMessage = 'test';
+      const testMessage = "test";
       const encrypted = await encryptMessage(testMessage, original);
       const decrypted = await decryptMessage(encrypted, imported);
       expect(decrypted).toBe(testMessage);
     });
   });
 
-  describe('Encryption', () => {
-    it('should encrypt and decrypt round-trip correctly', async () => {
+  describe("Encryption", () => {
+    it("should encrypt and decrypt round-trip correctly", async () => {
       const key = await generateChannelKey();
-      const originalMessage = 'Hello, this is a secret message!';
+      const originalMessage = "Hello, this is a secret message!";
 
       const ciphertext = await encryptMessage(originalMessage, key);
       const decrypted = await decryptMessage(ciphertext, key);
@@ -179,9 +173,9 @@ describe('Crypto Module', () => {
       expect(decrypted).toBe(originalMessage);
     });
 
-    it('should handle empty strings', async () => {
+    it("should handle empty strings", async () => {
       const key = await generateChannelKey();
-      const originalMessage = '';
+      const originalMessage = "";
 
       const ciphertext = await encryptMessage(originalMessage, key);
       const decrypted = await decryptMessage(ciphertext, key);
@@ -189,9 +183,9 @@ describe('Crypto Module', () => {
       expect(decrypted).toBe(originalMessage);
     });
 
-    it('should handle unicode characters', async () => {
+    it("should handle unicode characters", async () => {
       const key = await generateChannelKey();
-      const originalMessage = '你好世界! 🎉 привет мир';
+      const originalMessage = "你好世界! 🎉 привет мир";
 
       const ciphertext = await encryptMessage(originalMessage, key);
       const decrypted = await decryptMessage(ciphertext, key);
@@ -199,10 +193,10 @@ describe('Crypto Module', () => {
       expect(decrypted).toBe(originalMessage);
     });
 
-    it('should fail decryption with wrong key', async () => {
+    it("should fail decryption with wrong key", async () => {
       const key1 = await generateChannelKey();
       const key2 = await generateChannelKey();
-      const originalMessage = 'Secret message';
+      const originalMessage = "Secret message";
 
       const ciphertext = await encryptMessage(originalMessage, key1);
 
@@ -210,9 +204,9 @@ describe('Crypto Module', () => {
       await expect(decryptMessage(ciphertext, key2)).rejects.toThrow();
     });
 
-    it('should use unique IV per encryption', async () => {
+    it("should use unique IV per encryption", async () => {
       const key = await generateChannelKey();
-      const message = 'Same message';
+      const message = "Same message";
 
       const ciphertext1 = await encryptMessage(message, key);
       const ciphertext2 = await encryptMessage(message, key);
@@ -221,9 +215,9 @@ describe('Crypto Module', () => {
       expect(ciphertext1).not.toBe(ciphertext2);
     });
 
-    it('should produce ciphertext with IV prefix', async () => {
+    it("should produce ciphertext with IV prefix", async () => {
       const key = await generateChannelKey();
-      const message = 'Test';
+      const message = "Test";
 
       const ciphertext = await encryptMessage(message, key);
       const combined = new Uint8Array(base64ToArrayBuffer(ciphertext));
@@ -233,8 +227,8 @@ describe('Crypto Module', () => {
     });
   });
 
-  describe('Channel Key Distribution', () => {
-    it('should encrypt channel key for recipient', async () => {
+  describe("Channel Key Distribution", () => {
+    it("should encrypt channel key for recipient", async () => {
       const channelKey = await generateChannelKey();
       const sender = await generateKeyPair();
       const recipient = await generateKeyPair();
@@ -246,11 +240,11 @@ describe('Crypto Module', () => {
         recipientPublicBase64
       );
 
-      expect(typeof encrypted).toBe('string');
+      expect(typeof encrypted).toBe("string");
       expect(encrypted.length).toBeGreaterThan(0);
     });
 
-    it('should decrypt channel key correctly', async () => {
+    it("should decrypt channel key correctly", async () => {
       const channelKey = await generateChannelKey();
       const sender = await generateKeyPair();
       const recipient = await generateKeyPair();
@@ -273,14 +267,14 @@ describe('Crypto Module', () => {
       );
 
       // Verify the decrypted key works
-      const testMessage = 'Test channel message';
+      const testMessage = "Test channel message";
       const ciphertext = await encryptMessage(testMessage, channelKey);
       const plaintext = await decryptMessage(ciphertext, decryptedChannelKey);
 
       expect(plaintext).toBe(testMessage);
     });
 
-    it('should fail decryption with wrong sender public key', async () => {
+    it("should fail decryption with wrong sender public key", async () => {
       const channelKey = await generateChannelKey();
       const sender = await generateKeyPair();
       const recipient = await generateKeyPair();
