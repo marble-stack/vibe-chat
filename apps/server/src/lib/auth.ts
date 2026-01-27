@@ -22,13 +22,13 @@ function getJwtSecret(): string {
     if (process.env.NODE_ENV === "test") {
       throw new Error(
         "JWT_SECRET environment variable is required. " +
-        "For tests, set JWT_SECRET in your test setup file."
+          "For tests, set JWT_SECRET in your test setup file."
       );
     }
 
     throw new Error(
       "JWT_SECRET environment variable is required. " +
-      "Please set a secure JWT_SECRET in your environment."
+        "Please set a secure JWT_SECRET in your environment."
     );
   }
 
@@ -95,10 +95,7 @@ export function extractToken(authHeader: string | undefined): string | null {
  * Authentication middleware for protected routes
  * Adds `user` to request object if authenticated
  */
-export async function authMiddleware(
-  request: FastifyRequest,
-  reply: FastifyReply
-): Promise<void> {
+export async function authMiddleware(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const token = extractToken(request.headers.authorization);
 
   if (!token) {

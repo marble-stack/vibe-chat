@@ -1,4 +1,4 @@
-import { logger } from './logger';
+import { logger } from "./logger";
 
 type MessageHandler = (message: WsMessage) => void;
 
@@ -24,10 +24,12 @@ class WebSocketClient {
     this.authenticated = false;
 
     // Use environment variable if available, otherwise fall back to window.location
-    const wsUrl = import.meta.env.VITE_WS_URL || (() => {
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      return `${protocol}//${window.location.host}/ws`;
-    })();
+    const wsUrl =
+      import.meta.env.VITE_WS_URL ||
+      (() => {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        return `${protocol}//${window.location.host}/ws`;
+      })();
 
     this.ws = new WebSocket(wsUrl);
 

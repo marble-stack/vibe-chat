@@ -50,7 +50,9 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListP
 
   if (!activeCommunityId) {
     return (
-      <div className={`w-full md:w-60 bg-background-secondary flex flex-col ${showOnMobile ? 'flex' : 'hidden md:flex'}`}>
+      <div
+        className={`w-full md:w-60 bg-background-secondary flex flex-col ${showOnMobile ? "flex" : "hidden md:flex"}`}
+      >
         {/* Mobile header with hamburger menu */}
         <div className="h-12 px-4 flex items-center border-b border-background-tertiary shadow-sm md:hidden">
           <button
@@ -59,7 +61,12 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListP
             title="Open sidebar"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
         </div>
@@ -82,7 +89,12 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListP
             title="Log out"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
             </svg>
           </button>
         </div>
@@ -91,19 +103,24 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListP
   }
 
   return (
-    <div className={`w-full md:w-60 bg-background-secondary flex flex-col ${showOnMobile ? 'flex' : 'hidden md:flex'}`}>
+    <div
+      className={`w-full md:w-60 bg-background-secondary flex flex-col ${showOnMobile ? "flex" : "hidden md:flex"}`}
+    >
       {/* Community header */}
       <div className="h-12 px-4 flex items-center justify-between border-b border-background-tertiary shadow-sm">
-        <span className="font-semibold text-text-primary truncate">
-          {activeCommunity?.name}
-        </span>
+        <span className="font-semibold text-text-primary truncate">{activeCommunity?.name}</span>
         <button
           onClick={() => setShowInvite(true)}
           className="text-text-muted hover:text-text-primary"
           title="Invite people"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+            />
           </svg>
         </button>
       </div>
@@ -117,7 +134,12 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListP
             className="text-text-muted hover:text-text-primary"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
             </svg>
           </button>
         </div>
@@ -144,9 +166,7 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListP
           {user?.displayName.charAt(0).toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-text-primary truncate">
-            {user?.displayName}
-          </div>
+          <div className="text-sm font-medium text-text-primary truncate">{user?.displayName}</div>
         </div>
         <button
           onClick={logout}
@@ -154,15 +174,26 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListP
           title="Log out"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+            />
           </svg>
         </button>
       </div>
 
       {/* Create channel modal */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCreate(false)}>
-          <div className="bg-background-secondary rounded-lg p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowCreate(false)}
+        >
+          <div
+            className="bg-background-secondary rounded-lg p-6 w-full max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-xl font-bold text-text-primary mb-4">Create Channel</h2>
             <div className="flex items-center gap-2 bg-background-tertiary rounded px-3 py-2 mb-4">
               <span className="text-text-muted text-lg">#</span>
@@ -195,8 +226,14 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListP
 
       {/* Invite modal */}
       {showInvite && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowInvite(false)}>
-          <div className="bg-background-secondary rounded-lg p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowInvite(false)}
+        >
+          <div
+            className="bg-background-secondary rounded-lg p-6 w-full max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-xl font-bold text-text-primary mb-4">Invite Friends</h2>
             <p className="text-text-secondary mb-4">Share this invite code:</p>
             <div className="flex items-center gap-2 bg-background-tertiary rounded px-3 py-2 mb-4">

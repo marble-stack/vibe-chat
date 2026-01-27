@@ -44,9 +44,10 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
   const channelMessages = activeChannelId ? messages[activeChannelId] || [] : [];
   const communityMembers = activeCommunityId ? members[activeCommunityId] || [] : [];
   const channelTypingUsers = activeChannelId ? typingUsers[activeChannelId] || [] : [];
-  const activeChannel = activeCommunityId && activeChannelId
-    ? channels[activeCommunityId]?.find((c) => c.id === activeChannelId)
-    : null;
+  const activeChannel =
+    activeCommunityId && activeChannelId
+      ? channels[activeCommunityId]?.find((c) => c.id === activeChannelId)
+      : null;
 
   // Load and decrypt messages when channel changes
   useEffect(() => {
@@ -56,9 +57,9 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
       const { messages: msgs } = await api.messages.list(activeChannelId);
 
       // Ensure current user is in members list for key distribution/retrieval
-      const membersForDecryption = communityMembers.some(m => m.id === user.id)
+      const membersForDecryption = communityMembers.some((m) => m.id === user.id)
         ? communityMembers
-        : [...communityMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+        : [...communityMembers, { id: user.id, displayName: user.displayName || "Me" }];
 
       // Decrypt each message
       const decrypted = await Promise.all(
@@ -74,7 +75,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
               m.senderId
             );
           } catch (err) {
-            logger.error('Failed to decrypt message:', err);
+            logger.error("Failed to decrypt message:", err);
             decryptionFailed = true;
           }
           return { ...m, plaintext, decryptionFailed };
@@ -102,10 +103,13 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
   };
 
   // Get the original message being replied to
-  const getReplyMessage = useCallback((replyToId: string | undefined) => {
-    if (!replyToId || !activeChannelId) return null;
-    return getMessageById(activeChannelId, replyToId);
-  }, [activeChannelId, getMessageById]);
+  const getReplyMessage = useCallback(
+    (replyToId: string | undefined) => {
+      if (!replyToId || !activeChannelId) return null;
+      return getMessageById(activeChannelId, replyToId);
+    },
+    [activeChannelId, getMessageById]
+  );
 
   // Scroll to a specific message
   const scrollToMessage = useCallback((messageId: string) => {
@@ -128,10 +132,13 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
   }, [editingMessageId]);
 
   // Start editing a message
-  const startEditing = useCallback((message: { id: string; plaintext?: string; ciphertext: string }) => {
-    setEditingMessageId(message.id);
-    setEditText(message.plaintext || message.ciphertext);
-  }, []);
+  const startEditing = useCallback(
+    (message: { id: string; plaintext?: string; ciphertext: string }) => {
+      setEditingMessageId(message.id);
+      setEditText(message.plaintext || message.ciphertext);
+    },
+    []
+  );
 
   // Cancel editing
   const cancelEditing = useCallback(() => {
@@ -154,7 +161,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
 
       wsClient.editMessage(activeChannelId, editingMessageId, ciphertext);
     } catch (err) {
-      logger.error('Failed to encrypt edited message:', err);
+      logger.error("Failed to encrypt edited message:", err);
       // Fallback to plaintext
       wsClient.editMessage(activeChannelId, editingMessageId, editText.trim());
     }
@@ -163,14 +170,17 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
   }, [editingMessageId, editText, activeChannelId, user, communityMembers, cancelEditing]);
 
   // Handle edit key press (Enter to save, Escape to cancel)
-  const handleEditKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      saveEdit();
-    } else if (e.key === "Escape") {
-      cancelEditing();
-    }
-  }, [saveEdit, cancelEditing]);
+  const handleEditKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        saveEdit();
+      } else if (e.key === "Escape") {
+        cancelEditing();
+      }
+    },
+    [saveEdit, cancelEditing]
+  );
 
   // Delete a message
   const confirmDelete = useCallback(() => {
@@ -179,9 +189,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     setDeletingMessageId(null);
   }, [deletingMessageId, activeChannelId]);
 
-  const typingNames = channelTypingUsers
-    .map((id) => getMember(id)?.displayName)
-    .filter(Boolean);
+  const typingNames = channelTypingUsers.map((id) => getMember(id)?.displayName).filter(Boolean);
 
   const handleBack = () => {
     setActiveChannel(null);
@@ -211,7 +219,12 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
           title="Back to channels"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
           </svg>
         </button>
 
@@ -222,14 +235,17 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
           title="Open sidebar"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 6h16M4 12h16M4 18h16"
+            />
           </svg>
         </button>
 
         <span className="text-text-muted text-lg mr-2">#</span>
-        <span className="font-semibold text-text-primary">
-          {activeChannel?.name}
-        </span>
+        <span className="font-semibold text-text-primary">{activeChannel?.name}</span>
       </div>
 
       {/* Messages */}
@@ -249,8 +265,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
             const showHeader =
               !prevMessage ||
               prevMessage.senderId !== message.senderId ||
-              new Date(message.createdAt).getTime() -
-                new Date(prevMessage.createdAt).getTime() >
+              new Date(message.createdAt).getTime() - new Date(prevMessage.createdAt).getTime() >
                 5 * 60 * 1000 ||
               message.replyToId; // Always show header for replies
 
@@ -283,8 +298,18 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                       onClick={() => scrollToMessage(replyMessage.id)}
                       className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary mb-1 cursor-pointer"
                     >
-                      <svg className="w-3 h-3 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                      <svg
+                        className="w-3 h-3 rotate-180"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                        />
                       </svg>
                       <span className="font-medium">{replySender?.displayName || "Unknown"}</span>
                       <span className="truncate max-w-[200px]">
@@ -348,13 +373,17 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                       return (
                         <button
                           key={reaction.emoji}
-                          onClick={() => handleReactionClick(message.id, reaction.emoji, userReactionId)}
+                          onClick={() =>
+                            handleReactionClick(message.id, reaction.emoji, userReactionId)
+                          }
                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm transition-colors ${
                             userReacted
                               ? "bg-accent-primary/20 border border-accent-primary text-accent-primary"
                               : "bg-background-tertiary border border-background-tertiary text-text-primary hover:border-text-muted"
                           }`}
-                          title={reaction.userIds.map(id => getMember(id)?.displayName || "Unknown").join(", ")}
+                          title={reaction.userIds
+                            .map((id) => getMember(id)?.displayName || "Unknown")
+                            .join(", ")}
                         >
                           <span>{reaction.emoji}</span>
                           <span className="text-xs">{reaction.count}</span>
@@ -365,7 +394,9 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                     {/* Add reaction button */}
                     <div className="relative">
                       <button
-                        onClick={() => setShowEmojiPicker(showEmojiPicker === message.id ? null : message.id)}
+                        onClick={() =>
+                          setShowEmojiPicker(showEmojiPicker === message.id ? null : message.id)
+                        }
                         className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-background-tertiary hover:bg-background-modifier-hover text-text-muted hover:text-text-primary transition-colors opacity-0 group-hover:opacity-100"
                         title="Add reaction"
                       >
@@ -381,13 +412,20 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                           />
                           <div className="absolute left-0 top-full mt-1 z-20 bg-background-secondary border border-background-tertiary rounded-lg shadow-lg p-2 flex gap-1">
                             {EMOJI_OPTIONS.map((emoji) => {
-                              const existingReaction = message.reactions?.find(r => r.emoji === emoji);
-                              const userReactionId = user && existingReaction ? existingReaction.reactionIds[user.id] : undefined;
+                              const existingReaction = message.reactions?.find(
+                                (r) => r.emoji === emoji
+                              );
+                              const userReactionId =
+                                user && existingReaction
+                                  ? existingReaction.reactionIds[user.id]
+                                  : undefined;
 
                               return (
                                 <button
                                   key={emoji}
-                                  onClick={() => handleReactionClick(message.id, emoji, userReactionId)}
+                                  onClick={() =>
+                                    handleReactionClick(message.id, emoji, userReactionId)
+                                  }
                                   className="w-8 h-8 flex items-center justify-center rounded hover:bg-background-modifier-hover transition-colors text-lg"
                                   title={emoji}
                                 >
@@ -410,8 +448,18 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                       className="p-1.5 rounded hover:bg-background-tertiary text-text-muted hover:text-text-primary"
                       title="Reply"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                        />
                       </svg>
                     </button>
 
@@ -423,8 +471,18 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                           className="p-1.5 rounded hover:bg-background-tertiary text-text-muted hover:text-text-primary"
                           title="Edit"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                            />
                           </svg>
                         </button>
                         <button
@@ -432,8 +490,18 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                           className="p-1.5 rounded hover:bg-background-tertiary text-text-muted hover:text-red-400"
                           title="Delete"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
                           </svg>
                         </button>
                       </>
@@ -449,9 +517,18 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
         {typingNames.length > 0 && (
           <div className="text-text-muted text-sm px-2 py-2">
             <span className="inline-flex gap-1 mr-2">
-              <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-              <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-              <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              <span
+                className="w-2 h-2 bg-text-muted rounded-full animate-bounce"
+                style={{ animationDelay: "0ms" }}
+              />
+              <span
+                className="w-2 h-2 bg-text-muted rounded-full animate-bounce"
+                style={{ animationDelay: "150ms" }}
+              />
+              <span
+                className="w-2 h-2 bg-text-muted rounded-full animate-bounce"
+                style={{ animationDelay: "300ms" }}
+              />
             </span>
             {typingNames.join(", ")} {typingNames.length === 1 ? "is" : "are"} typing...
           </div>
@@ -464,9 +541,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
       {deletingMessageId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-background-secondary rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
-            <h3 className="text-lg font-semibold text-text-primary mb-2">
-              Delete Message
-            </h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-2">Delete Message</h3>
             <p className="text-text-muted mb-6">
               Are you sure you want to delete this message? This action cannot be undone.
             </p>

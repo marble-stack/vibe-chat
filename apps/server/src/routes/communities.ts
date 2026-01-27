@@ -22,11 +22,14 @@ export const communityRoutes: FastifyPluginAsync = async (fastify) => {
 
     const inviteCode = randomBytes(8).toString("hex");
 
-    const [community] = await db.insert(communities).values({
-      name: body.name,
-      inviteCode,
-      createdBy: body.userId,
-    }).returning();
+    const [community] = await db
+      .insert(communities)
+      .values({
+        name: body.name,
+        inviteCode,
+        createdBy: body.userId,
+      })
+      .returning();
 
     // Add creator as member
     await db.insert(communityMembers).values({
@@ -106,12 +109,13 @@ export const communityRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     const memberIds = members.map((m) => m.userId);
-    const memberUsers = memberIds.length > 0
-      ? await db.query.users.findMany({
-          where: (users, { inArray }) => inArray(users.id, memberIds),
-          columns: { id: true, displayName: true, avatarUrl: true },
-        })
-      : [];
+    const memberUsers =
+      memberIds.length > 0
+        ? await db.query.users.findMany({
+            where: (users, { inArray }) => inArray(users.id, memberIds),
+            columns: { id: true, displayName: true, avatarUrl: true },
+          })
+        : [];
 
     return {
       community,

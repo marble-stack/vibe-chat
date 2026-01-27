@@ -78,7 +78,22 @@
       "Bash(gh api:*)",
       "Bash(gh pr merge:*)",
       "Bash(gh run list:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(git log:*)",
+      "Bash(for commit in faf3287 b7203ad ff8e193 d16257d 31de08b)",
+      "Bash(do)",
+      "Bash(done)",
+      "Bash(npx eslint:*)",
+      "Bash(export PATH=\"$HOME/.local/share/pnpm:$HOME/.corepack/bin:$PATH\")",
+      "Bash(docker ps:*)",
+      "Bash(/usr/local/lib/node_modules/corepack/shims/pnpm test)",
+      "Bash(./node_modules/.bin/vitest:*)",
+      "Bash(corepack enable:*)",
+      "Bash(pnpm --version:*)",
+      "Bash(pnpm format:*)",
+      "Bash(curl:*)",
+      "Bash(pnpm --filter @vibe-chat/server build:*)",
+      "Bash(pnpm --filter @vibe-chat/web build:*)"
     ]
   }
 }

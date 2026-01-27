@@ -25,10 +25,10 @@ export function Login() {
 
       if (existingKeys && existingKeys.userId === user.id) {
         // Reuse existing keys - preserves ability to decrypt old messages
-        console.log('Reusing existing identity keys for user:', user.id);
+        console.log("Reusing existing identity keys for user:", user.id);
       } else {
         // Different user or no keys - clear and regenerate
-        console.log('Generating new identity keys for user:', user.id);
+        console.log("Generating new identity keys for user:", user.id);
         await clearAllKeys();
 
         const { keys, publicBundle } = await generateIdentityKeys();
@@ -84,9 +84,7 @@ export function Login() {
             />
           </div>
 
-          {error && (
-            <p className="text-red-400 text-sm mb-4">{error}</p>
-          )}
+          {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
           <button
             type="submit"
@@ -96,7 +94,6 @@ export function Login() {
             {loading ? "Logging in..." : "Log In"}
           </button>
         </form>
-
       </div>
     </div>
   );

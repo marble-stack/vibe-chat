@@ -85,8 +85,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setCommunities: (communities) => set({ communities }),
 
-  addCommunity: (community) =>
-    set((state) => ({ communities: [...state.communities, community] })),
+  addCommunity: (community) => set((state) => ({ communities: [...state.communities, community] })),
 
   setChannels: (communityId, channels) =>
     set((state) => ({
@@ -97,10 +96,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       channels: {
         ...state.channels,
-        [channel.communityId]: [
-          ...(state.channels[channel.communityId] || []),
-          channel,
-        ],
+        [channel.communityId]: [...(state.channels[channel.communityId] || []), channel],
       },
     })),
 
@@ -218,12 +214,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Find the channel containing this message
       for (const channelId in newMessages) {
         const channelMessages = newMessages[channelId];
-        const msgIndex = channelMessages.findIndex(m => m.id === messageId);
+        const msgIndex = channelMessages.findIndex((m) => m.id === messageId);
 
         if (msgIndex !== -1) {
           const message = channelMessages[msgIndex];
           const reactions = message.reactions || [];
-          const existingReaction = reactions.find(r => r.emoji === emoji);
+          const existingReaction = reactions.find((r) => r.emoji === emoji);
 
           if (existingReaction) {
             // Update existing reaction
@@ -259,7 +255,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Find the channel containing this message
       for (const channelId in newMessages) {
         const channelMessages = newMessages[channelId];
-        const msgIndex = channelMessages.findIndex(m => m.id === messageId);
+        const msgIndex = channelMessages.findIndex((m) => m.id === messageId);
 
         if (msgIndex !== -1) {
           const message = channelMessages[msgIndex];
@@ -268,16 +264,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
           // If emoji is provided, use it; otherwise find the reaction by userId
           let reactionIndex = -1;
           if (emoji) {
-            reactionIndex = reactions.findIndex(r => r.emoji === emoji);
+            reactionIndex = reactions.findIndex((r) => r.emoji === emoji);
           } else {
             // Find any reaction by this user
-            reactionIndex = reactions.findIndex(r => r.userIds.includes(userId));
+            reactionIndex = reactions.findIndex((r) => r.userIds.includes(userId));
           }
 
           if (reactionIndex !== -1) {
             const reaction = reactions[reactionIndex];
             reaction.count--;
-            reaction.userIds = reaction.userIds.filter(id => id !== userId);
+            reaction.userIds = reaction.userIds.filter((id) => id !== userId);
             delete reaction.reactionIds[userId];
 
             // Remove reaction if no users left

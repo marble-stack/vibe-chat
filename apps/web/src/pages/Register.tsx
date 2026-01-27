@@ -123,9 +123,7 @@ export function Register() {
             />
           </div>
 
-          {error && (
-            <p className="text-red-400 text-sm mb-4">{error}</p>
-          )}
+          {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
           <button
             type="submit"
@@ -135,7 +133,6 @@ export function Register() {
             {loading ? "Creating account..." : "Continue"}
           </button>
         </form>
-
       </div>
     </div>
   );

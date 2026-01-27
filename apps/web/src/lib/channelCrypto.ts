@@ -6,9 +6,9 @@
  * to members encrypted with their public keys.
  */
 
-import { api } from './api';
-import { logger } from './logger';
-import { wsClient } from './websocket';
+import { api } from "./api";
+import { logger } from "./logger";
+import { wsClient } from "./websocket";
 import {
   generateChannelKey,
   exportAesKey,
@@ -17,7 +17,7 @@ import {
   encryptChannelKeyForRecipient,
   decryptChannelKey,
   importPrivateKey,
-} from './crypto';
+} from "./crypto";
 import {
   getChannelKey,
   storeChannelKey,
@@ -25,7 +25,7 @@ import {
   getIdentityKeys,
   storeUserKey,
   getUserKey,
-} from './keyStore';
+} from "./keyStore";
 
 // Track pending key requests to avoid duplicate requests
 const pendingKeyRequests = new Set<string>();
@@ -52,7 +52,7 @@ export async function ensureChannelKey(
       try {
         await distributeChannelKey(channelId, existingKey, members, currentUserId);
       } catch (err) {
-        logger.error('Failed to redistribute channel key:', err);
+        logger.error("Failed to redistribute channel key:", err);
         // Continue anyway - we still have the key locally
       }
     }
@@ -62,7 +62,7 @@ export async function ensureChannelKey(
   // Try to fetch channel key from server (someone else may have distributed one)
   const identityKeys = await getIdentityKeys();
   if (!identityKeys) {
-    throw new Error('No identity keys found. Please log in again.');
+    throw new Error("No identity keys found. Please log in again.");
   }
 
   try {
@@ -107,7 +107,7 @@ export async function ensureChannelKey(
       return { key: channelKey, isNew: false };
     }
   } catch (_err) {
-    logger.debug('No existing channel key found for current user');
+    logger.debug("No existing channel key found for current user");
   }
 
   // No key exists on server for this user - check if ANY key exists in the channel
@@ -121,7 +121,9 @@ export async function ensureChannelKey(
 
       if (!pendingKeyRequests.has(requestKey)) {
         pendingKeyRequests.add(requestKey);
-        logger.debug(`Requesting key redistribution from ${keyOwner.userId} for channel ${channelId}`);
+        logger.debug(
+          `Requesting key redistribution from ${keyOwner.userId} for channel ${channelId}`
+        );
         wsClient.requestKey(channelId, keyOwner.userId);
 
         // Remove from pending after 30 seconds to allow retry
@@ -129,25 +131,25 @@ export async function ensureChannelKey(
       }
 
       if (!createIfMissing) {
-        throw new Error('Syncing keys...');
+        throw new Error("Syncing keys...");
       }
 
       // For sending: wait briefly for key redistribution, then retry
-      throw new Error('Syncing channel key. Please try again in a moment.');
+      throw new Error("Syncing channel key. Please try again in a moment.");
     }
   } catch (err) {
     // If this is our "syncing keys" error, re-throw it
-    if (err instanceof Error && err.message.includes('Syncing')) {
+    if (err instanceof Error && err.message.includes("Syncing")) {
       throw err;
     }
     // Otherwise, just log and continue to key creation
-    logger.debug('Could not check for existing channel keys:', err);
+    logger.debug("Could not check for existing channel keys:", err);
   }
 
   // No key exists on server for this user
   if (!createIfMissing) {
     // For decryption, don't create a new key - throw error so caller can handle gracefully
-    throw new Error('No channel key available. Waiting for key distribution from another member.');
+    throw new Error("No channel key available. Waiting for key distribution from another member.");
   }
 
   // For sending: create and distribute a new key (only if NO key exists at all)
@@ -175,7 +177,7 @@ export async function distributeChannelKey(
 ): Promise<void> {
   const identityKeys = await getIdentityKeys();
   if (!identityKeys) {
-    throw new Error('No identity keys found');
+    throw new Error("No identity keys found");
   }
 
   const privateKey = await importPrivateKey(identityKeys.identityKeyPair.privateKey);
@@ -249,8 +251,8 @@ export async function decryptChannelMessage(
   // Check if we have identity keys - if not, encryption is not set up
   const identityKeys = await getIdentityKeys();
   if (!identityKeys) {
-    logger.warn('No identity keys found - encryption not set up for this device');
-    return '[Encryption not set up - please re-register]';
+    logger.warn("No identity keys found - encryption not set up for this device");
+    return "[Encryption not set up - please re-register]";
   }
 
   // First try with local key if we have one
@@ -260,7 +262,7 @@ export async function decryptChannelMessage(
       return await decryptMessage(ciphertext, localKey);
     } catch {
       // Local key didn't work - might be stale, try fetching fresh key from server
-      logger.debug('Local key failed to decrypt, trying to fetch fresh key from server');
+      logger.debug("Local key failed to decrypt, trying to fetch fresh key from server");
     }
   }
 
@@ -301,7 +303,7 @@ export async function decryptChannelMessage(
       }
     }
   } catch (err) {
-    logger.error('Failed to fetch keys from server:', err);
+    logger.error("Failed to fetch keys from server:", err);
   }
 
   // Could not decrypt - request key from the sender if we know who they are
@@ -316,7 +318,7 @@ export async function decryptChannelMessage(
       // Remove from pending after 30 seconds to allow retry
       setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
     }
-    return '[Syncing keys...]';
+    return "[Syncing keys...]";
   }
 
   // Check if ANY key exists in the channel and request it
@@ -332,13 +334,13 @@ export async function decryptChannelMessage(
 
         setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
       }
-      return '[Syncing keys...]';
+      return "[Syncing keys...]";
     }
   } catch {
     // Ignore error checking for key owners
   }
 
-  return '[Unable to decrypt message]';
+  return "[Unable to decrypt message]";
 }
 
 /**
@@ -414,7 +416,7 @@ export async function tryFetchChannelKey(
       return true;
     }
   } catch (err) {
-    logger.debug('Failed to fetch channel key:', err);
+    logger.debug("Failed to fetch channel key:", err);
   }
 
   return false;

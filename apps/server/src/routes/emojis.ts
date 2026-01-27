@@ -6,7 +6,11 @@ import { isUserInCommunity } from "../lib/authorization.js";
 
 const createEmojiSchema = z.object({
   communityId: z.string().uuid(),
-  name: z.string().min(1).max(32).regex(/^[a-z0-9_]+$/, "Emoji name must be lowercase alphanumeric with underscores"),
+  name: z
+    .string()
+    .min(1)
+    .max(32)
+    .regex(/^[a-z0-9_]+$/, "Emoji name must be lowercase alphanumeric with underscores"),
   fileUrl: z.string().url(),
   animated: z.boolean().default(false),
   uploadedBy: z.string().uuid(),
@@ -35,23 +39,23 @@ export const emojiRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Check if emoji name already exists in community
     const existing = await db.query.emojis.findFirst({
-      where: and(
-        eq(emojis.communityId, body.communityId),
-        eq(emojis.name, body.name)
-      ),
+      where: and(eq(emojis.communityId, body.communityId), eq(emojis.name, body.name)),
     });
 
     if (existing) {
       return reply.status(400).send({ error: "Emoji name already exists" });
     }
 
-    const [emoji] = await db.insert(emojis).values({
-      communityId: body.communityId,
-      name: body.name,
-      fileUrl: body.fileUrl,
-      animated: body.animated,
-      uploadedBy: body.uploadedBy,
-    }).returning();
+    const [emoji] = await db
+      .insert(emojis)
+      .values({
+        communityId: body.communityId,
+        name: body.name,
+        fileUrl: body.fileUrl,
+        animated: body.animated,
+        uploadedBy: body.uploadedBy,
+      })
+      .returning();
 
     return { emoji };
   });

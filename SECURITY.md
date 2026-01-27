@@ -11,6 +11,7 @@ We take security vulnerabilities seriously. If you discover a security issue, pl
 Instead, please report security vulnerabilities by emailing the maintainers directly or using GitHub's private vulnerability reporting feature.
 
 Include the following information:
+
 - Description of the vulnerability
 - Steps to reproduce
 - Potential impact

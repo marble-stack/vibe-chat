@@ -15,7 +15,10 @@ export function sendToUser(userId: string, message: object): void {
 }
 
 // Map of WebSocket -> user info
-export const socketUsers = new Map<WebSocket, { userId: string; channelIds: Set<string>; communityIds: Set<string> }>();
+export const socketUsers = new Map<
+  WebSocket,
+  { userId: string; channelIds: Set<string>; communityIds: Set<string> }
+>();
 
 // Map of communityId -> Set of online userIds
 export const communityOnlineUsers = new Map<string, Set<string>>();

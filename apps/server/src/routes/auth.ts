@@ -11,10 +11,12 @@ const registerSchema = z.object({
   identityKeyPublic: z.string(),
   signedPreKeyPublic: z.string(),
   signedPreKeySignature: z.string(),
-  preKeys: z.array(z.object({
-    keyId: z.string(),
-    publicKey: z.string(),
-  })),
+  preKeys: z.array(
+    z.object({
+      keyId: z.string(),
+      publicKey: z.string(),
+    })
+  ),
 });
 
 const loginSchema = z.object({
@@ -26,10 +28,12 @@ const updateKeysSchema = z.object({
   identityKeyPublic: z.string(),
   signedPreKeyPublic: z.string(),
   signedPreKeySignature: z.string(),
-  preKeys: z.array(z.object({
-    keyId: z.string(),
-    publicKey: z.string(),
-  })),
+  preKeys: z.array(
+    z.object({
+      keyId: z.string(),
+      publicKey: z.string(),
+    })
+  ),
 });
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
@@ -50,14 +54,17 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     const passwordHash = await hashPassword(body.password);
 
     // Create user
-    const [user] = await db.insert(users).values({
-      email: body.email,
-      passwordHash,
-      displayName: body.displayName,
-      identityKeyPublic: body.identityKeyPublic,
-      signedPreKeyPublic: body.signedPreKeyPublic,
-      signedPreKeySignature: body.signedPreKeySignature,
-    }).returning();
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: body.email,
+        passwordHash,
+        displayName: body.displayName,
+        identityKeyPublic: body.identityKeyPublic,
+        signedPreKeyPublic: body.signedPreKeyPublic,
+        signedPreKeySignature: body.signedPreKeySignature,
+      })
+      .returning();
 
     // Store prekeys
     if (body.preKeys.length > 0) {
@@ -135,7 +142,8 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     const body = updateKeysSchema.parse(request.body);
 
     // Update user's keys
-    await db.update(users)
+    await db
+      .update(users)
       .set({
         identityKeyPublic: body.identityKeyPublic,
         signedPreKeyPublic: body.signedPreKeyPublic,
@@ -198,10 +206,12 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         publicKey: user.signedPreKeyPublic,
         signature: user.signedPreKeySignature,
       },
-      preKey: preKey ? {
-        keyId: preKey.keyId,
-        publicKey: preKey.publicKey,
-      } : null,
+      preKey: preKey
+        ? {
+            keyId: preKey.keyId,
+            publicKey: preKey.publicKey,
+          }
+        : null,
     };
   });
 };

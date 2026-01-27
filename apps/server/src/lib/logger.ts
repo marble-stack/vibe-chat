@@ -5,7 +5,7 @@
  * In production, debug logs are suppressed.
  */
 
-const isDevelopment = process.env.NODE_ENV !== 'production';
+const isDevelopment = process.env.NODE_ENV !== "production";
 
 export const logger = {
   /**
@@ -13,7 +13,7 @@ export const logger = {
    */
   debug: (...args: unknown[]) => {
     if (isDevelopment) {
-      console.log('[DEBUG]', ...args);
+      console.log("[DEBUG]", ...args);
     }
   },
 
@@ -22,7 +22,7 @@ export const logger = {
    */
   info: (...args: unknown[]) => {
     if (isDevelopment) {
-      console.log('[INFO]', ...args);
+      console.log("[INFO]", ...args);
     }
   },
 
@@ -30,13 +30,13 @@ export const logger = {
    * Warning level logging - always logged
    */
   warn: (...args: unknown[]) => {
-    console.warn('[WARN]', ...args);
+    console.warn("[WARN]", ...args);
   },
 
   /**
    * Error level logging - always logged
    */
   error: (...args: unknown[]) => {
-    console.error('[ERROR]', ...args);
+    console.error("[ERROR]", ...args);
   },
 };

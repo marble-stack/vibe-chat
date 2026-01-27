@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import { buildTestApp, createTestToken, authHeader } from '../helpers/testApp.js';
-import type { FastifyInstance } from 'fastify';
+import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from "vitest";
+import { buildTestApp, createTestToken, authHeader } from "../helpers/testApp.js";
+import type { FastifyInstance } from "fastify";
 
 // Mock the database module
-vi.mock('../../db/index.js', () => ({
+vi.mock("../../db/index.js", () => ({
   db: {
     insert: vi.fn().mockReturnValue({
       values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{ id: 'channel-123' }]),
+        returning: vi.fn().mockResolvedValue([{ id: "channel-123" }]),
         onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
       }),
     }),
@@ -27,30 +27,30 @@ vi.mock('../../db/index.js', () => ({
       },
     },
   },
-  channels: { id: 'id', communityId: 'communityId', name: 'name' },
-  senderKeys: { channelId: 'channelId', userId: 'userId', forUserId: 'forUserId' },
+  channels: { id: "id", communityId: "communityId", name: "name" },
+  senderKeys: { channelId: "channelId", userId: "userId", forUserId: "forUserId" },
 }));
 
 // Mock authorization module
-vi.mock('../../lib/authorization.js', () => ({
+vi.mock("../../lib/authorization.js", () => ({
   canUserAccessChannel: vi.fn(),
   isUserInCommunity: vi.fn(),
 }));
 
 // Mock WebSocket connection maps
-vi.mock('../../websocket/connectionMaps.js', () => ({
+vi.mock("../../websocket/connectionMaps.js", () => ({
   sendToUser: vi.fn(),
 }));
 
-import { db } from '../../db/index.js';
-import { canUserAccessChannel } from '../../lib/authorization.js';
-import { sendToUser } from '../../websocket/connectionMaps.js';
+import { db } from "../../db/index.js";
+import { canUserAccessChannel } from "../../lib/authorization.js";
+import { sendToUser } from "../../websocket/connectionMaps.js";
 
-describe('Channel Routes - Sender Key Security', () => {
+describe("Channel Routes - Sender Key Security", () => {
   let app: FastifyInstance;
-  const testUserId = '550e8400-e29b-41d4-a716-446655440001';
-  const otherUserId = '550e8400-e29b-41d4-a716-446655440002';
-  const testChannelId = '550e8400-e29b-41d4-a716-446655440003';
+  const testUserId = "550e8400-e29b-41d4-a716-446655440001";
+  const otherUserId = "550e8400-e29b-41d4-a716-446655440002";
+  const testChannelId = "550e8400-e29b-41d4-a716-446655440003";
 
   beforeAll(async () => {
     app = await buildTestApp();
@@ -65,33 +65,31 @@ describe('Channel Routes - Sender Key Security', () => {
     vi.clearAllMocks();
   });
 
-  describe('POST /api/channels/sender-keys', () => {
+  describe("POST /api/channels/sender-keys", () => {
     const validBody = {
       channelId: testChannelId,
       userId: testUserId,
-      distributionId: 'dist-123',
-      encryptedKeys: [
-        { forUserId: otherUserId, encryptedKey: 'encrypted-key-data' },
-      ],
+      distributionId: "dist-123",
+      encryptedKeys: [{ forUserId: otherUserId, encryptedKey: "encrypted-key-data" }],
     };
 
-    it('should reject unauthenticated requests with 401', async () => {
+    it("should reject unauthenticated requests with 401", async () => {
       const response = await app.inject({
-        method: 'POST',
-        url: '/api/channels/sender-keys',
+        method: "POST",
+        url: "/api/channels/sender-keys",
         payload: validBody,
       });
 
       expect(response.statusCode).toBe(401);
-      expect(response.json()).toHaveProperty('error');
+      expect(response.json()).toHaveProperty("error");
     });
 
-    it('should reject if userId in body does not match authenticated user', async () => {
+    it("should reject if userId in body does not match authenticated user", async () => {
       const token = createTestToken(otherUserId); // Authenticate as different user
 
       const response = await app.inject({
-        method: 'POST',
-        url: '/api/channels/sender-keys',
+        method: "POST",
+        url: "/api/channels/sender-keys",
         headers: {
           authorization: authHeader(token),
         },
@@ -99,19 +97,19 @@ describe('Channel Routes - Sender Key Security', () => {
       });
 
       expect(response.statusCode).toBe(403);
-      expect(response.json()).toHaveProperty('error');
-      expect(response.json().error).toContain('userId');
+      expect(response.json()).toHaveProperty("error");
+      expect(response.json().error).toContain("userId");
     });
 
-    it('should reject if user is not a member of the channel community', async () => {
+    it("should reject if user is not a member of the channel community", async () => {
       const token = createTestToken(testUserId);
 
       // Mock: user is NOT a member of the channel's community
       vi.mocked(canUserAccessChannel).mockResolvedValue(false);
 
       const response = await app.inject({
-        method: 'POST',
-        url: '/api/channels/sender-keys',
+        method: "POST",
+        url: "/api/channels/sender-keys",
         headers: {
           authorization: authHeader(token),
         },
@@ -119,18 +117,18 @@ describe('Channel Routes - Sender Key Security', () => {
       });
 
       expect(response.statusCode).toBe(403);
-      expect(response.json()).toHaveProperty('error');
+      expect(response.json()).toHaveProperty("error");
     });
 
-    it('should allow key distribution for authenticated user who is a channel member', async () => {
+    it("should allow key distribution for authenticated user who is a channel member", async () => {
       const token = createTestToken(testUserId);
 
       // Mock: user IS a member of the channel's community
       vi.mocked(canUserAccessChannel).mockResolvedValue(true);
 
       const response = await app.inject({
-        method: 'POST',
-        url: '/api/channels/sender-keys',
+        method: "POST",
+        url: "/api/channels/sender-keys",
         headers: {
           authorization: authHeader(token),
         },
@@ -141,15 +139,15 @@ describe('Channel Routes - Sender Key Security', () => {
       expect(response.json()).toEqual({ success: true });
     });
 
-    it('should only allow distributing keys for your own userId', async () => {
+    it("should only allow distributing keys for your own userId", async () => {
       // This test ensures that even if authenticated, you can't set keys for another user
       const token = createTestToken(testUserId);
 
       vi.mocked(canUserAccessChannel).mockResolvedValue(true);
 
       const response = await app.inject({
-        method: 'POST',
-        url: '/api/channels/sender-keys',
+        method: "POST",
+        url: "/api/channels/sender-keys",
         headers: {
           authorization: authHeader(token),
         },
@@ -162,25 +160,25 @@ describe('Channel Routes - Sender Key Security', () => {
       expect(response.statusCode).toBe(403);
     });
 
-    it('should send key:available WebSocket notification to recipients', async () => {
+    it("should send key:available WebSocket notification to recipients", async () => {
       const token = createTestToken(testUserId);
-      const thirdUserId = '550e8400-e29b-41d4-a716-446655440004';
+      const thirdUserId = "550e8400-e29b-41d4-a716-446655440004";
 
       vi.mocked(canUserAccessChannel).mockResolvedValue(true);
 
       const bodyWithMultipleRecipients = {
         channelId: testChannelId,
         userId: testUserId,
-        distributionId: 'dist-456',
+        distributionId: "dist-456",
         encryptedKeys: [
-          { forUserId: otherUserId, encryptedKey: 'encrypted-key-1' },
-          { forUserId: thirdUserId, encryptedKey: 'encrypted-key-2' },
+          { forUserId: otherUserId, encryptedKey: "encrypted-key-1" },
+          { forUserId: thirdUserId, encryptedKey: "encrypted-key-2" },
         ],
       };
 
       const response = await app.inject({
-        method: 'POST',
-        url: '/api/channels/sender-keys',
+        method: "POST",
+        url: "/api/channels/sender-keys",
         headers: {
           authorization: authHeader(token),
         },
@@ -192,16 +190,16 @@ describe('Channel Routes - Sender Key Security', () => {
       // Verify sendToUser was called for each recipient
       expect(sendToUser).toHaveBeenCalledTimes(2);
       expect(sendToUser).toHaveBeenCalledWith(otherUserId, {
-        type: 'key:available',
+        type: "key:available",
         payload: { channelId: testChannelId, fromUserId: testUserId },
       });
       expect(sendToUser).toHaveBeenCalledWith(thirdUserId, {
-        type: 'key:available',
+        type: "key:available",
         payload: { channelId: testChannelId, fromUserId: testUserId },
       });
     });
 
-    it('should not send key:available if no encrypted keys provided', async () => {
+    it("should not send key:available if no encrypted keys provided", async () => {
       const token = createTestToken(testUserId);
 
       vi.mocked(canUserAccessChannel).mockResolvedValue(true);
@@ -209,13 +207,13 @@ describe('Channel Routes - Sender Key Security', () => {
       const bodyWithNoKeys = {
         channelId: testChannelId,
         userId: testUserId,
-        distributionId: 'dist-789',
+        distributionId: "dist-789",
         encryptedKeys: [],
       };
 
       const response = await app.inject({
-        method: 'POST',
-        url: '/api/channels/sender-keys',
+        method: "POST",
+        url: "/api/channels/sender-keys",
         headers: {
           authorization: authHeader(token),
         },
@@ -227,24 +225,24 @@ describe('Channel Routes - Sender Key Security', () => {
     });
   });
 
-  describe('GET /api/channels/:channelId/sender-keys/:userId', () => {
-    it('should reject unauthenticated requests with 401', async () => {
+  describe("GET /api/channels/:channelId/sender-keys/:userId", () => {
+    it("should reject unauthenticated requests with 401", async () => {
       const response = await app.inject({
-        method: 'GET',
+        method: "GET",
         url: `/api/channels/${testChannelId}/sender-keys/${testUserId}`,
       });
 
       expect(response.statusCode).toBe(401);
-      expect(response.json()).toHaveProperty('error');
+      expect(response.json()).toHaveProperty("error");
     });
 
-    it('should reject if user is not a member of the channel community', async () => {
+    it("should reject if user is not a member of the channel community", async () => {
       const token = createTestToken(testUserId);
 
       vi.mocked(canUserAccessChannel).mockResolvedValue(false);
 
       const response = await app.inject({
-        method: 'GET',
+        method: "GET",
         url: `/api/channels/${testChannelId}/sender-keys/${testUserId}`,
         headers: {
           authorization: authHeader(token),
@@ -252,28 +250,28 @@ describe('Channel Routes - Sender Key Security', () => {
       });
 
       expect(response.statusCode).toBe(403);
-      expect(response.json()).toHaveProperty('error');
+      expect(response.json()).toHaveProperty("error");
     });
 
-    it('should allow fetching sender keys for authenticated member', async () => {
+    it("should allow fetching sender keys for authenticated member", async () => {
       const token = createTestToken(testUserId);
 
       vi.mocked(canUserAccessChannel).mockResolvedValue(true);
       vi.mocked(db.query.senderKeys.findMany).mockResolvedValue([
         {
-          id: 'key-1',
+          id: "key-1",
           channelId: testChannelId,
           userId: otherUserId,
           forUserId: testUserId,
-          encryptedKey: 'some-encrypted-key',
-          distributionId: 'dist-1',
-          senderPublicKey: 'public-key',
+          encryptedKey: "some-encrypted-key",
+          distributionId: "dist-1",
+          senderPublicKey: "public-key",
           createdAt: new Date(),
         },
       ]);
 
       const response = await app.inject({
-        method: 'GET',
+        method: "GET",
         url: `/api/channels/${testChannelId}/sender-keys/${testUserId}`,
         headers: {
           authorization: authHeader(token),
@@ -281,7 +279,7 @@ describe('Channel Routes - Sender Key Security', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toHaveProperty('senderKeys');
+      expect(response.json()).toHaveProperty("senderKeys");
     });
   });
 });
