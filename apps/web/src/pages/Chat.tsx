@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/auth";
 import { useChatStore } from "../stores/chat";
 import { api } from "../lib/api";
 import { wsClient } from "../lib/websocket";
 import { decryptChannelMessage } from "../lib/channelCrypto";
+import { clearAllKeys } from "../lib/keyStore";
 import { logger } from "../lib/logger";
 import { Sidebar } from "../components/Sidebar";
 import { ChannelList } from "../components/ChannelList";
@@ -12,8 +14,10 @@ import { MessageInput } from "../components/MessageInput";
 import { MemberList } from "../components/MemberList";
 
 export function Chat() {
+  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
+  const logout = useAuthStore((state) => state.logout);
   const hasHydrated = useAuthStore((state) => state._hasHydrated);
   const {
     activeCommunityId,
@@ -243,7 +247,17 @@ export function Chat() {
       removeReaction(messageId, userId, emoji);
     };
 
+    // Handle auth failure - force re-login
+    const handleAuthFailed = async () => {
+      logger.warn("WebSocket authentication failed - forcing re-login");
+      // Clear all keys and logout to force fresh login
+      await clearAllKeys();
+      logout();
+      navigate("/login");
+    };
+
     wsClient.on("message:new", handleNewMessage);
+    wsClient.on("auth:failed", handleAuthFailed);
     wsClient.on("typing:update", handleTypingUpdate);
     wsClient.on("presence:list", handlePresenceList);
     wsClient.on("presence:update", handlePresenceUpdate);
@@ -254,6 +268,7 @@ export function Chat() {
 
     return () => {
       wsClient.off("message:new", handleNewMessage);
+      wsClient.off("auth:failed", handleAuthFailed);
       wsClient.off("typing:update", handleTypingUpdate);
       wsClient.off("presence:list", handlePresenceList);
       wsClient.off("presence:update", handlePresenceUpdate);
@@ -263,7 +278,7 @@ export function Chat() {
       wsClient.off("reaction:removed", handleReactionRemoved);
       wsClient.disconnect();
     };
-  }, [user, token, addMessage, setTypingUser, setOnlineUsers, setUserOnline, updateMessage, deleteMessage, addReaction, removeReaction, addMemberIfMissing]);
+  }, [user, token, logout, navigate, addMessage, setTypingUser, setOnlineUsers, setUserOnline, updateMessage, deleteMessage, addReaction, removeReaction, addMemberIfMissing]);
 
   // Join active community for presence updates
   useEffect(() => {

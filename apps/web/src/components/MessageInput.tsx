@@ -9,6 +9,7 @@ export function MessageInput() {
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { activeChannelId, channels, activeCommunityId, members, replyingTo, setReplyingTo } = useChatStore();
@@ -31,9 +32,19 @@ export function MessageInput() {
     e.preventDefault();
     if (!message.trim() || !activeChannelId || !user || isSending) return;
 
+    // Clear any previous error
+    setSendError(null);
+
+    // Check if WebSocket is connected
+    if (!wsClient.isConnected()) {
+      setSendError("Not connected. Please wait or refresh the page.");
+      return;
+    }
+
     // Ensure members are loaded before sending to properly distribute encryption keys
     if (communityMembers.length === 0) {
       logger.warn('Members not loaded yet, cannot encrypt message properly');
+      setSendError("Loading... please try again.");
       return;
     }
 
@@ -57,11 +68,17 @@ export function MessageInput() {
         user.id
       );
 
-      wsClient.sendMessage(activeChannelId, ciphertext, replyToId);
+      const sent = wsClient.sendMessage(activeChannelId, ciphertext, replyToId);
+      if (!sent) {
+        setSendError("Message queued - connection issue. Will send when reconnected.");
+      }
     } catch (err) {
       logger.error('Failed to encrypt message:', err);
       // Fallback to plaintext if encryption fails (for backward compatibility)
-      wsClient.sendMessage(activeChannelId, plaintext, replyToId);
+      const sent = wsClient.sendMessage(activeChannelId, plaintext, replyToId);
+      if (!sent) {
+        setSendError("Message queued - connection issue. Will send when reconnected.");
+      }
     } finally {
       setIsSending(false);
     }
@@ -118,8 +135,23 @@ export function MessageInput() {
     }
   }, [replyingTo]);
 
+  // Clear error after a few seconds
+  useEffect(() => {
+    if (sendError) {
+      const timer = setTimeout(() => setSendError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [sendError]);
+
   return (
     <form onSubmit={handleSubmit} className="px-4 pb-6">
+      {/* Error message */}
+      {sendError && (
+        <div className="bg-red-500/20 border border-red-500/50 text-red-400 text-sm px-4 py-2 rounded-lg mb-2">
+          {sendError}
+        </div>
+      )}
+
       {/* Reply preview bar */}
       {replyingTo && (
         <div className="bg-background-tertiary rounded-t-lg border-b border-background-primary px-4 py-2 flex items-center gap-2">
