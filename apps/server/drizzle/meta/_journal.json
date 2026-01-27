@@ -50,6 +50,13 @@
       "when": 1737936000000,
       "tag": "0006_cleanup_duplicates",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1769487408846,
+      "tag": "0007_aberrant_inertia",
+      "breakpoints": true
     }
   ]
 }

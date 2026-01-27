@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 import { WebSocket } from "ws";
-import { db, messages, users, reactions } from "../db/index.js";
+import { db, messages, users, reactions, senderKeys, pendingKeyRequests } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { validatePayload } from "./schemas.js";
@@ -29,7 +29,9 @@ export const websocketHandler: FastifyPluginAsync = async (fastify) => {
         await handleMessage(socket, message);
       } catch (err) {
         logger.error("WebSocket message error:", err);
-        socket.send(JSON.stringify({ type: "error", payload: { message: "Invalid message format" } }));
+        socket.send(
+          JSON.stringify({ type: "error", payload: { message: "Invalid message format" } })
+        );
       }
     });
 
@@ -57,13 +59,21 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       // Verify JWT token and extract userId
       const tokenPayload = verifyToken(payload.token);
       if (!tokenPayload) {
-        socket.send(JSON.stringify({ type: "error", payload: { message: "Invalid or expired token" } }));
+        socket.send(
+          JSON.stringify({ type: "error", payload: { message: "Invalid or expired token" } })
+        );
         return;
       }
 
       // Associate user with socket using verified userId from token
-      socketUsers.set(socket, { userId: tokenPayload.userId, channelIds: new Set(), communityIds: new Set() });
-      socket.send(JSON.stringify({ type: "auth:success", payload: { userId: tokenPayload.userId } }));
+      socketUsers.set(socket, {
+        userId: tokenPayload.userId,
+        channelIds: new Set(),
+        communityIds: new Set(),
+      });
+      socket.send(
+        JSON.stringify({ type: "auth:success", payload: { userId: tokenPayload.userId } })
+      );
       break;
     }
 
@@ -85,7 +95,9 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       // Authorization check: verify user is a member of this community
       const isMember = await isUserInCommunity(user.userId, communityId);
       if (!isMember) {
-        socket.send(JSON.stringify({ type: "error", payload: { message: "Not a member of this community" } }));
+        socket.send(
+          JSON.stringify({ type: "error", payload: { message: "Not a member of this community" } })
+        );
         return;
       }
 
@@ -105,17 +117,23 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
 
       // Send current online users to the joining socket
       const onlineUsers = Array.from(communityOnlineUsers.get(communityId) || []);
-      socket.send(JSON.stringify({
-        type: "presence:list",
-        payload: { communityId, onlineUserIds: onlineUsers },
-      }));
+      socket.send(
+        JSON.stringify({
+          type: "presence:list",
+          payload: { communityId, onlineUserIds: onlineUsers },
+        })
+      );
 
       // Broadcast user came online (if they weren't already online from another tab)
       if (!wasOnline) {
-        broadcastToCommunity(communityId, {
-          type: "presence:update",
-          payload: { communityId, userId: user.userId, isOnline: true },
-        }, socket);
+        broadcastToCommunity(
+          communityId,
+          {
+            type: "presence:update",
+            payload: { communityId, userId: user.userId, isOnline: true },
+          },
+          socket
+        );
       }
       break;
     }
@@ -153,7 +171,9 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       // Authorization check: verify user can access this channel
       const canAccess = await canUserAccessChannel(user.userId, channelId);
       if (!canAccess) {
-        socket.send(JSON.stringify({ type: "error", payload: { message: "Cannot access this channel" } }));
+        socket.send(
+          JSON.stringify({ type: "error", payload: { message: "Cannot access this channel" } })
+        );
         return;
       }
 
@@ -202,17 +222,25 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       // Authorization check: verify user can access this channel
       const canSend = await canUserAccessChannel(user.userId, channelId);
       if (!canSend) {
-        socket.send(JSON.stringify({ type: "error", payload: { message: "Cannot send messages to this channel" } }));
+        socket.send(
+          JSON.stringify({
+            type: "error",
+            payload: { message: "Cannot send messages to this channel" },
+          })
+        );
         return;
       }
 
       // Store message
-      const [savedMessage] = await db.insert(messages).values({
-        channelId,
-        senderId: user.userId,
-        ciphertext,
-        replyToId,
-      }).returning();
+      const [savedMessage] = await db
+        .insert(messages)
+        .values({
+          channelId,
+          senderId: user.userId,
+          ciphertext,
+          replyToId,
+        })
+        .returning();
 
       // Get sender's display name for clients that may not have it cached
       const sender = await db.query.users.findFirst({
@@ -274,12 +302,15 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       });
 
       if (!existingMessage || existingMessage.senderId !== user.userId) {
-        socket.send(JSON.stringify({ type: "error", payload: { message: "Cannot edit this message" } }));
+        socket.send(
+          JSON.stringify({ type: "error", payload: { message: "Cannot edit this message" } })
+        );
         return;
       }
 
       // Update the message
-      const [updatedMessage] = await db.update(messages)
+      const [updatedMessage] = await db
+        .update(messages)
         .set({ ciphertext, editedAt: new Date() })
         .where(eq(messages.id, messageId))
         .returning();
@@ -327,14 +358,14 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       });
 
       if (!existingMsg || existingMsg.senderId !== user.userId) {
-        socket.send(JSON.stringify({ type: "error", payload: { message: "Cannot delete this message" } }));
+        socket.send(
+          JSON.stringify({ type: "error", payload: { message: "Cannot delete this message" } })
+        );
         return;
       }
 
       // Soft delete the message
-      await db.update(messages)
-        .set({ deletedAt: new Date() })
-        .where(eq(messages.id, messageId));
+      await db.update(messages).set({ deletedAt: new Date() }).where(eq(messages.id, messageId));
 
       // Broadcast to all users in channel
       const deleteChannelSockets = channelConnections.get(channelId);
@@ -363,10 +394,18 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       const user = socketUsers.get(socket);
 
       if (user) {
-        broadcastToChannel(typingStartPayload.channelId, {
-          type: "typing:update",
-          payload: { channelId: typingStartPayload.channelId, userId: user.userId, isTyping: true },
-        }, socket);
+        broadcastToChannel(
+          typingStartPayload.channelId,
+          {
+            type: "typing:update",
+            payload: {
+              channelId: typingStartPayload.channelId,
+              userId: user.userId,
+              isTyping: true,
+            },
+          },
+          socket
+        );
       }
       break;
     }
@@ -381,10 +420,18 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       const user = socketUsers.get(socket);
 
       if (user) {
-        broadcastToChannel(typingStopPayload.channelId, {
-          type: "typing:update",
-          payload: { channelId: typingStopPayload.channelId, userId: user.userId, isTyping: false },
-        }, socket);
+        broadcastToChannel(
+          typingStopPayload.channelId,
+          {
+            type: "typing:update",
+            payload: {
+              channelId: typingStopPayload.channelId,
+              userId: user.userId,
+              isTyping: false,
+            },
+          },
+          socket
+        );
       }
       break;
     }
@@ -414,15 +461,20 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       });
 
       if (existing) {
-        socket.send(JSON.stringify({ type: "error", payload: { message: "Reaction already exists" } }));
+        socket.send(
+          JSON.stringify({ type: "error", payload: { message: "Reaction already exists" } })
+        );
         return;
       }
 
-      const [reaction] = await db.insert(reactions).values({
-        messageId,
-        userId: user.userId,
-        emoji,
-      }).returning();
+      const [reaction] = await db
+        .insert(reactions)
+        .values({
+          messageId,
+          userId: user.userId,
+          emoji,
+        })
+        .returning();
 
       // Broadcast to channel
       broadcastToChannel(channelId, {
@@ -474,7 +526,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
         sendValidationError();
         return;
       }
-      const { channelId, fromUserId } = keyRequestPayload;
+      const { channelId } = keyRequestPayload;
       const user = socketUsers.get(socket);
 
       if (!user) {
@@ -485,26 +537,53 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       // Authorization check: verify user can access this channel
       const canAccess = await canUserAccessChannel(user.userId, channelId);
       if (!canAccess) {
-        socket.send(JSON.stringify({ type: "error", payload: { message: "Cannot access this channel" } }));
+        socket.send(
+          JSON.stringify({ type: "error", payload: { message: "Cannot access this channel" } })
+        );
         return;
       }
 
-      // Find the target user's socket(s) and send them a key:requested message
-      // They should redistribute their key to include the requesting user
+      // Get ALL users who have distributed keys for this channel (not just the specified one)
+      const keyOwners = await db.query.senderKeys.findMany({
+        where: eq(senderKeys.channelId, channelId),
+        columns: { userId: true },
+      });
+      const uniqueKeyOwnerIds = [...new Set(keyOwners.map((k) => k.userId))];
+
+      // Send key:requested to ALL online key owners (any of them can redistribute)
+      let sentToSomeone = false;
       for (const [targetSocket, targetUser] of socketUsers) {
-        if (targetUser.userId === fromUserId && targetSocket.readyState === WebSocket.OPEN) {
-          targetSocket.send(JSON.stringify({
-            type: "key:requested",
-            payload: {
-              channelId,
-              requestingUserId: user.userId,
-            },
-          }));
+        if (
+          uniqueKeyOwnerIds.includes(targetUser.userId) &&
+          targetUser.userId !== user.userId && // Don't send to the requester
+          targetSocket.readyState === WebSocket.OPEN
+        ) {
+          targetSocket.send(
+            JSON.stringify({
+              type: "key:requested",
+              payload: {
+                channelId,
+                requestingUserId: user.userId,
+              },
+            })
+          );
+          sentToSomeone = true;
         }
       }
 
+      // Store the request in database for offline key holders to process when they come online
+      await db
+        .insert(pendingKeyRequests)
+        .values({ channelId, requestingUserId: user.userId })
+        .onConflictDoNothing();
+
       // Acknowledge the request was sent
-      socket.send(JSON.stringify({ type: "key:request:sent", payload: { channelId, fromUserId } }));
+      socket.send(
+        JSON.stringify({
+          type: "key:request:sent",
+          payload: { channelId, sentToOnlineKeyHolder: sentToSomeone },
+        })
+      );
       break;
     }
 
@@ -545,7 +624,11 @@ function handleUserLeaveCommunity(socket: WebSocket, userId: string, communityId
   // Check if user has any other sockets in this community
   let hasOtherConnections = false;
   for (const [otherSocket, otherUser] of socketUsers) {
-    if (otherSocket !== socket && otherUser.userId === userId && otherUser.communityIds.has(communityId)) {
+    if (
+      otherSocket !== socket &&
+      otherUser.userId === userId &&
+      otherUser.communityIds.has(communityId)
+    ) {
       hasOtherConnections = true;
       break;
     }

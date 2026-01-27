@@ -4,7 +4,11 @@ import { useAuthStore } from "../stores/auth";
 import { useChatStore } from "../stores/chat";
 import { api } from "../lib/api";
 import { wsClient } from "../lib/websocket";
-import { decryptChannelMessage, distributeChannelKey, tryFetchChannelKey } from "../lib/channelCrypto";
+import {
+  decryptChannelMessage,
+  distributeChannelKey,
+  tryFetchChannelKey,
+} from "../lib/channelCrypto";
 import { getChannelKey } from "../lib/keyStore";
 import { clearAllKeys } from "../lib/keyStore";
 import { logger } from "../lib/logger";
@@ -64,14 +68,14 @@ export function Chat() {
         const { communities } = await api.communities.list(user.id);
         setCommunities(communities);
       } catch (err) {
-        logger.error('Failed to load communities:', err);
+        logger.error("Failed to load communities:", err);
         // Retry once after a short delay (helps with mobile auth timing)
         setTimeout(async () => {
           try {
             const { communities } = await api.communities.list(user.id);
             setCommunities(communities);
           } catch (retryErr) {
-            logger.error('Failed to load communities on retry:', retryErr);
+            logger.error("Failed to load communities on retry:", retryErr);
           }
         }, 500);
       }
@@ -79,6 +83,74 @@ export function Chat() {
 
     loadCommunities();
   }, [user, hasHydrated, setCommunities]);
+
+  // Process pending key requests on login (for offline key sync)
+  // When a key holder comes online, they should redistribute keys to users who requested while offline
+  useEffect(() => {
+    if (!user || !hasHydrated) return;
+
+    const processPendingRequests = async () => {
+      try {
+        const { pendingRequests } = await api.channels.getPendingKeyRequests();
+
+        if (pendingRequests.length === 0) return;
+
+        logger.debug(`Processing ${pendingRequests.length} pending key requests`);
+
+        // Group requests by channel
+        const requestsByChannel = new Map<string, typeof pendingRequests>();
+        for (const req of pendingRequests) {
+          const existing = requestsByChannel.get(req.channelId) || [];
+          existing.push(req);
+          requestsByChannel.set(req.channelId, existing);
+        }
+
+        // Process each channel's requests
+        for (const [channelId, requests] of requestsByChannel) {
+          const channelKey = await getChannelKey(channelId);
+          if (!channelKey) {
+            logger.debug(`No local key for channel ${channelId}, skipping`);
+            continue;
+          }
+
+          // Get all requesting user IDs for this channel
+          const requestingUserIds = requests.map((r) => r.requestingUserId);
+
+          // We need member info for key distribution - fetch it for these users
+          // Create minimal member objects with the requesting user IDs
+          const membersForDistribution = [
+            { id: user.id, displayName: user.displayName || "Me" },
+            ...requestingUserIds.map((id) => ({ id, displayName: "Unknown" })),
+          ];
+
+          // Redistribute the key to all members
+          try {
+            await distributeChannelKey(channelId, channelKey, membersForDistribution, user.id);
+            logger.debug(
+              `Redistributed key for channel ${channelId} to ${requestingUserIds.length} users`
+            );
+
+            // Delete the fulfilled requests
+            for (const req of requests) {
+              try {
+                await api.channels.deletePendingKeyRequest(req.id);
+              } catch {
+                // Ignore deletion errors - request might have been deleted by another key holder
+              }
+            }
+          } catch (err) {
+            logger.error(`Failed to redistribute key for channel ${channelId}:`, err);
+          }
+        }
+      } catch (err) {
+        logger.error("Failed to process pending key requests:", err);
+      }
+    };
+
+    // Process after a short delay to let WebSocket connect first
+    const timeoutId = setTimeout(processPendingRequests, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [user, hasHydrated]);
 
   // Load community details when active community changes
   useEffect(() => {
@@ -115,13 +187,14 @@ export function Chat() {
 
       // Get current community members for decryption
       const currentCommunityId = activeCommunityRef.current;
-      let currentMembers = currentCommunityId
-        ? membersRef.current[currentCommunityId] || []
-        : [];
+      let currentMembers = currentCommunityId ? membersRef.current[currentCommunityId] || [] : [];
 
       // Ensure current user is in members list for key distribution/retrieval
-      if (user && !currentMembers.some(m => m.id === user.id)) {
-        currentMembers = [...currentMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+      if (user && !currentMembers.some((m) => m.id === user.id)) {
+        currentMembers = [
+          ...currentMembers,
+          { id: user.id, displayName: user.displayName || "Me" },
+        ];
       }
 
       // Decrypt the message
@@ -137,7 +210,7 @@ export function Chat() {
           );
         }
       } catch (err) {
-        logger.error('Failed to decrypt message:', err);
+        logger.error("Failed to decrypt message:", err);
         // Keep ciphertext as fallback
       }
 
@@ -192,28 +265,24 @@ export function Chat() {
 
       // Get current community members for decryption
       const currentCommunityId = activeCommunityRef.current;
-      let currentMembers = currentCommunityId
-        ? membersRef.current[currentCommunityId] || []
-        : [];
+      let currentMembers = currentCommunityId ? membersRef.current[currentCommunityId] || [] : [];
 
       // Ensure current user is in members list for key distribution/retrieval
-      if (user && !currentMembers.some(m => m.id === user.id)) {
-        currentMembers = [...currentMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+      if (user && !currentMembers.some((m) => m.id === user.id)) {
+        currentMembers = [
+          ...currentMembers,
+          { id: user.id, displayName: user.displayName || "Me" },
+        ];
       }
 
       // Decrypt the updated message
       let plaintext = ciphertext;
       try {
         if (user) {
-          plaintext = await decryptChannelMessage(
-            channelId,
-            ciphertext,
-            currentMembers,
-            user.id
-          );
+          plaintext = await decryptChannelMessage(channelId, ciphertext, currentMembers, user.id);
         }
       } catch (err) {
-        logger.error('Failed to decrypt edited message:', err);
+        logger.error("Failed to decrypt edited message:", err);
       }
 
       updateMessage(channelId, id, { ciphertext, plaintext, editedAt });
@@ -272,24 +341,25 @@ export function Chat() {
       // Get our local channel key
       const channelKey = await getChannelKey(channelId);
       if (!channelKey) {
-        logger.debug('No local channel key to redistribute');
+        logger.debug("No local channel key to redistribute");
         return;
       }
 
       // Get current community members including the requester
       const currentCommunityId = activeCommunityRef.current;
-      let currentMembers = currentCommunityId
-        ? membersRef.current[currentCommunityId] || []
-        : [];
+      let currentMembers = currentCommunityId ? membersRef.current[currentCommunityId] || [] : [];
 
       // Ensure the requester is in the list
-      if (!currentMembers.some(m => m.id === requestingUserId)) {
-        currentMembers = [...currentMembers, { id: requestingUserId, displayName: 'Unknown' }];
+      if (!currentMembers.some((m) => m.id === requestingUserId)) {
+        currentMembers = [...currentMembers, { id: requestingUserId, displayName: "Unknown" }];
       }
 
       // Ensure current user is in members list
-      if (!currentMembers.some(m => m.id === user.id)) {
-        currentMembers = [...currentMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+      if (!currentMembers.some((m) => m.id === user.id)) {
+        currentMembers = [
+          ...currentMembers,
+          { id: user.id, displayName: user.displayName || "Me" },
+        ];
       }
 
       // Redistribute the key to all members (including the requester)
@@ -297,7 +367,7 @@ export function Chat() {
         await distributeChannelKey(channelId, channelKey, currentMembers, user.id);
         logger.debug(`Redistributed key to ${currentMembers.length} members`);
       } catch (err) {
-        logger.error('Failed to redistribute key:', err);
+        logger.error("Failed to redistribute key:", err);
       }
     };
 
@@ -312,9 +382,10 @@ export function Chat() {
       // Get current messages for this channel
       const channelMsgs = useChatStore.getState().messages[channelId] || [];
       const failedMsgs = channelMsgs.filter(
-        m => m.plaintext === '[Syncing keys...]' ||
-             m.plaintext === '[Unable to decrypt message]' ||
-             m.decryptionFailed
+        (m) =>
+          m.plaintext === "[Syncing keys...]" ||
+          m.plaintext === "[Unable to decrypt message]" ||
+          m.decryptionFailed
       );
 
       if (failedMsgs.length === 0) return;
@@ -323,13 +394,14 @@ export function Chat() {
 
       // Get current community members for decryption
       const currentCommunityId = activeCommunityRef.current;
-      let currentMembers = currentCommunityId
-        ? membersRef.current[currentCommunityId] || []
-        : [];
+      let currentMembers = currentCommunityId ? membersRef.current[currentCommunityId] || [] : [];
 
       // Ensure current user is in members list
-      if (!currentMembers.some(m => m.id === user.id)) {
-        currentMembers = [...currentMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+      if (!currentMembers.some((m) => m.id === user.id)) {
+        currentMembers = [
+          ...currentMembers,
+          { id: user.id, displayName: user.displayName || "Me" },
+        ];
       }
 
       // Re-decrypt each failed message
@@ -343,7 +415,7 @@ export function Chat() {
             failedMsg.senderId
           );
           // Only update if decryption succeeded (not still syncing)
-          if (plaintext !== '[Syncing keys...]' && plaintext !== '[Unable to decrypt message]') {
+          if (plaintext !== "[Syncing keys...]" && plaintext !== "[Unable to decrypt message]") {
             updateMessage(channelId, failedMsg.id, { plaintext, decryptionFailed: false });
           }
         } catch {
@@ -378,7 +450,21 @@ export function Chat() {
       wsClient.off("key:available", handleKeyAvailable);
       wsClient.disconnect();
     };
-  }, [user, token, logout, navigate, addMessage, setTypingUser, setOnlineUsers, setUserOnline, updateMessage, deleteMessage, addReaction, removeReaction, addMemberIfMissing]);
+  }, [
+    user,
+    token,
+    logout,
+    navigate,
+    addMessage,
+    setTypingUser,
+    setOnlineUsers,
+    setUserOnline,
+    updateMessage,
+    deleteMessage,
+    addReaction,
+    removeReaction,
+    addMemberIfMissing,
+  ]);
 
   // Join active community for presence updates
   useEffect(() => {
@@ -402,9 +488,10 @@ export function Chat() {
       // Check if there are any messages stuck in syncing state for the active channel
       const channelMsgs = useChatStore.getState().messages[activeChannelId] || [];
       const hasSyncingMessages = channelMsgs.some(
-        m => m.plaintext === '[Syncing keys...]' ||
-             m.plaintext === '[Unable to decrypt message]' ||
-             m.decryptionFailed
+        (m) =>
+          m.plaintext === "[Syncing keys...]" ||
+          m.plaintext === "[Unable to decrypt message]" ||
+          m.decryptionFailed
       );
 
       if (!hasSyncingMessages) return;
@@ -413,28 +500,42 @@ export function Chat() {
       // Returns true if a NEW key was fetched, false if key already existed or not found
       const keyFound = await tryFetchChannelKey(activeChannelId, user.id);
       if (keyFound) {
-        logger.debug('Polling found new key');
+        logger.debug("Polling found new key");
+      }
+
+      // If no key found, re-request via WebSocket (server broadcasts to all online key holders)
+      if (!keyFound) {
+        const localKey = await getChannelKey(activeChannelId);
+        if (!localKey) {
+          // We don't have a local key and couldn't fetch one - request it
+          // Server will broadcast to all online key holders
+          wsClient.requestKey(activeChannelId, user.id);
+          logger.debug("Re-requesting key via WebSocket");
+        }
       }
 
       // Always try to re-decrypt if we have syncing messages
       // The key might have been stored by key:available handler (tryFetchChannelKey returns false if key exists)
       // Get current community members for decryption
       const currentCommunityId = activeCommunityRef.current;
-      let currentMembers = currentCommunityId
-        ? membersRef.current[currentCommunityId] || []
-        : [];
+      let currentMembers = currentCommunityId ? membersRef.current[currentCommunityId] || [] : [];
 
       // Ensure current user is in members list
-      if (!currentMembers.some(m => m.id === user.id)) {
-        currentMembers = [...currentMembers, { id: user.id, displayName: user.displayName || 'Me' }];
+      if (!currentMembers.some((m) => m.id === user.id)) {
+        currentMembers = [
+          ...currentMembers,
+          { id: user.id, displayName: user.displayName || "Me" },
+        ];
       }
 
       // Re-decrypt failed messages
-      const failedMsgs = useChatStore.getState().messages[activeChannelId]?.filter(
-        m => m.plaintext === '[Syncing keys...]' ||
-             m.plaintext === '[Unable to decrypt message]' ||
-             m.decryptionFailed
-      ) || [];
+      const failedMsgs =
+        useChatStore
+          .getState()
+          .messages[
+            activeChannelId
+          ]?.filter((m) => m.plaintext === "[Syncing keys...]" || m.plaintext === "[Unable to decrypt message]" || m.decryptionFailed) ||
+        [];
 
       for (const failedMsg of failedMsgs) {
         try {
@@ -445,7 +546,7 @@ export function Chat() {
             user.id,
             failedMsg.senderId
           );
-          if (plaintext !== '[Syncing keys...]' && plaintext !== '[Unable to decrypt message]') {
+          if (plaintext !== "[Syncing keys...]" && plaintext !== "[Unable to decrypt message]") {
             updateMessage(activeChannelId, failedMsg.id, { plaintext, decryptionFailed: false });
           }
         } catch {
@@ -467,17 +568,11 @@ export function Chat() {
     <div className="h-screen flex bg-background-primary">
       {/* Mobile backdrop overlay */}
       {showMobileSidebar && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={handleBackdropClick}
-        />
+        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={handleBackdropClick} />
       )}
 
       {/* Community sidebar */}
-      <Sidebar
-        showMobile={showMobileSidebar}
-        onClose={() => setShowMobileSidebar(false)}
-      />
+      <Sidebar showMobile={showMobileSidebar} onClose={() => setShowMobileSidebar(false)} />
 
       {/* Channel list - hidden on mobile when chat is active */}
       <ChannelList
@@ -486,12 +581,10 @@ export function Chat() {
       />
 
       {/* Main chat area - only show on mobile when channel is selected */}
-      <div className={`flex-1 flex flex-col ${activeChannelId ? 'flex' : 'hidden md:flex'}`}>
+      <div className={`flex-1 flex flex-col ${activeChannelId ? "flex" : "hidden md:flex"}`}>
         {activeChannelId ? (
           <>
-            <MessageList
-              onOpenSidebar={() => setShowMobileSidebar(true)}
-            />
+            <MessageList onOpenSidebar={() => setShowMobileSidebar(true)} />
             <MessageInput />
           </>
         ) : (

@@ -69,7 +69,7 @@ export const reactionRemovePayloadSchema = z.object({
 // Key distribution request - for when a user needs a channel key
 export const keyRequestPayloadSchema = z.object({
   channelId: z.string().uuid(),
-  fromUserId: z.string().uuid(), // The user who has the key
+  fromUserId: z.string().uuid().optional(), // Deprecated - server broadcasts to all key holders
 });
 
 // Message type to schema mapping
