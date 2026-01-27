@@ -13,10 +13,12 @@ class WebSocketClient {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private userId: string | null = null;
+  private token: string | null = null;
   private joinedChannels: Set<string> = new Set();
 
-  connect(userId: string) {
+  connect(userId: string, token: string) {
     this.userId = userId;
+    this.token = token;
 
     // Use environment variable if available, otherwise fall back to window.location
     const wsUrl = import.meta.env.VITE_WS_URL || (() => {
@@ -30,8 +32,8 @@ class WebSocketClient {
       logger.debug("WebSocket connected");
       this.reconnectAttempts = 0;
 
-      // Authenticate
-      this.send({ type: "auth", payload: { userId } });
+      // Authenticate with JWT token
+      this.send({ type: "auth", payload: { token } });
 
       // Rejoin channels
       for (const channelId of this.joinedChannels) {
@@ -70,8 +72,8 @@ class WebSocketClient {
     logger.debug(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
     setTimeout(() => {
-      if (this.userId) {
-        this.connect(this.userId);
+      if (this.userId && this.token) {
+        this.connect(this.userId, this.token);
       }
     }, delay);
   }
