@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { db, channels, senderKeys, pendingKeyRequests } from "../db/index.js";
+import { db, channels, senderKeys, pendingKeyRequests, communityMembers, users } from "../db/index.js";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { canUserAccessChannel } from "../lib/authorization.js";
 import { sendToUser } from "../websocket/connectionMaps.js";
@@ -240,5 +240,47 @@ export const channelRoutes: FastifyPluginAsync = async (fastify) => {
     await db.delete(pendingKeyRequests).where(eq(pendingKeyRequests.id, requestId));
 
     return { success: true };
+  });
+
+  // Get community members for a channel (for key distribution)
+  // This ensures clients always have fresh member lists when distributing keys
+  fastify.get("/:channelId/members", async (request, reply) => {
+    // Authorization: require authentication
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
+    const { channelId } = request.params as { channelId: string };
+
+    // Authorization: must be a member of the channel's community
+    const canAccess = await canUserAccessChannel(request.user.userId, channelId);
+    if (!canAccess) {
+      return reply.status(403).send({ error: "Not a member of this channel's community" });
+    }
+
+    // Get the channel to find its community
+    const channel = await db.query.channels.findFirst({
+      where: eq(channels.id, channelId),
+    });
+
+    if (!channel) {
+      return reply.status(404).send({ error: "Channel not found" });
+    }
+
+    // Get all members of the community
+    const memberships = await db.query.communityMembers.findMany({
+      where: eq(communityMembers.communityId, channel.communityId),
+    });
+
+    const memberIds = memberships.map((m) => m.userId);
+    const memberUsers =
+      memberIds.length > 0
+        ? await db.query.users.findMany({
+            where: inArray(users.id, memberIds),
+            columns: { id: true, displayName: true },
+          })
+        : [];
+
+    return { members: memberUsers };
   });
 };

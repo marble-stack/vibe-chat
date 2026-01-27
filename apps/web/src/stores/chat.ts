@@ -56,6 +56,7 @@ interface ChatState {
   addChannel: (channel: Channel) => void;
   setMembers: (communityId: string, members: Member[]) => void;
   addMemberIfMissing: (userId: string, displayName: string) => void;
+  addMemberToCommunity: (communityId: string, member: Member) => void;
   setMessages: (channelId: string, messages: Message[]) => void;
   addMessage: (message: Message) => void;
   setActiveCommunity: (communityId: string | null) => void;
@@ -118,6 +119,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
         members: {
           ...state.members,
           [communityId]: [...currentMembers, { id: userId, displayName }],
+        },
+      };
+    }),
+
+  addMemberToCommunity: (communityId, member) =>
+    set((state) => {
+      const currentMembers = state.members[communityId] || [];
+      const exists = currentMembers.some((m) => m.id === member.id);
+      if (exists) return state;
+
+      return {
+        members: {
+          ...state.members,
+          [communityId]: [...currentMembers, member],
         },
       };
     }),

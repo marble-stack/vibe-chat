@@ -76,11 +76,10 @@ export function MessageInput() {
       }
     } catch (err) {
       logger.error("Failed to encrypt message:", err);
-      // Fallback to plaintext if encryption fails (for backward compatibility)
-      const sent = wsClient.sendMessage(activeChannelId, plaintext, replyToId);
-      if (!sent) {
-        setSendError("Message queued - connection issue. Will send when reconnected.");
-      }
+      // Do NOT fall back to plaintext - encryption is mandatory
+      // Restore the message so user can retry
+      setMessage(plaintext);
+      setSendError("Encryption failed. Please try again or refresh the page.");
     } finally {
       setIsSending(false);
     }

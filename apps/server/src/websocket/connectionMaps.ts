@@ -14,6 +14,21 @@ export function sendToUser(userId: string, message: object): void {
   }
 }
 
+/**
+ * Send a message to all connected sockets in a community
+ */
+export function sendToCommunity(communityId: string, message: object): void {
+  const sockets = communityConnections.get(communityId);
+  if (!sockets) return;
+
+  const messageStr = JSON.stringify(message);
+  for (const socket of sockets) {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(messageStr);
+    }
+  }
+}
+
 // Map of WebSocket -> user info
 export const socketUsers = new Map<
   WebSocket,

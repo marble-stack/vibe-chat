@@ -33,6 +33,7 @@ export function Chat() {
     setMembers,
     addMessage,
     addMemberIfMissing,
+    addMemberToCommunity,
     setTypingUser,
     setOnlineUsers,
     setUserOnline,
@@ -424,6 +425,16 @@ export function Chat() {
       }
     };
 
+    // Handle new member joining a community - update local member list
+    const handleMemberJoined = (msg: { payload: Record<string, unknown> }) => {
+      const { communityId, member } = msg.payload as {
+        communityId: string;
+        member: { id: string; displayName: string; avatarUrl?: string };
+      };
+      logger.debug(`New member ${member.displayName} joined community ${communityId}`);
+      addMemberToCommunity(communityId, member);
+    };
+
     wsClient.on("message:new", handleNewMessage);
     wsClient.on("auth:failed", handleAuthFailed);
     wsClient.on("typing:update", handleTypingUpdate);
@@ -435,6 +446,7 @@ export function Chat() {
     wsClient.on("reaction:removed", handleReactionRemoved);
     wsClient.on("key:requested", handleKeyRequested);
     wsClient.on("key:available", handleKeyAvailable);
+    wsClient.on("member:joined", handleMemberJoined);
 
     return () => {
       wsClient.off("message:new", handleNewMessage);
@@ -448,6 +460,7 @@ export function Chat() {
       wsClient.off("reaction:removed", handleReactionRemoved);
       wsClient.off("key:requested", handleKeyRequested);
       wsClient.off("key:available", handleKeyAvailable);
+      wsClient.off("member:joined", handleMemberJoined);
       wsClient.disconnect();
     };
   }, [
@@ -464,6 +477,7 @@ export function Chat() {
     addReaction,
     removeReaction,
     addMemberIfMissing,
+    addMemberToCommunity,
   ]);
 
   // Join active community for presence updates
