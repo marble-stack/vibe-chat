@@ -17,6 +17,7 @@ import { ChannelList } from "../components/ChannelList";
 import { MessageList } from "../components/MessageList";
 import { MessageInput } from "../components/MessageInput";
 import { MemberList } from "../components/MemberList";
+import { KeyRecoveryBanner } from "../components/KeyRecoveryBanner";
 
 export function Chat() {
   const navigate = useNavigate();
@@ -596,6 +597,9 @@ export function Chat() {
 
       {/* Main chat area - only show on mobile when channel is selected */}
       <div className={`flex-1 flex flex-col ${activeChannelId ? "flex" : "hidden md:flex"}`}>
+        {/* Key recovery banner - shown when encryption keys are missing */}
+        <KeyRecoveryBanner />
+
         {activeChannelId ? (
           <>
             <MessageList onOpenSidebar={() => setShowMobileSidebar(true)} />
