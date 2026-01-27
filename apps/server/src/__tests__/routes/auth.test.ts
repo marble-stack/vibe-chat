@@ -38,8 +38,22 @@ vi.mock('bcrypt', () => ({
 import { authRoutes } from '../../routes/auth.js';
 import { db } from '../../db/index.js';
 
-// Get type-safe access to mocked db
-const mockDb = vi.mocked(db);
+// Cast to get type-safe mock access
+const mockDb = db as unknown as {
+  insert: ReturnType<typeof vi.fn>;
+  delete: ReturnType<typeof vi.fn>;
+  update: ReturnType<typeof vi.fn>;
+  query: {
+    users: {
+      findFirst: ReturnType<typeof vi.fn>;
+    };
+    preKeys: {
+      findFirst: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
+    };
+  };
+  transaction: ReturnType<typeof vi.fn>;
+};
 
 describe('Auth Routes - Prekey Security', () => {
   let app: FastifyInstance;

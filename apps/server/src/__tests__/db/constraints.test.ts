@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { sql } from 'drizzle-orm';
 
 // Tests for database schema constraints
 // These verify that unique and FK constraints are properly defined
@@ -60,7 +59,7 @@ describe('Database Constraints', () => {
 
       // Simulate what happens when constraint is violated
       const duplicateError = new Error('duplicate key value violates unique constraint "community_members_unique"');
-      (duplicateError as any).code = '23505'; // PostgreSQL unique violation code
+      (duplicateError as Error & { code: string }).code = '23505'; // PostgreSQL unique violation code
 
       vi.mocked(db.insert).mockReturnValueOnce({
         values: vi.fn().mockReturnValue({
@@ -69,7 +68,7 @@ describe('Database Constraints', () => {
             returning: vi.fn().mockResolvedValue([]),
           }),
         }),
-      } as any);
+      } as unknown as ReturnType<typeof db.insert>);
 
       // The application should handle this by using onConflictDoNothing
       // or catching the error appropriately
@@ -98,7 +97,7 @@ describe('Database Constraints', () => {
       // When trying to insert a duplicate sender key, the DB should reject it
 
       const duplicateError = new Error('duplicate key value violates unique constraint "sender_keys_unique"');
-      (duplicateError as any).code = '23505';
+      (duplicateError as Error & { code: string }).code = '23505';
 
       vi.mocked(db.insert).mockReturnValueOnce({
         values: vi.fn().mockReturnValue({
@@ -107,7 +106,7 @@ describe('Database Constraints', () => {
             returning: vi.fn().mockResolvedValue([]),
           }),
         }),
-      } as any);
+      } as unknown as ReturnType<typeof db.insert>);
 
       const mockInsert = db.insert(schema.senderKeys);
       const mockValues = mockInsert.values({
@@ -150,6 +149,8 @@ describe('Database Constraints', () => {
       vi.mocked(db.query.messages.findFirst).mockResolvedValue({
         ...replyMessage,
         replyToId: null, // After delete, this should be null
+        editedAt: null,
+        deletedAt: null,
       });
 
       // After deleting original-message-id, the reply's replyToId becomes null
@@ -171,10 +172,12 @@ describe('Database Constraints', () => {
             senderId: 'user-1',
             ciphertext: 'reply content',
             replyToId: 'existing-message-id',
+            editedAt: null,
+            deletedAt: null,
             createdAt: new Date(),
           }]),
         }),
-      } as any);
+      } as unknown as ReturnType<typeof db.insert>);
 
       const mockInsert = db.insert(schema.messages);
       const result = await mockInsert.values({

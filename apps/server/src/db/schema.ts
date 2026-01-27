@@ -80,6 +80,7 @@ export const messages = pgTable("messages", {
   channelId: uuid("channel_id").references(() => channels.id).notNull(),
   senderId: uuid("sender_id").references(() => users.id).notNull(),
   ciphertext: text("ciphertext").notNull(),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- self-referencing FK requires any type in drizzle
   replyToId: uuid("reply_to_id").references((): any => messages.id, { onDelete: "set null" }),
   editedAt: timestamp("edited_at"),
   deletedAt: timestamp("deleted_at"),

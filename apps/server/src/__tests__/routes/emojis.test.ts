@@ -112,7 +112,7 @@ describe('Emoji Routes - Authorization', () => {
     it('should return 403 if uploadedBy does not match authenticated user', async () => {
       const token = createTestToken(testUserId);
       vi.mocked(isUserInCommunity).mockResolvedValue(true);
-      vi.mocked(db.query.emojis.findFirst).mockResolvedValue(null);
+      vi.mocked(db.query.emojis.findFirst).mockResolvedValue(undefined);
 
       const response = await app.inject({
         method: 'POST',
@@ -127,7 +127,7 @@ describe('Emoji Routes - Authorization', () => {
     it('should allow emoji creation for authenticated community member', async () => {
       const token = createTestToken(testUserId);
       vi.mocked(isUserInCommunity).mockResolvedValue(true);
-      vi.mocked(db.query.emojis.findFirst).mockResolvedValue(null);
+      vi.mocked(db.query.emojis.findFirst).mockResolvedValue(undefined);
 
       const response = await app.inject({
         method: 'POST',

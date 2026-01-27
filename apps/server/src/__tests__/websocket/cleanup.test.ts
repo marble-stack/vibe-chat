@@ -1,14 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-
-// Mock WebSocket
-class MockWebSocket {
-  readyState = 1; // OPEN
-  sentMessages: string[] = [];
-
-  send(data: string) {
-    this.sentMessages.push(data);
-  }
-}
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // The connection management functions are not exported, so we test them
 // through the exported module state accessors we'll create

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 // Tests for database operation safety patterns
 // These test the helper function that wraps .returning() operations

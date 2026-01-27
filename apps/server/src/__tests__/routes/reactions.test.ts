@@ -150,7 +150,7 @@ describe('Reaction Routes - Authorization', () => {
         createdAt: new Date(),
       });
       vi.mocked(canUserAccessChannel).mockResolvedValue(true);
-      vi.mocked(db.query.reactions.findFirst).mockResolvedValue(null);
+      vi.mocked(db.query.reactions.findFirst).mockResolvedValue(undefined);
 
       const response = await app.inject({
         method: 'POST',
@@ -219,7 +219,7 @@ describe('Reaction Routes - Authorization', () => {
     it('should return 404 if reaction does not exist', async () => {
       const token = createTestToken(testUserId);
 
-      vi.mocked(db.query.reactions.findFirst).mockResolvedValue(null);
+      vi.mocked(db.query.reactions.findFirst).mockResolvedValue(undefined);
 
       const response = await app.inject({
         method: 'DELETE',
