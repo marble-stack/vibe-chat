@@ -181,3 +181,50 @@ export async function hasIdentityKeys(): Promise<boolean> {
   const identity = await db.identity.get("local");
   return identity !== null;
 }
+
+/**
+ * Regenerate identity keys for an existing user (e.g., after clearing storage)
+ * This generates new keys, stores them locally, and updates them on the server.
+ *
+ * WARNING: This will make any existing encrypted messages unreadable since
+ * channel keys encrypted with the old public key cannot be decrypted.
+ */
+export async function regenerateIdentityKeys(
+  userId: string,
+  token: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Import the crypto functions dynamically to avoid circular deps
+    const { generateIdentityKeys } = await import("./crypto");
+    const { api } = await import("./api");
+
+    // Generate fresh identity keys
+    const { keys, publicBundle } = await generateIdentityKeys();
+
+    // Store locally first
+    await storeIdentityKeys(userId, keys);
+
+    // Update on server
+    await api.auth.updateKeys(
+      {
+        identityKeyPublic: publicBundle.identityKeyPublic,
+        signedPreKeyPublic: publicBundle.signedPreKeyPublic,
+        signedPreKeySignature: publicBundle.signedPreKeySignature,
+        preKeys: publicBundle.preKeys,
+      },
+      token
+    );
+
+    // Clear old channel keys since they're encrypted for the old identity
+    await db.channelKeys.clear();
+    await db.userKeys.clear();
+
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to regenerate keys:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to regenerate keys",
+    };
+  }
+}
