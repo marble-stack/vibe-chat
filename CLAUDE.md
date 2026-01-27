@@ -108,14 +108,28 @@ vibe-chat/
 ### WebSocket Protocol
 Messages use `{ type: string, payload: object }` format:
 - `message:send` / `message:new` - Chat messages
+- `message:edit` / `message:edited` - Edit messages
+- `message:delete` / `message:deleted` - Delete messages
 - `typing:start` / `typing:stop` / `typing:update` - Typing indicators
 - `channel:join` / `channel:leave` - Channel subscription
+- `community:join` / `community:leave` - Community subscription (for presence)
+- `presence:list` / `presence:update` - Online status
+- `reaction:add` / `reaction:added` - Add emoji reactions
+- `reaction:remove` / `reaction:removed` - Remove emoji reactions
+- `key:request` / `key:requested` - Channel key redistribution requests
 
 ### Encryption
 - Uses Web Crypto API (ECDH P-256 for key exchange, AES-GCM for messages)
 - Private keys stored locally in IndexedDB via Dexie
-- Each channel has a shared symmetric key distributed to members
+- Each channel has ONE canonical shared symmetric key (first user to message creates it)
+- Key redistribution: When a new user joins, they request the key via WebSocket and the key owner redistributes it
 - Key files: `apps/web/src/lib/crypto.ts`, `keyStore.ts`, `channelCrypto.ts`
+
+**Key sync flow:**
+1. User A sends first message → creates channel key, distributes to current members
+2. User B joins later → sees "[Syncing keys...]" → requests key via WebSocket
+3. User A receives `key:requested` → redistributes key to all members including B
+4. User B receives key → can now decrypt all messages
 
 **Known limitations:**
 - Keys are device-local; logging in on a new device requires re-registration
@@ -182,15 +196,21 @@ Copy `apps/web/.env.example` to `apps/web/.env` if you need to override default 
 - Community creation and joining (via invite codes)
 - Channel creation within communities
 - Real-time messaging via WebSockets
+- Message editing and deletion
 - Emoji reactions
+- Typing indicators
+- Online presence tracking
+- End-to-end encryption with automatic key sync for new members
 
-### Recent Fixes (Jan 2025)
+### Recent Fixes (Jan 2026)
 - Fixed modal positioning for create/join community on mobile and laptop screens
 - Fixed @fastify/rate-limit compatibility with Fastify 4.x
 - Fixed production migrations for Railway deployment
+- Fixed multi-user message decryption (single canonical channel key)
+- Added key redistribution protocol for users joining after channel key creation
 
 ### Security Improvements (Jan 2026)
-- Added comprehensive test suite (98+ tests) with TDD approach
+- Added comprehensive test suite (114 tests) with TDD approach
 - JWT authentication required on WebSocket connections
 - Authorization checks on all REST endpoints (emojis, reactions, channels)
 - Sender key distribution security with auth + membership verification
@@ -198,6 +218,7 @@ Copy `apps/web/.env.example` to `apps/web/.env` if you need to override default 
 - WebSocket message validation with Zod schemas for all message types
 - Database operation safety helpers
 - Memory leak prevention in WebSocket connection management
+- Single canonical channel key enforcement to prevent key fragmentation
 
 ### Workflow Note
 Always push changes after making edits so Railway auto-deploys.
