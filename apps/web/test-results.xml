@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="28" failures="0" errors="0" time="0.125869332">
+    <testsuite name="src/__tests__/placeholder.test.ts" timestamp="2026-01-27T00:50:30.249Z" hostname="MacBookPro.search.charter.net" tests="2" failures="0" errors="0" skipped="0" time="0.002069166">
+        <testcase classname="src/__tests__/placeholder.test.ts" name="Test Infrastructure &gt; should run a basic test" time="0.000785792">
+        </testcase>
+        <testcase classname="src/__tests__/placeholder.test.ts" name="Test Infrastructure &gt; should have jsdom environment" time="0.000131583">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/components/DecryptionErrorMessage.test.tsx" timestamp="2026-01-27T00:50:30.250Z" hostname="MacBookPro.search.charter.net" tests="6" failures="0" errors="0" skipped="0" time="0.105975916">
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should display error message when decryption fails" time="0.0175285">
+        </testcase>
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should show error icon" time="0.001694167">
+        </testcase>
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should not show retry button when onRetry is not provided" time="0.001454833">
+        </testcase>
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should show retry button when onRetry is provided" time="0.07244825">
+        </testcase>
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should call onRetry when retry button is clicked" time="0.010218583">
+        </testcase>
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should have appropriate error styling" time="0.001315375">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/lib/crypto.test.ts" timestamp="2026-01-27T00:50:30.250Z" hostname="MacBookPro.search.charter.net" tests="20" failures="0" errors="0" skipped="0" time="0.01782425">
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Base64 Encoding/Decoding &gt; should encode ArrayBuffer to base64" time="0.000843">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Base64 Encoding/Decoding &gt; should decode base64 to ArrayBuffer" time="0.000603083">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Base64 Encoding/Decoding &gt; should round-trip encode/decode" time="0.000135916">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Generation &gt; should generate valid ECDH P-256 key pairs" time="0.00269325">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Generation &gt; should generate unique keys each call" time="0.000802542">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Generation &gt; should export and import public keys correctly" time="0.001265417">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Generation &gt; should export and import private keys correctly" time="0.000879709">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Exchange &gt; should derive same shared secret in both directions" time="0.001469792">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Exchange &gt; should derive different keys for different key pairs" time="0.000706292">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; AES Key Management &gt; should generate channel keys" time="0.000335583">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; AES Key Management &gt; should export and import AES keys" time="0.001147542">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should encrypt and decrypt round-trip correctly" time="0.000280917">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should handle empty strings" time="0.0002215">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should handle unicode characters" time="0.000205708">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should fail decryption with wrong key" time="0.001067875">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should use unique IV per encryption" time="0.000222625">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should produce ciphertext with IV prefix" time="0.0001515">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Channel Key Distribution &gt; should encrypt channel key for recipient" time="0.000886042">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Channel Key Distribution &gt; should decrypt channel key correctly" time="0.001126875">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Channel Key Distribution &gt; should fail decryption with wrong sender public key" time="0.001184375">
+        </testcase>
+    </testsuite>
+</testsuites>

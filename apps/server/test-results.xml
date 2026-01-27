@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="86" failures="0" errors="0" time="0.324829917">
+    <testsuite name="src/__tests__/placeholder.test.ts" timestamp="2026-01-27T00:48:52.612Z" hostname="MacBookPro.search.charter.net" tests="2" failures="0" errors="0" skipped="0" time="0.001915917">
+        <testcase classname="src/__tests__/placeholder.test.ts" name="Test Infrastructure &gt; should run a basic test" time="0.000718083">
+        </testcase>
+        <testcase classname="src/__tests__/placeholder.test.ts" name="Test Infrastructure &gt; should have access to test environment variables" time="0.000090583">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/db/constraints.test.ts" timestamp="2026-01-27T00:48:52.613Z" hostname="MacBookPro.search.charter.net" tests="10" failures="0" errors="0" skipped="0" time="0.0067055">
+        <testcase classname="src/__tests__/db/constraints.test.ts" name="Database Constraints &gt; communityMembers unique constraint &gt; should define a unique constraint on (communityId, userId)" time="0.000877042">
+        </testcase>
+        <testcase classname="src/__tests__/db/constraints.test.ts" name="Database Constraints &gt; communityMembers unique constraint &gt; should reject duplicate community memberships at schema level" time="0.001276542">
+        </testcase>
+        <testcase classname="src/__tests__/db/constraints.test.ts" name="Database Constraints &gt; senderKeys unique constraint &gt; should define a unique constraint on (channelId, userId, forUserId)" time="0.0001315">
+        </testcase>
+        <testcase classname="src/__tests__/db/constraints.test.ts" name="Database Constraints &gt; senderKeys unique constraint &gt; should prevent duplicate sender keys at schema level" time="0.001538959">
+        </testcase>
+        <testcase classname="src/__tests__/db/constraints.test.ts" name="Database Constraints &gt; messages.replyToId foreign key &gt; should reference messages.id in the schema" time="0.000105708">
+        </testcase>
+        <testcase classname="src/__tests__/db/constraints.test.ts" name="Database Constraints &gt; messages.replyToId foreign key &gt; should set replyToId to null when referenced message is deleted" time="0.001051791">
+        </testcase>
+        <testcase classname="src/__tests__/db/constraints.test.ts" name="Database Constraints &gt; messages.replyToId foreign key &gt; should allow replyToId to reference an existing message" time="0.000244333">
+        </testcase>
+        <testcase classname="src/__tests__/db/constraints.test.ts" name="Database Constraints &gt; Schema constraint definitions &gt; should have communityMembers table with unique index definition" time="0.00007075">
+        </testcase>
+        <testcase classname="src/__tests__/db/constraints.test.ts" name="Database Constraints &gt; Schema constraint definitions &gt; should have senderKeys table with unique index definition" time="0.000066666">
+        </testcase>
+        <testcase classname="src/__tests__/db/constraints.test.ts" name="Database Constraints &gt; Schema constraint definitions &gt; should have messages table with replyToId FK definition" time="0.000051875">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/db/operations.test.ts" timestamp="2026-01-27T00:48:52.614Z" hostname="MacBookPro.search.charter.net" tests="5" failures="0" errors="0" skipped="0" time="0.0427375">
+        <testcase classname="src/__tests__/db/operations.test.ts" name="Database Operations &gt; assertSingleResult &gt; should return the single result when array has one element" time="0.037295292">
+        </testcase>
+        <testcase classname="src/__tests__/db/operations.test.ts" name="Database Operations &gt; assertSingleResult &gt; should throw error when .returning() returns empty array" time="0.001435">
+            <system-err>
+[ERROR] Database operation failed: insert community returned no results
+
+            </system-err>
+        </testcase>
+        <testcase classname="src/__tests__/db/operations.test.ts" name="Database Operations &gt; assertSingleResult &gt; should work with different object types" time="0.002020791">
+        </testcase>
+        <testcase classname="src/__tests__/db/operations.test.ts" name="Database Operations &gt; assertSingleResult &gt; should preserve all properties of the result object" time="0.000511791">
+        </testcase>
+        <testcase classname="src/__tests__/db/operations.test.ts" name="Database Operations &gt; Error handling patterns &gt; should provide meaningful error messages for debugging" time="0.000369042">
+            <system-err>
+[ERROR] Database operation failed: insert into communities returned no results
+
+            </system-err>
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/lib/auth.test.ts" timestamp="2026-01-27T00:48:52.615Z" hostname="MacBookPro.search.charter.net" tests="13" failures="0" errors="0" skipped="0" time="0.096643875">
+        <testcase classname="src/__tests__/lib/auth.test.ts" name="Auth Module - JWT Secret Security &gt; JWT_SECRET Configuration &gt; should throw if JWT_SECRET is not set in production" time="0.08160125">
+        </testcase>
+        <testcase classname="src/__tests__/lib/auth.test.ts" name="Auth Module - JWT Secret Security &gt; JWT_SECRET Configuration &gt; should throw if JWT_SECRET is not set in non-test environments" time="0.000706709">
+        </testcase>
+        <testcase classname="src/__tests__/lib/auth.test.ts" name="Auth Module - JWT Secret Security &gt; JWT_SECRET Configuration &gt; should use environment JWT_SECRET when provided" time="0.004893583">
+        </testcase>
+        <testcase classname="src/__tests__/lib/auth.test.ts" name="Auth Module - JWT Secret Security &gt; JWT_SECRET Configuration &gt; should work in test environment with JWT_SECRET set" time="0.000990709">
+        </testcase>
+        <testcase classname="src/__tests__/lib/auth.test.ts" name="Auth Module - JWT Secret Security &gt; JWT_SECRET Configuration &gt; should never use a hardcoded default secret" time="0.001102834">
+        </testcase>
+        <testcase classname="src/__tests__/lib/auth.test.ts" name="Auth Module - JWT Secret Security &gt; Token Generation and Verification &gt; should generate valid JWT tokens" time="0.001528458">
+        </testcase>
+        <testcase classname="src/__tests__/lib/auth.test.ts" name="Auth Module - JWT Secret Security &gt; Token Generation and Verification &gt; should verify valid tokens" time="0.001570166">
+        </testcase>
+        <testcase classname="src/__tests__/lib/auth.test.ts" name="Auth Module - JWT Secret Security &gt; Token Generation and Verification &gt; should reject invalid tokens" time="0.000707959">
+        </testcase>
+        <testcase classname="src/__tests__/lib/auth.test.ts" name="Auth Module - JWT Secret Security &gt; Token Generation and Verification &gt; should reject tampered tokens" time="0.000548166">
+        </testcase>
+        <testcase classname="src/__tests__/lib/auth.test.ts" name="Auth Module - JWT Secret Security &gt; Token Extraction &gt; should extract token from valid Authorization header" time="0.000378375">
+        </testcase>
+        <testcase classname="src/__tests__/lib/auth.test.ts" name="Auth Module - JWT Secret Security &gt; Token Extraction &gt; should return null for missing Authorization header" time="0.000324833">
+        </testcase>
+        <testcase classname="src/__tests__/lib/auth.test.ts" name="Auth Module - JWT Secret Security &gt; Token Extraction &gt; should return null for non-Bearer Authorization header" time="0.000322083">
+        </testcase>
+        <testcase classname="src/__tests__/lib/auth.test.ts" name="Auth Module - JWT Secret Security &gt; Token Extraction &gt; should return null for empty Authorization header" time="0.000330667">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/websocket/auth.test.ts" timestamp="2026-01-27T00:48:52.615Z" hostname="MacBookPro.search.charter.net" tests="8" failures="0" errors="0" skipped="0" time="0.030530166">
+        <testcase classname="src/__tests__/websocket/auth.test.ts" name="WebSocket Authentication &gt; Token-based Authentication &gt; should verify valid JWT tokens" time="0.00569025">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/auth.test.ts" name="WebSocket Authentication &gt; Token-based Authentication &gt; should reject invalid JWT tokens" time="0.000126958">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/auth.test.ts" name="WebSocket Authentication &gt; Token-based Authentication &gt; should reject tampered JWT tokens" time="0.00042375">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/auth.test.ts" name="WebSocket Authentication &gt; Token-based Authentication &gt; should extract userId from verified token, not trust client payload" time="0.000593833">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/auth.test.ts" name="WebSocket Authentication &gt; Token-based Authentication &gt; should reject expired JWT tokens" time="0.0012075">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/auth.test.ts" name="WebSocket Authentication &gt; Authentication Schema Requirements &gt; should require token in auth payload" time="0.01930375">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/auth.test.ts" name="WebSocket Authentication &gt; Authentication Schema Requirements &gt; should reject auth payload without token" time="0.000546">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/auth.test.ts" name="WebSocket Authentication &gt; Authentication Schema Requirements &gt; should reject auth payload with only userId (no token)" time="0.000139">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/websocket/cleanup.test.ts" timestamp="2026-01-27T00:48:52.616Z" hostname="MacBookPro.search.charter.net" tests="3" failures="0" errors="0" skipped="0" time="0.028704458">
+        <testcase classname="src/__tests__/websocket/cleanup.test.ts" name="WebSocket Connection Management &gt; Empty Set Cleanup &gt; should expose functions to check map sizes" time="0.02698625">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/cleanup.test.ts" name="WebSocket Connection Management &gt; Empty Set Cleanup &gt; should start with empty maps" time="0.000397709">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/cleanup.test.ts" name="WebSocket Connection Management &gt; Empty Set Cleanup &gt; should provide a cleanupEmptyMaps function" time="0.000204334">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/websocket/validation.test.ts" timestamp="2026-01-27T00:48:52.616Z" hostname="MacBookPro.search.charter.net" tests="14" failures="0" errors="0" skipped="0" time="0.005181459">
+        <testcase classname="src/__tests__/websocket/validation.test.ts" name="WebSocket Message Validation &gt; reaction:add &gt; should reject missing messageId" time="0.001797333">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/validation.test.ts" name="WebSocket Message Validation &gt; reaction:add &gt; should reject missing channelId" time="0.000212958">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/validation.test.ts" name="WebSocket Message Validation &gt; reaction:add &gt; should reject missing emoji" time="0.000121334">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/validation.test.ts" name="WebSocket Message Validation &gt; reaction:add &gt; should reject invalid messageId format" time="0.000109291">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/validation.test.ts" name="WebSocket Message Validation &gt; reaction:add &gt; should reject invalid channelId format" time="0.000110459">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/validation.test.ts" name="WebSocket Message Validation &gt; reaction:add &gt; should reject empty emoji" time="0.000088042">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/validation.test.ts" name="WebSocket Message Validation &gt; reaction:add &gt; should accept valid reaction payload" time="0.000554916">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/validation.test.ts" name="WebSocket Message Validation &gt; reaction:add &gt; should accept custom emoji with ID format" time="0.000189542">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/validation.test.ts" name="WebSocket Message Validation &gt; reaction:remove &gt; should reject missing reactionId" time="0.000106375">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/validation.test.ts" name="WebSocket Message Validation &gt; reaction:remove &gt; should reject missing channelId" time="0.000095833">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/validation.test.ts" name="WebSocket Message Validation &gt; reaction:remove &gt; should reject missing messageId" time="0.000069042">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/validation.test.ts" name="WebSocket Message Validation &gt; reaction:remove &gt; should reject missing emoji" time="0.000082">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/validation.test.ts" name="WebSocket Message Validation &gt; reaction:remove &gt; should reject invalid reactionId format" time="0.000062542">
+        </testcase>
+        <testcase classname="src/__tests__/websocket/validation.test.ts" name="WebSocket Message Validation &gt; reaction:remove &gt; should accept valid reaction:remove payload" time="0.000118791">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/routes/auth.test.ts" timestamp="2026-01-27T00:48:52.617Z" hostname="MacBookPro.search.charter.net" tests="5" failures="0" errors="0" skipped="0" time="0.022429667">
+        <testcase classname="src/__tests__/routes/auth.test.ts" name="Auth Routes - Prekey Security &gt; GET /api/auth/users/:userId/keys &gt; should return 404 if user does not exist" time="0.008884875">
+        </testcase>
+        <testcase classname="src/__tests__/routes/auth.test.ts" name="Auth Routes - Prekey Security &gt; GET /api/auth/users/:userId/keys &gt; should return key bundle with prekey if available" time="0.000819875">
+        </testcase>
+        <testcase classname="src/__tests__/routes/auth.test.ts" name="Auth Routes - Prekey Security &gt; GET /api/auth/users/:userId/keys &gt; should return key bundle without prekey if none available" time="0.000450208">
+        </testcase>
+        <testcase classname="src/__tests__/routes/auth.test.ts" name="Auth Routes - Prekey Security &gt; GET /api/auth/users/:userId/keys &gt; should use atomic transaction for prekey fetch and delete" time="0.00054725">
+        </testcase>
+        <testcase classname="src/__tests__/routes/auth.test.ts" name="Auth Routes - Prekey Security &gt; GET /api/auth/users/:userId/keys &gt; should only delete one prekey, not all prekeys" time="0.000434917">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/routes/channels.test.ts" timestamp="2026-01-27T00:48:52.617Z" hostname="MacBookPro.search.charter.net" tests="8" failures="0" errors="0" skipped="0" time="0.028383542">
+        <testcase classname="src/__tests__/routes/channels.test.ts" name="Channel Routes - Sender Key Security &gt; POST /api/channels/sender-keys &gt; should reject unauthenticated requests with 401" time="0.0098885">
+        </testcase>
+        <testcase classname="src/__tests__/routes/channels.test.ts" name="Channel Routes - Sender Key Security &gt; POST /api/channels/sender-keys &gt; should reject if userId in body does not match authenticated user" time="0.004437958">
+        </testcase>
+        <testcase classname="src/__tests__/routes/channels.test.ts" name="Channel Routes - Sender Key Security &gt; POST /api/channels/sender-keys &gt; should reject if user is not a member of the channel community" time="0.000863125">
+        </testcase>
+        <testcase classname="src/__tests__/routes/channels.test.ts" name="Channel Routes - Sender Key Security &gt; POST /api/channels/sender-keys &gt; should allow key distribution for authenticated user who is a channel member" time="0.0012235">
+        </testcase>
+        <testcase classname="src/__tests__/routes/channels.test.ts" name="Channel Routes - Sender Key Security &gt; POST /api/channels/sender-keys &gt; should only allow distributing keys for your own userId" time="0.000628">
+        </testcase>
+        <testcase classname="src/__tests__/routes/channels.test.ts" name="Channel Routes - Sender Key Security &gt; GET /api/channels/:channelId/sender-keys/:userId &gt; should reject unauthenticated requests with 401" time="0.000359625">
+        </testcase>
+        <testcase classname="src/__tests__/routes/channels.test.ts" name="Channel Routes - Sender Key Security &gt; GET /api/channels/:channelId/sender-keys/:userId &gt; should reject if user is not a member of the channel community" time="0.000437">
+        </testcase>
+        <testcase classname="src/__tests__/routes/channels.test.ts" name="Channel Routes - Sender Key Security &gt; GET /api/channels/:channelId/sender-keys/:userId &gt; should allow fetching sender keys for authenticated member" time="0.000380375">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/routes/emojis.test.ts" timestamp="2026-01-27T00:48:52.618Z" hostname="MacBookPro.search.charter.net" tests="10" failures="0" errors="0" skipped="0" time="0.030748708">
+        <testcase classname="src/__tests__/routes/emojis.test.ts" name="Emoji Routes - Authorization &gt; POST /api/emojis &gt; should return 401 without auth token" time="0.01206175">
+        </testcase>
+        <testcase classname="src/__tests__/routes/emojis.test.ts" name="Emoji Routes - Authorization &gt; POST /api/emojis &gt; should return 403 if user not in community" time="0.00447725">
+        </testcase>
+        <testcase classname="src/__tests__/routes/emojis.test.ts" name="Emoji Routes - Authorization &gt; POST /api/emojis &gt; should return 403 if uploadedBy does not match authenticated user" time="0.000709708">
+        </testcase>
+        <testcase classname="src/__tests__/routes/emojis.test.ts" name="Emoji Routes - Authorization &gt; POST /api/emojis &gt; should allow emoji creation for authenticated community member" time="0.00068525">
+        </testcase>
+        <testcase classname="src/__tests__/routes/emojis.test.ts" name="Emoji Routes - Authorization &gt; GET /api/emojis/community/:communityId &gt; should return 401 without auth token" time="0.000260917">
+        </testcase>
+        <testcase classname="src/__tests__/routes/emojis.test.ts" name="Emoji Routes - Authorization &gt; GET /api/emojis/community/:communityId &gt; should return 403 if user not in community" time="0.000331833">
+        </testcase>
+        <testcase classname="src/__tests__/routes/emojis.test.ts" name="Emoji Routes - Authorization &gt; GET /api/emojis/community/:communityId &gt; should return emojis for authenticated community member" time="0.00036525">
+        </testcase>
+        <testcase classname="src/__tests__/routes/emojis.test.ts" name="Emoji Routes - Authorization &gt; DELETE /api/emojis/:emojiId &gt; should return 401 without auth token" time="0.000235917">
+        </testcase>
+        <testcase classname="src/__tests__/routes/emojis.test.ts" name="Emoji Routes - Authorization &gt; DELETE /api/emojis/:emojiId &gt; should return 403 if user did not upload the emoji" time="0.000347125">
+        </testcase>
+        <testcase classname="src/__tests__/routes/emojis.test.ts" name="Emoji Routes - Authorization &gt; DELETE /api/emojis/:emojiId &gt; should allow delete for user who uploaded the emoji" time="0.000283541">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/routes/reactions.test.ts" timestamp="2026-01-27T00:48:52.619Z" hostname="MacBookPro.search.charter.net" tests="8" failures="0" errors="0" skipped="0" time="0.030849125">
+        <testcase classname="src/__tests__/routes/reactions.test.ts" name="Reaction Routes - Authorization &gt; POST /api/reactions &gt; should return 401 without auth token" time="0.011086417">
+        </testcase>
+        <testcase classname="src/__tests__/routes/reactions.test.ts" name="Reaction Routes - Authorization &gt; POST /api/reactions &gt; should return 403 if userId does not match authenticated user" time="0.004597417">
+        </testcase>
+        <testcase classname="src/__tests__/routes/reactions.test.ts" name="Reaction Routes - Authorization &gt; POST /api/reactions &gt; should return 403 if user cannot access the message channel" time="0.001104667">
+        </testcase>
+        <testcase classname="src/__tests__/routes/reactions.test.ts" name="Reaction Routes - Authorization &gt; POST /api/reactions &gt; should allow reaction for authenticated user with channel access" time="0.002245916">
+        </testcase>
+        <testcase classname="src/__tests__/routes/reactions.test.ts" name="Reaction Routes - Authorization &gt; DELETE /api/reactions/:reactionId &gt; should return 401 without auth token" time="0.000384375">
+        </testcase>
+        <testcase classname="src/__tests__/routes/reactions.test.ts" name="Reaction Routes - Authorization &gt; DELETE /api/reactions/:reactionId &gt; should return 403 if user did not create the reaction" time="0.000458667">
+        </testcase>
+        <testcase classname="src/__tests__/routes/reactions.test.ts" name="Reaction Routes - Authorization &gt; DELETE /api/reactions/:reactionId &gt; should allow delete for user who created the reaction" time="0.000362958">
+        </testcase>
+        <testcase classname="src/__tests__/routes/reactions.test.ts" name="Reaction Routes - Authorization &gt; DELETE /api/reactions/:reactionId &gt; should return 404 if reaction does not exist" time="0.000326">
+        </testcase>
+    </testsuite>
+</testsuites>
