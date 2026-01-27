@@ -168,11 +168,14 @@ export async function ensureChannelKey(
 /**
  * Distribute a channel key to all members
  * Exported so it can be called when we receive a key:requested message
+ *
+ * IMPORTANT: This function fetches fresh members from the API to ensure
+ * new members who joined after the UI loaded will receive the key.
  */
 export async function distributeChannelKey(
   channelId: string,
   channelKey: CryptoKey,
-  members: { id: string }[],
+  _members: { id: string }[], // Deprecated: members are now fetched from API
   currentUserId: string
 ): Promise<void> {
   const identityKeys = await getIdentityKeys();
@@ -180,10 +183,23 @@ export async function distributeChannelKey(
     throw new Error("No identity keys found");
   }
 
+  // Fetch fresh member list from API to ensure new members are included
+  // This fixes the stale member list issue where new members wouldn't receive keys
+  let freshMembers: { id: string }[];
+  try {
+    const { members } = await api.channels.getMembers(channelId);
+    freshMembers = members;
+    logger.debug(`Fetched ${freshMembers.length} fresh members for key distribution`);
+  } catch (err) {
+    logger.error("Failed to fetch fresh members, using provided list:", err);
+    // Fall back to provided members if API fails (better than nothing)
+    freshMembers = _members;
+  }
+
   const privateKey = await importPrivateKey(identityKeys.identityKeyPair.privateKey);
   const encryptedKeys: { forUserId: string; encryptedKey: string }[] = [];
 
-  for (const member of members) {
+  for (const member of freshMembers) {
     try {
       // Always fetch fresh keys from server to handle key regeneration
       // Users may have regenerated their keys on a new device
@@ -212,17 +228,19 @@ export async function distributeChannelKey(
     }
   }
 
-  // Send to server
-  if (encryptedKeys.length > 0) {
-    await api.channels.distributeSenderKey({
-      channelId,
-      userId: currentUserId,
-      distributionId: crypto.randomUUID(),
-      // Include sender's public key for decryption after key rotation
-      senderPublicKey: identityKeys.identityKeyPair.publicKey,
-      encryptedKeys,
-    });
+  // Send to server - throw error if no keys could be encrypted
+  if (encryptedKeys.length === 0) {
+    throw new Error("Failed to encrypt key for any members");
   }
+
+  await api.channels.distributeSenderKey({
+    channelId,
+    userId: currentUserId,
+    distributionId: crypto.randomUUID(),
+    // Include sender's public key for decryption after key rotation
+    senderPublicKey: identityKeys.identityKeyPair.publicKey,
+    encryptedKeys,
+  });
 }
 
 /**

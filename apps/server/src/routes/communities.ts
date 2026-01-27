@@ -1,9 +1,10 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { db, communities, communityMembers, channels } from "../db/index.js";
+import { db, communities, communityMembers, channels, users } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { isUserInCommunity } from "../lib/authorization.js";
+import { sendToCommunity } from "../websocket/connectionMaps.js";
 
 const createCommunitySchema = z.object({
   name: z.string().min(1).max(100),
@@ -152,6 +153,27 @@ export const communityRoutes: FastifyPluginAsync = async (fastify) => {
       communityId: community.id,
       userId: body.userId,
     });
+
+    // Get user info to include in the notification
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, body.userId),
+      columns: { id: true, displayName: true, avatarUrl: true },
+    });
+
+    // Notify all online members that a new member joined
+    if (user) {
+      sendToCommunity(community.id, {
+        type: "member:joined",
+        payload: {
+          communityId: community.id,
+          member: {
+            id: user.id,
+            displayName: user.displayName,
+            avatarUrl: user.avatarUrl,
+          },
+        },
+      });
+    }
 
     return { community };
   });

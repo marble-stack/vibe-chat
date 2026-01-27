@@ -164,6 +164,11 @@ export const api = {
       request<{ success: boolean }>(`/channels/pending-key-requests/${requestId}`, {
         method: "DELETE",
       }),
+
+    getMembers: (channelId: string) =>
+      request<{ members: { id: string; displayName: string }[] }>(
+        `/channels/${channelId}/members`
+      ),
   },
 
   messages: {
