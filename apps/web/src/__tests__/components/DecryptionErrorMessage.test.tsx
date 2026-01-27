@@ -7,7 +7,7 @@ describe("DecryptionErrorMessage", () => {
     render(<DecryptionErrorMessage />);
 
     // Should show error message
-    expect(screen.getByText(/failed to decrypt/i)).toBeInTheDocument();
+    expect(screen.getByText(/unable to decrypt/i)).toBeInTheDocument();
   });
 
   it("should show error icon", () => {
@@ -52,5 +52,33 @@ describe("DecryptionErrorMessage", () => {
     // The container should have error-related styling
     const container = screen.getByTestId("decryption-error-container");
     expect(container).toHaveClass("text-red-400");
+  });
+
+  it("should show syncing message and yellow styling when syncing keys", () => {
+    render(<DecryptionErrorMessage errorType="[Syncing keys...]" />);
+
+    // Should show syncing message
+    expect(screen.getByText(/syncing encryption keys/i)).toBeInTheDocument();
+    expect(screen.getByText(/waiting for another member/i)).toBeInTheDocument();
+
+    // Should have yellow styling
+    const container = screen.getByTestId("decryption-error-container");
+    expect(container).toHaveClass("text-yellow-400");
+  });
+
+  it("should show setup required message for encryption not set up", () => {
+    render(<DecryptionErrorMessage errorType="[Encryption not set up - please re-register]" />);
+
+    // Should show setup message
+    expect(screen.getByText(/encryption not set up/i)).toBeInTheDocument();
+    expect(screen.getByText(/please re-register/i)).toBeInTheDocument();
+  });
+
+  it("should not show retry button when syncing keys", () => {
+    const onRetry = vi.fn();
+    render(<DecryptionErrorMessage errorType="[Syncing keys...]" onRetry={onRetry} />);
+
+    // Retry button should not be present during sync
+    expect(screen.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
   });
 });
