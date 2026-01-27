@@ -76,7 +76,9 @@
       "Bash(npx vitest:*)",
       "Bash(npx tsc:*)",
       "Bash(gh api:*)",
-      "Bash(gh pr merge:*)"
+      "Bash(gh pr merge:*)",
+      "Bash(gh run list:*)",
+      "Bash(git fetch:*)"
     ]
   }
 }
