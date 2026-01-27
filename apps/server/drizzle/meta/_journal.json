@@ -36,6 +36,13 @@
       "when": 1737907200000,
       "tag": "0003_add_sender_public_key",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1769472818816,
+      "tag": "0005_abnormal_newton_destine",
+      "breakpoints": true
     }
   ]
 }

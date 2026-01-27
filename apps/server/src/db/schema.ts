@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, boolean, index, unique } from "drizzle-orm/pg-core";
 
 // Users
 export const users = pgTable("users", {
@@ -44,6 +44,7 @@ export const communityMembers = pgTable("community_members", {
 }, (table) => ({
   communityIdx: index("community_members_community_idx").on(table.communityId),
   userIdx: index("community_members_user_idx").on(table.userId),
+  uniqueMembership: unique("community_members_unique").on(table.communityId, table.userId),
 }));
 
 // Channels within communities
@@ -70,6 +71,7 @@ export const senderKeys = pgTable("sender_keys", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   channelUserIdx: index("sender_keys_channel_user_idx").on(table.channelId, table.forUserId),
+  uniqueSenderKey: unique("sender_keys_unique").on(table.channelId, table.userId, table.forUserId),
 }));
 
 // Messages (encrypted)
@@ -78,7 +80,7 @@ export const messages = pgTable("messages", {
   channelId: uuid("channel_id").references(() => channels.id).notNull(),
   senderId: uuid("sender_id").references(() => users.id).notNull(),
   ciphertext: text("ciphertext").notNull(),
-  replyToId: uuid("reply_to_id"),
+  replyToId: uuid("reply_to_id").references((): any => messages.id, { onDelete: "set null" }),
   editedAt: timestamp("edited_at"),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
