@@ -222,22 +222,30 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
 
       // Broadcast to all users in channel
       const channelSockets = channelConnections.get(channelId);
-      if (channelSockets) {
-        const broadcastMsg = JSON.stringify({
-          type: "message:new",
-          payload: {
-            id: savedMessage.id,
-            channelId,
-            senderId: user.userId,
-            senderDisplayName: sender?.displayName,
-            ciphertext,
-            replyToId,
-            createdAt: savedMessage.createdAt.toISOString(),
-          },
-        });
+      const broadcastMsg = JSON.stringify({
+        type: "message:new",
+        payload: {
+          id: savedMessage.id,
+          channelId,
+          senderId: user.userId,
+          senderDisplayName: sender?.displayName,
+          ciphertext,
+          replyToId,
+          createdAt: savedMessage.createdAt.toISOString(),
+        },
+      });
 
+      // Always send back to the sender first (handles race condition where
+      // channel:join might still be processing when message is sent)
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(broadcastMsg);
+      }
+
+      // Then broadcast to other channel members
+      if (channelSockets) {
         for (const clientSocket of channelSockets) {
-          if (clientSocket.readyState === WebSocket.OPEN) {
+          // Skip sender since we already sent to them
+          if (clientSocket !== socket && clientSocket.readyState === WebSocket.OPEN) {
             clientSocket.send(broadcastMsg);
           }
         }
