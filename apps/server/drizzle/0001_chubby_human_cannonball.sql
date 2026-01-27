@@ -6,7 +6,11 @@ CREATE TABLE IF NOT EXISTS "reactions" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "password_hash" text NOT NULL;--> statement-breakpoint
+DO $$ BEGIN
+  ALTER TABLE "users" ADD COLUMN "password_hash" text NOT NULL;
+EXCEPTION
+  WHEN duplicate_column THEN null;
+END $$;--> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "reactions" ADD CONSTRAINT "reactions_message_id_messages_id_fk" FOREIGN KEY ("message_id") REFERENCES "public"."messages"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
