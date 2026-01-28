@@ -71,6 +71,10 @@ interface ChatState {
   deleteMessage: (channelId: string, messageId: string) => void;
   addReaction: (messageId: string, reactionId: string, userId: string, emoji: string) => void;
   removeReaction: (messageId: string, userId: string, emoji: string) => void;
+  // Cleanup methods to prevent memory leaks
+  clearChannelMessages: (channelId: string) => void;
+  clearTypingUsers: (channelId: string) => void;
+  clearChannelState: (channelId: string) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -307,5 +311,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       return { messages: newMessages };
+    }),
+
+  // Cleanup methods to prevent memory leaks
+
+  clearChannelMessages: (channelId) =>
+    set((state) => {
+      const { [channelId]: _, ...restMessages } = state.messages;
+      return { messages: restMessages };
+    }),
+
+  clearTypingUsers: (channelId) =>
+    set((state) => {
+      const { [channelId]: _, ...restTyping } = state.typingUsers;
+      return { typingUsers: restTyping };
+    }),
+
+  clearChannelState: (channelId) =>
+    set((state) => {
+      const { [channelId]: _messages, ...restMessages } = state.messages;
+      const { [channelId]: _typing, ...restTyping } = state.typingUsers;
+      return {
+        messages: restMessages,
+        typingUsers: restTyping,
+      };
     }),
 }));
