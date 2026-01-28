@@ -139,7 +139,7 @@ export async function getChannelKey(channelId: string): Promise<CryptoKey | null
  */
 export async function hasChannelKey(channelId: string): Promise<boolean> {
   const stored = await db.channelKeys.get(channelId);
-  return stored !== null;
+  return stored !== undefined;
 }
 
 /**
@@ -179,7 +179,7 @@ export async function clearAllKeys(): Promise<void> {
  */
 export async function hasIdentityKeys(): Promise<boolean> {
   const identity = await db.identity.get("local");
-  return identity !== null;
+  return identity !== undefined;
 }
 
 /**

@@ -111,11 +111,14 @@ describe("ErrorBoundary", () => {
 
   it("should call window.location.reload when Reload Page is clicked", () => {
     const reloadMock = vi.fn();
-    const originalLocation = window.location;
 
-    // @ts-expect-error - Mocking window.location
-    delete window.location;
-    window.location = { ...originalLocation, reload: reloadMock };
+    // Use Object.defineProperty for proper Location type handling
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      value: { ...originalLocation, reload: reloadMock },
+      writable: true,
+      configurable: true,
+    });
 
     render(
       <ErrorBoundary>
@@ -127,7 +130,12 @@ describe("ErrorBoundary", () => {
 
     expect(reloadMock).toHaveBeenCalled();
 
-    window.location = originalLocation;
+    // Restore original location
+    Object.defineProperty(window, "location", {
+      value: originalLocation,
+      writable: true,
+      configurable: true,
+    });
   });
 
   it("should render custom fallback when provided", () => {
