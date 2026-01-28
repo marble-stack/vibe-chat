@@ -47,29 +47,8 @@
     {
       "idx": 6,
       "version": "7",
-      "when": 1737936000000,
-      "tag": "0006_cleanup_duplicates",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
       "when": 1769487408846,
       "tag": "0007_aberrant_inertia",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1769500000000,
-      "tag": "0008_fix_sender_keys_duplicates",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1769600000000,
-      "tag": "0009_fix_sender_keys_duplicates_v2",
       "breakpoints": true
     }
   ]

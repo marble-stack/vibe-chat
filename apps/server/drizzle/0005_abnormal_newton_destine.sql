@@ -27,5 +27,21 @@ EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
-ALTER TABLE "community_members" ADD CONSTRAINT "community_members_unique" UNIQUE("community_id","user_id");--> statement-breakpoint
-ALTER TABLE "sender_keys" ADD CONSTRAINT "sender_keys_unique" UNIQUE("channel_id","user_id","for_user_id");
+-- Clean up duplicate community_members (keep oldest)
+DELETE FROM community_members a USING community_members b
+WHERE a.community_id = b.community_id AND a.user_id = b.user_id AND a.id > b.id;
+--> statement-breakpoint
+DO $$ BEGIN
+  ALTER TABLE "community_members" ADD CONSTRAINT "community_members_unique" UNIQUE("community_id","user_id");
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
+-- Clean up duplicate sender_keys (keep newest by created_at, then by id)
+DELETE FROM sender_keys a USING sender_keys b
+WHERE a.channel_id = b.channel_id AND a.user_id = b.user_id AND a.for_user_id = b.for_user_id
+  AND (a.created_at < b.created_at OR (a.created_at = b.created_at AND a.id < b.id));
+--> statement-breakpoint
+DO $$ BEGIN
+  ALTER TABLE "sender_keys" ADD CONSTRAINT "sender_keys_unique" UNIQUE("channel_id","user_id","for_user_id");
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
