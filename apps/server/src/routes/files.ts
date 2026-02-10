@@ -11,11 +11,6 @@ const UPLOADS_DIR = join(process.cwd(), "uploads");
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 const MAX_EMOJI_SIZE = 256 * 1024; // 256KB
 const ALLOWED_EMOJI_MIMES = new Set(["image/png", "image/gif", "image/webp"]);
-const MIME_TO_EXT: Record<string, string> = {
-  "image/png": ".png",
-  "image/gif": ".gif",
-  "image/webp": ".webp",
-};
 
 export const fileRoutes: FastifyPluginAsync = async (fastify) => {
   // Upload an encrypted file
@@ -104,15 +99,8 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(413).send({ error: "Emoji too large. Maximum size is 256KB." });
     }
 
-    const emojiId = randomUUID();
-    const ext = MIME_TO_EXT[data.mimetype] || extname(data.filename || ".png");
-    const fileName = `${emojiId}${ext}`;
-
-    const emojiDir = join(UPLOADS_DIR, "emojis");
-    await mkdir(emojiDir, { recursive: true });
-    await writeFile(join(emojiDir, fileName), buffer);
-
-    return { fileUrl: `/api/files/emoji/${fileName}` };
+    const base64 = buffer.toString("base64");
+    return { fileUrl: `data:${data.mimetype};base64,${base64}` };
   });
 
   // Serve a custom emoji image
