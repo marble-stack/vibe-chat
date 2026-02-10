@@ -6,6 +6,8 @@ import { wsClient } from "../lib/websocket";
 import { decryptChannelMessage, encryptChannelMessage, isDecryptionError } from "../lib/channelCrypto";
 import { logger } from "../lib/logger";
 import { DecryptionErrorMessage } from "./DecryptionErrorMessage";
+import { FileMessage } from "./FileMessage";
+import { PollMessage } from "./PollMessage";
 
 interface ThreadMessage {
   id: string;
@@ -169,11 +171,25 @@ export function ThreadPanel() {
         </div>
         {rootMessage.decryptionFailed ? (
           <DecryptionErrorMessage errorType={rootMessage.plaintext} />
-        ) : (
-          <p className="text-text-primary text-sm break-words ml-10">
-            {rootMessage.plaintext || rootMessage.ciphertext}
-          </p>
-        )}
+        ) : (() => {
+          const plaintext = rootMessage.plaintext || rootMessage.ciphertext;
+          try {
+            const parsed = JSON.parse(plaintext);
+            if (parsed.type === "file") {
+              return <div className="ml-10"><FileMessage metadata={parsed} channelId={rootMessage.channelId} /></div>;
+            }
+            if (parsed.type === "poll") {
+              return <div className="ml-10"><PollMessage metadata={parsed} messageId={rootMessage.id} /></div>;
+            }
+          } catch {
+            // Not JSON, render as text
+          }
+          return (
+            <p className="text-text-primary text-sm break-words ml-10">
+              {plaintext}
+            </p>
+          );
+        })()}
       </div>
 
       {/* Replies */}
