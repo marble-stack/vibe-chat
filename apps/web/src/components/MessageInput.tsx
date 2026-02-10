@@ -8,6 +8,8 @@ import { api } from "../lib/api";
 import { logger } from "../lib/logger";
 import { PollCreator } from "./PollCreator";
 
+let messageCounter = 0;
+
 export function MessageInput() {
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -20,7 +22,7 @@ export function MessageInput() {
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const plusBtnRef = useRef<HTMLButtonElement>(null);
-  const { activeChannelId, channels, activeCommunityId, members, replyingTo, setReplyingTo } =
+  const { activeChannelId, channels, activeCommunityId, members, replyingTo, setReplyingTo, addMessage, updateMessage } =
     useChatStore();
   const user = useAuthStore((state) => state.user);
 
@@ -65,9 +67,23 @@ export function MessageInput() {
 
     const plaintext = message.trim();
     const replyToId = replyingTo?.id;
+    const clientId = `optimistic-${Date.now()}-${++messageCounter}`;
     setMessage("");
     setReplyingTo(null);
     setIsSending(true);
+
+    // Insert optimistic message immediately (appears instantly for the sender)
+    addMessage({
+      id: clientId, // temporary id, replaced when server confirms
+      clientId,
+      channelId: activeChannelId,
+      senderId: user.id,
+      ciphertext: "",
+      plaintext,
+      replyToId,
+      createdAt: new Date().toISOString(),
+      pending: true,
+    });
 
     try {
       // Encrypt message with channel key
@@ -78,15 +94,14 @@ export function MessageInput() {
         user.id
       );
 
-      const sent = wsClient.sendMessage(activeChannelId, ciphertext, replyToId);
+      const sent = wsClient.sendMessage(activeChannelId, ciphertext, replyToId, clientId);
       if (!sent) {
         setSendError("Message queued - connection issue. Will send when reconnected.");
       }
     } catch (err) {
       logger.error("Failed to encrypt message:", err);
-      // Do NOT fall back to plaintext - encryption is mandatory
-      // Restore the message so user can retry
-      setMessage(plaintext);
+      // Mark the optimistic message as failed
+      updateMessage(activeChannelId, clientId, { sendFailed: true, pending: false });
       setSendError("Encryption failed. Please try again or refresh the page.");
     } finally {
       setIsSending(false);

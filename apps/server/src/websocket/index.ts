@@ -14,6 +14,9 @@ import {
   cleanupEmptyMaps,
 } from "./connectionMaps.js";
 
+// In-memory cache for display names (populated during auth, avoids DB query per message)
+const displayNameCache = new Map<string, string>();
+
 interface WsMessage {
   type: string;
   payload: Record<string, unknown>;
@@ -71,6 +74,18 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
         channelIds: new Set(),
         communityIds: new Set(),
       });
+
+      // Cache display name if not already cached
+      if (!displayNameCache.has(tokenPayload.userId)) {
+        const authUser = await db.query.users.findFirst({
+          where: eq(users.id, tokenPayload.userId),
+          columns: { displayName: true },
+        });
+        if (authUser?.displayName) {
+          displayNameCache.set(tokenPayload.userId, authUser.displayName);
+        }
+      }
+
       socket.send(
         JSON.stringify({ type: "auth:success", payload: { userId: tokenPayload.userId } })
       );
@@ -211,7 +226,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
         sendValidationError();
         return;
       }
-      const { channelId, ciphertext, replyToId } = sendPayload;
+      const { channelId, ciphertext, replyToId, clientId } = sendPayload;
       const user = socketUsers.get(socket);
 
       if (!user) {
@@ -219,34 +234,49 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
         return;
       }
 
-      // Authorization check: verify user can access this channel
-      const canSend = await canUserAccessChannel(user.userId, channelId);
-      if (!canSend) {
-        socket.send(
-          JSON.stringify({
-            type: "error",
-            payload: { message: "Cannot send messages to this channel" },
-          })
-        );
-        return;
+      // Fast-path: if socket is already in channelConnections for this channel,
+      // it was authorized at channel:join time — skip the DB query
+      const isAlreadyInChannel = channelConnections.get(channelId)?.has(socket);
+      if (!isAlreadyInChannel) {
+        const canSend = await canUserAccessChannel(user.userId, channelId);
+        if (!canSend) {
+          socket.send(
+            JSON.stringify({
+              type: "error",
+              payload: { message: "Cannot send messages to this channel" },
+            })
+          );
+          return;
+        }
       }
 
-      // Store message
-      const [savedMessage] = await db
-        .insert(messages)
-        .values({
-          channelId,
-          senderId: user.userId,
-          ciphertext,
-          replyToId,
-        })
-        .returning();
+      // Run DB insert and display name lookup in parallel
+      const cachedDisplayName = displayNameCache.get(user.userId);
+      const [insertResult, senderResult] = await Promise.all([
+        db
+          .insert(messages)
+          .values({
+            channelId,
+            senderId: user.userId,
+            ciphertext,
+            replyToId,
+          })
+          .returning(),
+        cachedDisplayName
+          ? Promise.resolve({ displayName: cachedDisplayName })
+          : db.query.users.findFirst({
+              where: eq(users.id, user.userId),
+              columns: { displayName: true },
+            }),
+      ]);
 
-      // Get sender's display name for clients that may not have it cached
-      const sender = await db.query.users.findFirst({
-        where: eq(users.id, user.userId),
-        columns: { displayName: true },
-      });
+      const savedMessage = insertResult[0];
+      const sender = senderResult;
+
+      // Update cache if we had to fetch
+      if (!cachedDisplayName && sender?.displayName) {
+        displayNameCache.set(user.userId, sender.displayName);
+      }
 
       // Broadcast to all users in channel
       const channelSockets = channelConnections.get(channelId);
@@ -259,6 +289,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
           senderDisplayName: sender?.displayName,
           ciphertext,
           replyToId,
+          clientId,
           createdAt: savedMessage.createdAt.toISOString(),
         },
       });

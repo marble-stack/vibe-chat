@@ -182,12 +182,30 @@ export function Chat() {
         senderDisplayName?: string;
         ciphertext: string;
         replyToId?: string;
+        clientId?: string;
         createdAt: string;
       };
 
       // Add sender to members if we have their info and they're not already known
       if (payload.senderDisplayName) {
         addMemberIfMissing(payload.senderId, payload.senderDisplayName);
+      }
+
+      // If this is our own message echoed back, reconcile with the optimistic message
+      // (skip decryption — we already have the plaintext from the optimistic insert)
+      if (user && payload.senderId === user.id && payload.clientId) {
+        addMessage({
+          id: payload.id,
+          clientId: payload.clientId,
+          channelId: payload.channelId,
+          senderId: payload.senderId,
+          ciphertext: payload.ciphertext,
+          replyToId: payload.replyToId,
+          createdAt: payload.createdAt,
+          pending: false,
+          sendFailed: false,
+        });
+        return;
       }
 
       // Get current community members for decryption

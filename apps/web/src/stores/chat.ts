@@ -31,6 +31,9 @@ interface Message {
   createdAt: string;
   reactions?: Reaction[];
   decryptionFailed?: boolean; // True if decryption failed for this message
+  clientId?: string; // For optimistic message reconciliation
+  pending?: boolean; // True while message is being sent
+  sendFailed?: boolean; // True if send/encrypt failed
 }
 
 interface Member {
@@ -162,7 +165,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
   addMessage: (message) =>
     set((state) => {
       const channelMessages = state.messages[message.channelId] || [];
-      // Deduplicate - check if message already exists
+
+      // Reconcile: if incoming message has a clientId that matches a pending optimistic message,
+      // replace the optimistic message in-place (preserving position)
+      if (message.clientId) {
+        const optimisticIndex = channelMessages.findIndex(
+          (m) => m.clientId === message.clientId && m.pending
+        );
+        if (optimisticIndex !== -1) {
+          const updated = [...channelMessages];
+          updated[optimisticIndex] = { ...message, pending: false, sendFailed: false };
+          return {
+            messages: { ...state.messages, [message.channelId]: updated },
+          };
+        }
+      }
+
+      // Deduplicate - check if message already exists by id
       if (channelMessages.some((m) => m.id === message.id)) {
         return state;
       }

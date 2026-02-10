@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, memo } from "react";
 import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
@@ -8,6 +8,339 @@ import { logger } from "../lib/logger";
 import { DecryptionErrorMessage } from "./DecryptionErrorMessage";
 import { FileMessage } from "./FileMessage";
 import { PollMessage } from "./PollMessage";
+
+interface Member {
+  id: string;
+  displayName: string;
+  avatarUrl?: string;
+}
+
+interface Message {
+  id: string;
+  channelId: string;
+  senderId: string;
+  ciphertext: string;
+  plaintext?: string;
+  replyToId?: string;
+  editedAt?: string | null;
+  createdAt: string;
+  reactions?: { emoji: string; count: number; userIds: string[]; reactionIds: Record<string, string> }[];
+  decryptionFailed?: boolean;
+  clientId?: string;
+  pending?: boolean;
+  sendFailed?: boolean;
+}
+
+const EMOJI_OPTIONS = ["\u{1F44D}", "\u{2764}\u{FE0F}", "\u{1F602}", "\u{1F62E}", "\u{1F622}", "\u{1F389}"];
+
+const formatTime = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
+
+interface MessageItemProps {
+  message: Message;
+  sender: Member | undefined;
+  showHeader: boolean;
+  replyMessage: Message | null | undefined;
+  replySender: Member | null | undefined;
+  isEditing: boolean;
+  isEmojiPickerOpen: boolean;
+  editText: string;
+  editInputRef: React.RefObject<HTMLInputElement>;
+  userId: string | undefined;
+  isOwnMessage: boolean;
+  messageRefs: React.MutableRefObject<Map<string, HTMLDivElement>>;
+  onScrollToMessage: (id: string) => void;
+  onSetEditText: (text: string) => void;
+  onEditKeyDown: (e: React.KeyboardEvent) => void;
+  onCancelEditing: () => void;
+  onSaveEdit: () => void;
+  onStartEditing: (message: { id: string; plaintext?: string; ciphertext: string }) => void;
+  onDelete: (id: string) => void;
+  onReactionClick: (messageId: string, emoji: string, userReactionId?: string) => void;
+  onToggleEmojiPicker: (id: string | null) => void;
+  onCloseEmojiPicker: () => void;
+  onOpenThread: (messageId: string) => void;
+  getMember: (userId: string) => Member | undefined;
+  replyCount: number;
+  channelMessages: Message[];
+}
+
+const MessageItem = memo(function MessageItem({
+  message,
+  sender,
+  showHeader,
+  replyMessage,
+  replySender,
+  isEditing,
+  isEmojiPickerOpen,
+  editText,
+  editInputRef,
+  userId,
+  isOwnMessage,
+  messageRefs,
+  onScrollToMessage,
+  onSetEditText,
+  onEditKeyDown,
+  onCancelEditing,
+  onSaveEdit,
+  onStartEditing,
+  onDelete,
+  onReactionClick,
+  onToggleEmojiPicker,
+  onCloseEmojiPicker,
+  onOpenThread,
+  getMember,
+  replyCount,
+}: MessageItemProps) {
+  return (
+    <div
+      ref={(el) => {
+        if (el) messageRefs.current.set(message.id, el);
+        else messageRefs.current.delete(message.id);
+      }}
+      className={`group relative flex gap-4 hover:bg-background-primary/30 px-2 py-0.5 rounded transition-colors ${
+        showHeader ? "mt-4" : ""
+      } ${message.pending ? "opacity-60" : ""} ${message.sendFailed ? "opacity-80" : ""}`}
+    >
+      {/* Discord-style floating toolbar - top right on hover */}
+      {!isEditing && (
+        <div className="absolute -top-3 right-2 hidden group-hover:flex items-center bg-background-tertiary border border-background-secondary rounded shadow-lg z-10">
+          {/* Add reaction */}
+          <div className="relative">
+            <button
+              onClick={() =>
+                onToggleEmojiPicker(isEmojiPickerOpen ? null : message.id)
+              }
+              className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-text-primary transition-colors rounded-l"
+              title="Add Reaction"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+
+            {/* Emoji picker dropdown */}
+            {isEmojiPickerOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={onCloseEmojiPicker}
+                />
+                <div className="absolute right-0 top-full mt-1 z-20 bg-background-secondary border border-background-tertiary rounded-lg shadow-lg p-2 flex gap-1">
+                  {EMOJI_OPTIONS.map((emoji) => {
+                    const existingReaction = message.reactions?.find(
+                      (r) => r.emoji === emoji
+                    );
+                    const emojiUserReactionId =
+                      userId && existingReaction
+                        ? existingReaction.reactionIds[userId]
+                        : undefined;
+
+                    return (
+                      <button
+                        key={emoji}
+                        onClick={() =>
+                          onReactionClick(message.id, emoji, emojiUserReactionId)
+                        }
+                        className="w-8 h-8 flex items-center justify-center rounded hover:bg-background-primary/50 transition-colors text-lg"
+                        title={emoji}
+                      >
+                        {emoji}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Reply / Thread */}
+          <button
+            onClick={() => onOpenThread(message.id)}
+            className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-text-primary transition-colors"
+            title="Reply in Thread"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+          </button>
+
+          {/* Edit and delete - only for own messages */}
+          {isOwnMessage && (
+            <>
+              <button
+                onClick={() => onStartEditing(message)}
+                className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-text-primary transition-colors"
+                title="Edit"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => onDelete(message.id)}
+                className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-red-400 transition-colors rounded-r"
+                title="Delete"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {showHeader ? (
+        <div className="w-10 h-10 rounded-full bg-accent-primary flex-shrink-0 flex items-center justify-center text-white font-medium">
+          {sender?.displayName?.charAt(0).toUpperCase() || "?"}
+        </div>
+      ) : (
+        <div className="w-10 flex-shrink-0" />
+      )}
+      <div className="flex-1 min-w-0">
+        {/* Reply context */}
+        {replyMessage && (
+          <button
+            onClick={() => onScrollToMessage(replyMessage.id)}
+            className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary mb-1 cursor-pointer"
+          >
+            <svg
+              className="w-3 h-3 rotate-180"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+              />
+            </svg>
+            <span className="font-medium">{replySender?.displayName || "Unknown"}</span>
+            <span className="truncate max-w-[200px]">
+              {replyMessage.plaintext || replyMessage.ciphertext}
+            </span>
+          </button>
+        )}
+
+        {showHeader && (
+          <div className="flex items-baseline gap-2">
+            <span className="font-medium text-text-primary hover:underline cursor-pointer">
+              {sender?.displayName || "Unknown"}
+            </span>
+            <span className="text-xs text-text-muted">
+              {formatTime(message.createdAt)}
+            </span>
+          </div>
+        )}
+
+        {/* Message content or edit input */}
+        {isEditing ? (
+          <div className="flex gap-2">
+            <input
+              ref={editInputRef}
+              type="text"
+              value={editText}
+              onChange={(e) => onSetEditText(e.target.value)}
+              onKeyDown={onEditKeyDown}
+              className="flex-1 bg-background-tertiary text-text-primary px-3 py-1 rounded outline-none border border-accent-primary"
+            />
+            <button
+              onClick={onCancelEditing}
+              className="text-xs text-text-muted hover:text-text-primary"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onSaveEdit}
+              className="text-xs text-accent-primary hover:text-accent-primary/80"
+            >
+              Save
+            </button>
+          </div>
+        ) : message.sendFailed ? (
+          <div>
+            <p className="text-text-primary break-words">
+              {message.plaintext || message.ciphertext}
+            </p>
+            <span className="text-xs text-red-400">Failed to send</span>
+          </div>
+        ) : message.decryptionFailed ? (
+          <DecryptionErrorMessage errorType={message.plaintext} />
+        ) : (() => {
+          // Try to parse as structured content (file, poll)
+          const plaintext = message.plaintext || message.ciphertext;
+          try {
+            const parsed = JSON.parse(plaintext);
+            if (parsed.type === "file") {
+              return <FileMessage metadata={parsed} channelId={message.channelId} />;
+            }
+            if (parsed.type === "poll") {
+              return <PollMessage metadata={parsed} messageId={message.id} channelId={message.channelId} />;
+            }
+          } catch {
+            // Not JSON, render as text
+          }
+          return (
+            <p className="text-text-primary break-words">
+              {plaintext}
+              {message.editedAt && (
+                <span className="text-xs text-text-muted ml-1">(edited)</span>
+              )}
+            </p>
+          );
+        })()}
+
+        {/* Thread reply count indicator */}
+        {replyCount > 0 && (
+          <button
+            onClick={() => onOpenThread(message.id)}
+            className="flex items-center gap-1 text-xs text-accent-primary hover:underline mt-1"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+            {replyCount} {replyCount === 1 ? "reply" : "replies"}
+          </button>
+        )}
+
+        {/* Existing reactions display */}
+        {message.reactions && message.reactions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 mt-1">
+            {message.reactions.map((reaction) => {
+              const userReacted = userId && reaction.userIds.includes(userId);
+              const userReactionId = userId ? reaction.reactionIds[userId] : undefined;
+
+              return (
+                <button
+                  key={reaction.emoji}
+                  onClick={() =>
+                    onReactionClick(message.id, reaction.emoji, userReactionId)
+                  }
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm transition-colors ${
+                    userReacted
+                      ? "bg-accent-primary/20 border border-accent-primary text-accent-primary"
+                      : "bg-background-tertiary border border-background-tertiary text-text-primary hover:border-text-muted"
+                  }`}
+                  title={reaction.userIds
+                    .map((id) => getMember(id)?.displayName || "Unknown")
+                    .join(", ")}
+                >
+                  <span>{reaction.emoji}</span>
+                  <span className="text-xs">{reaction.count}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
 
 interface MessageListProps {
   onOpenSidebar: () => void;
@@ -29,7 +362,9 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
   const user = useAuthStore((state) => state.user);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const prevMessageCountRef = useRef(0);
 
   // Edit state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -41,7 +376,6 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
 
   // Reaction emoji picker state
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
-  const EMOJI_OPTIONS = ["👍", "❤️", "😂", "😮", "😢", "🎉"];
 
   const allChannelMessages = activeChannelId ? messages[activeChannelId] || [] : [];
   // Filter out thread replies from main view — they only show in ThreadPanel
@@ -56,6 +390,9 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
   // Load and decrypt messages when channel changes
   useEffect(() => {
     if (!activeChannelId || !user) return;
+
+    // Reset counter so initial load scrolls to bottom
+    prevMessageCountRef.current = 0;
 
     const loadMessages = async () => {
       const { messages: msgs } = await api.messages.list(activeChannelId);
@@ -95,19 +432,29 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     loadMessages();
   }, [activeChannelId, user, setMessages, communityMembers]);
 
-  // Auto-scroll to bottom on new messages
+  // Smart auto-scroll: only scroll when a new message is added AND user is near the bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const newCount = channelMessages.length;
+    const wasNewMessage = newCount > prevMessageCountRef.current;
+    prevMessageCountRef.current = newCount;
+
+    if (!wasNewMessage) return;
+
+    // Only auto-scroll if user is within 100px of the bottom
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (distanceFromBottom < 100) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [channelMessages]);
 
-  const getMember = (userId: string) => {
-    return communityMembers.find((m) => m.id === userId);
-  };
-
-  const formatTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
+  const getMember = useCallback(
+    (userId: string) => communityMembers.find((m) => m.id === userId),
+    [communityMembers]
+  );
 
   // Get the original message being replied to
   const getReplyMessage = useCallback(
@@ -202,18 +549,19 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     setActiveChannel(null);
   };
 
-  const handleReactionClick = (messageId: string, emoji: string, userReactionId?: string) => {
-    if (!user || !activeChannelId) return;
+  const handleReactionClick = useCallback(
+    (messageId: string, emoji: string, userReactionId?: string) => {
+      if (!user || !activeChannelId) return;
 
-    if (userReactionId) {
-      // Remove reaction
-      wsClient.removeReaction(userReactionId, activeChannelId, messageId, emoji);
-    } else {
-      // Add reaction
-      wsClient.addReaction(messageId, activeChannelId, emoji);
-    }
-    setShowEmojiPicker(null);
-  };
+      if (userReactionId) {
+        wsClient.removeReaction(userReactionId, activeChannelId, messageId, emoji);
+      } else {
+        wsClient.addReaction(messageId, activeChannelId, emoji);
+      }
+      setShowEmojiPicker(null);
+    },
+    [user, activeChannelId]
+  );
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -256,7 +604,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4">
         {channelMessages.length === 0 ? (
           <div className="text-center text-text-muted py-8">
             <div className="text-4xl mb-4">#</div>
@@ -280,249 +628,38 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
             const replyMessage = getReplyMessage(message.replyToId);
             const replySender = replyMessage ? getMember(replyMessage.senderId) : null;
 
+            const replyCount = allChannelMessages.filter((m) => m.replyToId === message.id).length;
+
             return (
-              <div
-                key={message.id}
-                ref={(el) => {
-                  if (el) messageRefs.current.set(message.id, el);
-                  else messageRefs.current.delete(message.id);
-                }}
-                className={`group relative flex gap-4 hover:bg-background-primary/30 px-2 py-0.5 rounded transition-colors ${
-                  showHeader ? "mt-4" : ""
-                }`}
-              >
-                {/* Discord-style floating toolbar - top right on hover */}
-                {editingMessageId !== message.id && (
-                  <div className="absolute -top-3 right-2 hidden group-hover:flex items-center bg-background-tertiary border border-background-secondary rounded shadow-lg z-10">
-                    {/* Add reaction */}
-                    <div className="relative">
-                      <button
-                        onClick={() =>
-                          setShowEmojiPicker(showEmojiPicker === message.id ? null : message.id)
-                        }
-                        className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-text-primary transition-colors rounded-l"
-                        title="Add Reaction"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </button>
-
-                      {/* Emoji picker dropdown */}
-                      {showEmojiPicker === message.id && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-10"
-                            onClick={() => setShowEmojiPicker(null)}
-                          />
-                          <div className="absolute right-0 top-full mt-1 z-20 bg-background-secondary border border-background-tertiary rounded-lg shadow-lg p-2 flex gap-1">
-                            {EMOJI_OPTIONS.map((emoji) => {
-                              const existingReaction = message.reactions?.find(
-                                (r) => r.emoji === emoji
-                              );
-                              const userReactionId =
-                                user && existingReaction
-                                  ? existingReaction.reactionIds[user.id]
-                                  : undefined;
-
-                              return (
-                                <button
-                                  key={emoji}
-                                  onClick={() =>
-                                    handleReactionClick(message.id, emoji, userReactionId)
-                                  }
-                                  className="w-8 h-8 flex items-center justify-center rounded hover:bg-background-primary/50 transition-colors text-lg"
-                                  title={emoji}
-                                >
-                                  {emoji}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Reply / Thread */}
-                    <button
-                      onClick={() => setActiveThread(message.id)}
-                      className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-text-primary transition-colors"
-                      title="Reply in Thread"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                      </svg>
-                    </button>
-
-                    {/* Edit and delete - only for own messages */}
-                    {user && message.senderId === user.id && (
-                      <>
-                        <button
-                          onClick={() => startEditing(message)}
-                          className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-text-primary transition-colors"
-                          title="Edit"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => setDeletingMessageId(message.id)}
-                          className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-red-400 transition-colors rounded-r"
-                          title="Delete"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {showHeader ? (
-                  <div className="w-10 h-10 rounded-full bg-accent-primary flex-shrink-0 flex items-center justify-center text-white font-medium">
-                    {sender?.displayName?.charAt(0).toUpperCase() || "?"}
-                  </div>
-                ) : (
-                  <div className="w-10 flex-shrink-0" />
-                )}
-                <div className="flex-1 min-w-0">
-                  {/* Reply context */}
-                  {replyMessage && (
-                    <button
-                      onClick={() => scrollToMessage(replyMessage.id)}
-                      className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary mb-1 cursor-pointer"
-                    >
-                      <svg
-                        className="w-3 h-3 rotate-180"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-                        />
-                      </svg>
-                      <span className="font-medium">{replySender?.displayName || "Unknown"}</span>
-                      <span className="truncate max-w-[200px]">
-                        {replyMessage.plaintext || replyMessage.ciphertext}
-                      </span>
-                    </button>
-                  )}
-
-                  {showHeader && (
-                    <div className="flex items-baseline gap-2">
-                      <span className="font-medium text-text-primary hover:underline cursor-pointer">
-                        {sender?.displayName || "Unknown"}
-                      </span>
-                      <span className="text-xs text-text-muted">
-                        {formatTime(message.createdAt)}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Message content or edit input */}
-                  {editingMessageId === message.id ? (
-                    <div className="flex gap-2">
-                      <input
-                        ref={editInputRef}
-                        type="text"
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        onKeyDown={handleEditKeyDown}
-                        className="flex-1 bg-background-tertiary text-text-primary px-3 py-1 rounded outline-none border border-accent-primary"
-                      />
-                      <button
-                        onClick={cancelEditing}
-                        className="text-xs text-text-muted hover:text-text-primary"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={saveEdit}
-                        className="text-xs text-accent-primary hover:text-accent-primary/80"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  ) : message.decryptionFailed ? (
-                    <DecryptionErrorMessage errorType={message.plaintext} />
-                  ) : (() => {
-                    // Try to parse as structured content (file, poll)
-                    const plaintext = message.plaintext || message.ciphertext;
-                    try {
-                      const parsed = JSON.parse(plaintext);
-                      if (parsed.type === "file") {
-                        return <FileMessage metadata={parsed} channelId={message.channelId} />;
-                      }
-                      if (parsed.type === "poll") {
-                        return <PollMessage metadata={parsed} messageId={message.id} channelId={message.channelId} />;
-                      }
-                    } catch {
-                      // Not JSON, render as text
-                    }
-                    return (
-                      <p className="text-text-primary break-words">
-                        {plaintext}
-                        {message.editedAt && (
-                          <span className="text-xs text-text-muted ml-1">(edited)</span>
-                        )}
-                      </p>
-                    );
-                  })()}
-
-                  {/* Thread reply count indicator */}
-                  {(() => {
-                    const replyCount = allChannelMessages.filter((m) => m.replyToId === message.id).length;
-                    if (replyCount === 0) return null;
-                    return (
-                      <button
-                        onClick={() => setActiveThread(message.id)}
-                        className="flex items-center gap-1 text-xs text-accent-primary hover:underline mt-1"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                        </svg>
-                        {replyCount} {replyCount === 1 ? "reply" : "replies"}
-                      </button>
-                    );
-                  })()}
-
-                  {/* Existing reactions display */}
-                  {message.reactions && message.reactions.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1 mt-1">
-                      {message.reactions.map((reaction) => {
-                        const userReacted = user && reaction.userIds.includes(user.id);
-                        const userReactionId = user ? reaction.reactionIds[user.id] : undefined;
-
-                        return (
-                          <button
-                            key={reaction.emoji}
-                            onClick={() =>
-                              handleReactionClick(message.id, reaction.emoji, userReactionId)
-                            }
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm transition-colors ${
-                              userReacted
-                                ? "bg-accent-primary/20 border border-accent-primary text-accent-primary"
-                                : "bg-background-tertiary border border-background-tertiary text-text-primary hover:border-text-muted"
-                            }`}
-                            title={reaction.userIds
-                              .map((id) => getMember(id)?.displayName || "Unknown")
-                              .join(", ")}
-                          >
-                            <span>{reaction.emoji}</span>
-                            <span className="text-xs">{reaction.count}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <MessageItem
+                key={message.clientId || message.id}
+                message={message}
+                sender={sender}
+                showHeader={!!showHeader}
+                replyMessage={replyMessage}
+                replySender={replySender}
+                isEditing={editingMessageId === message.id}
+                isEmojiPickerOpen={showEmojiPicker === message.id}
+                editText={editText}
+                editInputRef={editInputRef}
+                userId={user?.id}
+                isOwnMessage={!!user && message.senderId === user.id}
+                messageRefs={messageRefs}
+                onScrollToMessage={scrollToMessage}
+                onSetEditText={setEditText}
+                onEditKeyDown={handleEditKeyDown}
+                onCancelEditing={cancelEditing}
+                onSaveEdit={saveEdit}
+                onStartEditing={startEditing}
+                onDelete={setDeletingMessageId}
+                onReactionClick={handleReactionClick}
+                onToggleEmojiPicker={setShowEmojiPicker}
+                onCloseEmojiPicker={() => setShowEmojiPicker(null)}
+                onOpenThread={setActiveThread}
+                getMember={getMember}
+                replyCount={replyCount}
+                channelMessages={channelMessages}
+              />
             );
           })
         )}

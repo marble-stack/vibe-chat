@@ -34,6 +34,7 @@ export const messageSendPayloadSchema = z.object({
   channelId: z.string().uuid(),
   ciphertext: z.string().min(1).max(50000), // Reasonable message size limit
   replyToId: z.string().uuid().optional(),
+  clientId: z.string().max(100).optional(), // For optimistic message reconciliation
 });
 
 export const messageEditPayloadSchema = z.object({
