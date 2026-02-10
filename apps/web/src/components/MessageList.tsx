@@ -368,7 +368,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                   )}
 
                   {/* Reactions */}
-                  <div className="flex flex-wrap gap-1 mt-1 relative">
+                  <div className={`flex flex-wrap items-center gap-1 relative ${message.reactions?.length ? "mt-1" : "hidden group-hover:flex mt-1"}`}>
                     {message.reactions?.map((reaction) => {
                       const userReacted = user && reaction.userIds.includes(user.id);
                       const userReactionId = user ? reaction.reactionIds[user.id] : undefined;

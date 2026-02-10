@@ -15,6 +15,7 @@ class WebSocketClient {
   private userId: string | null = null;
   private token: string | null = null;
   private joinedChannels: Set<string> = new Set();
+  private joinedCommunities: Set<string> = new Set();
   private authenticated = false;
   private pendingMessages: WsMessage[] = [];
 
@@ -52,9 +53,12 @@ class WebSocketClient {
           logger.debug("WebSocket authenticated");
           this.authenticated = true;
 
-          // Rejoin channels after auth succeeds
+          // Rejoin channels and communities after auth succeeds
           for (const channelId of this.joinedChannels) {
             this.send({ type: "channel:join", payload: { channelId } });
+          }
+          for (const communityId of this.joinedCommunities) {
+            this.send({ type: "community:join", payload: { communityId } });
           }
 
           // Send any queued messages
@@ -123,6 +127,7 @@ class WebSocketClient {
       this.ws = null;
     }
     this.joinedChannels.clear();
+    this.joinedCommunities.clear();
     this.authenticated = false;
     this.pendingMessages = [];
   }
@@ -159,10 +164,12 @@ class WebSocketClient {
   }
 
   joinCommunity(communityId: string) {
+    this.joinedCommunities.add(communityId);
     this.send({ type: "community:join", payload: { communityId } });
   }
 
   leaveCommunity(communityId: string) {
+    this.joinedCommunities.delete(communityId);
     this.send({ type: "community:leave", payload: { communityId } });
   }
 
