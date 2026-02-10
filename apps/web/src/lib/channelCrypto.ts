@@ -49,12 +49,12 @@ export async function ensureChannelKey(
     // When sending (createIfMissing=true), redistribute key to all current members
     // in case new members joined. This ensures new members can decrypt messages.
     if (createIfMissing && members.length > 0) {
-      try {
-        await distributeChannelKey(channelId, existingKey, members, currentUserId);
-      } catch (err) {
-        logger.error("Failed to redistribute channel key:", err);
-        // Continue anyway - we still have the key locally
-      }
+      // Fire-and-forget: don't block sends on key redistribution.
+      // The local key is already available for encryption — redistribution
+      // only ensures new members receive the key, which isn't urgent for this send.
+      distributeChannelKey(channelId, existingKey, members, currentUserId).catch(
+        (err) => logger.error("Failed to redistribute channel key:", err)
+      );
     }
     return { key: existingKey, isNew: false };
   }
@@ -202,32 +202,26 @@ export async function distributeChannelKey(
   const privateKey = await importPrivateKey(identityKeys.identityKeyPair.privateKey);
   const encryptedKeys: { forUserId: string; encryptedKey: string }[] = [];
 
-  for (const member of freshMembers) {
-    try {
-      // Always fetch fresh keys from server to handle key regeneration
-      // Users may have regenerated their keys on a new device
+  const results = await Promise.allSettled(
+    freshMembers.map(async (member) => {
       const userKeys = await api.auth.getUserKeys(member.id);
-      const memberKey = {
-        userId: member.id,
-        identityKeyPublic: userKeys.identityKey,
-        signedPreKeyPublic: userKeys.signedPreKey.publicKey,
-      };
-      // Update local cache with fresh keys
       await storeUserKey(member.id, userKeys.identityKey, userKeys.signedPreKey.publicKey);
 
-      // Encrypt channel key for this member
       const encryptedKey = await encryptChannelKeyForRecipient(
         channelKey,
         privateKey,
-        memberKey.identityKeyPublic
+        userKeys.identityKey
       );
 
-      encryptedKeys.push({
-        forUserId: member.id,
-        encryptedKey,
-      });
-    } catch (err) {
-      logger.error(`Failed to encrypt key for member ${member.id}:`, err);
+      return { forUserId: member.id, encryptedKey };
+    })
+  );
+
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      encryptedKeys.push(result.value);
+    } else {
+      logger.error("Failed to encrypt key for a member:", result.reason);
     }
   }
 
