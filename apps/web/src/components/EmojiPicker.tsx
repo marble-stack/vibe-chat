@@ -92,7 +92,7 @@ export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
                   No custom emojis yet
                 </p>
               ) : (
-                <div className="grid grid-cols-8 gap-1 max-h-[200px] overflow-y-auto">
+                <div className="grid grid-cols-8 gap-1 max-h-[200px] overflow-y-auto p-1">
                   {communityEmojis.map((emoji) => (
                     <div key={emoji.id} className="relative group/emoji">
                       <button
@@ -110,7 +110,7 @@ export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
                       <button
                         type="button"
                         onClick={(e) => handleDeleteEmoji(emoji.id, e)}
-                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] leading-none flex items-center justify-center opacity-0 group-hover/emoji:opacity-100 transition-opacity hover:bg-red-600"
+                        className="absolute top-0 right-0 w-3.5 h-3.5 bg-red-500 text-white rounded-full text-[9px] leading-none flex items-center justify-center opacity-0 group-hover/emoji:opacity-100 transition-opacity hover:bg-red-600 z-10"
                         title={`Delete :${emoji.name}:`}
                       >
                         &times;
