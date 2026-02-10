@@ -17,7 +17,7 @@ interface ThreadMessage {
   ciphertext: string;
   plaintext?: string;
   decryptionFailed?: boolean;
-  replyToId?: string;
+  replyToId?: string | null;
   createdAt: string;
 }
 

@@ -26,7 +26,7 @@ interface Message {
   senderId: string;
   ciphertext: string;
   plaintext?: string; // Decrypted content
-  replyToId?: string;
+  replyToId?: string | null;
   isThreadReply?: boolean;
   editedAt?: string | null;
   createdAt: string;

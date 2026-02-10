@@ -24,7 +24,7 @@ interface Message {
   senderId: string;
   ciphertext: string;
   plaintext?: string;
-  replyToId?: string;
+  replyToId?: string | null;
   isThreadReply?: boolean;
   editedAt?: string | null;
   createdAt: string;
@@ -559,7 +559,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
 
   // Get the original message being replied to
   const getReplyMessage = useCallback(
-    (replyToId: string | undefined) => {
+    (replyToId: string | null | undefined) => {
       if (!replyToId || !activeChannelId) return null;
       return getMessageById(activeChannelId, replyToId);
     },
