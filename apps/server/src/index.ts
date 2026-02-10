@@ -24,6 +24,7 @@ async function main() {
   await fastify.register(cors, {
     origin: process.env.CORS_ORIGIN || "http://localhost:5173",
     credentials: true,
+    exposedHeaders: ["X-File-IV"],
   });
   await fastify.register(websocket);
   await fastify.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });

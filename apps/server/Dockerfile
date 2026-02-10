@@ -46,11 +46,14 @@ RUN pnpm install --frozen-lockfile --prod
 # Copy built files from builder
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 
+# Copy drizzle migrations for runtime migration
+COPY --from=builder /app/apps/server/drizzle ./apps/server/drizzle
+
 # Expose port
 EXPOSE 3000
 
 # Set working directory to server
 WORKDIR /app/apps/server
 
-# Start the server
-CMD ["node", "dist/index.js"]
+# Run migrations then start the server
+CMD ["sh", "-c", "node dist/db/migrate.js && node dist/index.js"]

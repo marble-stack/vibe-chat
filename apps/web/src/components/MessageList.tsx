@@ -22,7 +22,6 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     activeCommunityId,
     typingUsers,
     setMessages,
-    setReplyingTo,
     getMessageById,
     setActiveChannel,
     setActiveThread,
@@ -44,7 +43,9 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
   const EMOJI_OPTIONS = ["👍", "❤️", "😂", "😮", "😢", "🎉"];
 
-  const channelMessages = activeChannelId ? messages[activeChannelId] || [] : [];
+  const allChannelMessages = activeChannelId ? messages[activeChannelId] || [] : [];
+  // Filter out thread replies from main view — they only show in ThreadPanel
+  const channelMessages = allChannelMessages.filter((m) => !m.replyToId);
   const communityMembers = activeCommunityId ? members[activeCommunityId] || [] : [];
   const channelTypingUsers = activeChannelId ? typingUsers[activeChannelId] || [] : [];
   const activeChannel =
@@ -342,22 +343,11 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                       )}
                     </div>
 
-                    {/* Reply */}
-                    <button
-                      onClick={() => setReplyingTo(message)}
-                      className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-text-primary transition-colors"
-                      title="Reply"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                      </svg>
-                    </button>
-
-                    {/* Thread */}
+                    {/* Reply / Thread */}
                     <button
                       onClick={() => setActiveThread(message.id)}
                       className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-text-primary transition-colors"
-                      title="Thread"
+                      title="Reply in Thread"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -487,7 +477,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
 
                   {/* Thread reply count indicator */}
                   {(() => {
-                    const replyCount = channelMessages.filter((m) => m.replyToId === message.id).length;
+                    const replyCount = allChannelMessages.filter((m) => m.replyToId === message.id).length;
                     if (replyCount === 0) return null;
                     return (
                       <button
