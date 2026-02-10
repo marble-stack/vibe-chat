@@ -90,6 +90,9 @@ export function Chat() {
         if (savedCommunityId && communities.some((c) => c.id === savedCommunityId)) {
           // Community exists — select it (triggers channel load via the community effect)
           useChatStore.getState().setActiveCommunity(savedCommunityId);
+        } else if (communities.length > 0) {
+          // No saved community (or it was deleted) — auto-select the first one
+          useChatStore.getState().setActiveCommunity(communities[0].id);
         }
       } catch (err) {
         logger.error("Failed to load communities:", err);
@@ -102,6 +105,8 @@ export function Chat() {
             const { activeCommunityId: savedCommunityId } = useChatStore.getState();
             if (savedCommunityId && communities.some((c) => c.id === savedCommunityId)) {
               useChatStore.getState().setActiveCommunity(savedCommunityId);
+            } else if (communities.length > 0) {
+              useChatStore.getState().setActiveCommunity(communities[0].id);
             }
           } catch (retryErr) {
             logger.error("Failed to load communities on retry:", retryErr);
@@ -209,7 +214,7 @@ export function Chat() {
       if (savedChannelId && channels.some((c) => c.id === savedChannelId)) {
         // Saved channel exists in this community — keep it selected
         useChatStore.getState().setActiveChannel(savedChannelId);
-      } else if (channels.length > 0 && !savedChannelId) {
+      } else if (channels.length > 0) {
         // No saved channel — auto-select first channel (mobile convenience)
         useChatStore.getState().setActiveChannel(channels[0].id);
       }
