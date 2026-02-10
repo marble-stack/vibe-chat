@@ -29,6 +29,7 @@ export interface Message {
   senderId: string;
   ciphertext: string;
   replyToId?: string;
+  isThreadReply?: boolean;
   createdAt: string;
 }
 

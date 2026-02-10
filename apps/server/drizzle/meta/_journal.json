@@ -64,6 +64,13 @@
       "when": 1770696090674,
       "tag": "0008_famous_yellowjacket",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1770696788705,
+      "tag": "0009_rainy_vision",
+      "breakpoints": true
     }
   ]
 }

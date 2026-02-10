@@ -127,6 +127,7 @@ export const messages = pgTable(
     ciphertext: text("ciphertext").notNull(),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- self-referencing FK requires any type in drizzle
     replyToId: uuid("reply_to_id").references((): any => messages.id, { onDelete: "set null" }),
+    isThreadReply: boolean("is_thread_reply").default(false).notNull(),
     editedAt: timestamp("edited_at"),
     deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -25,6 +25,7 @@ interface Message {
   ciphertext: string;
   plaintext?: string;
   replyToId?: string;
+  isThreadReply?: boolean;
   editedAt?: string | null;
   createdAt: string;
   reactions?: { emoji: string; count: number; userIds: string[]; reactionIds: Record<string, string> }[];
@@ -139,6 +140,7 @@ interface MessageItemProps {
   onToggleEmojiPicker: (id: string | null) => void;
   onCloseEmojiPicker: () => void;
   onOpenThread: (messageId: string) => void;
+  onReply: (message: Message) => void;
   onUsernameClick: (userId: string, e: React.MouseEvent) => void;
   getMember: (userId: string) => Member | undefined;
   replyCount: number;
@@ -169,6 +171,7 @@ const MessageItem = memo(function MessageItem({
   onToggleEmojiPicker,
   onCloseEmojiPicker,
   onOpenThread,
+  onReply,
   onUsernameClick,
   getMember,
   replyCount,
@@ -216,7 +219,18 @@ const MessageItem = memo(function MessageItem({
             )}
           </div>
 
-          {/* Reply / Thread */}
+          {/* Inline Reply */}
+          <button
+            onClick={() => onReply(message)}
+            className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-text-primary transition-colors"
+            title="Reply"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10l7-7v4c8 0 11 4 11 11-2-4-5-6-11-6v4l-7-7z" />
+            </svg>
+          </button>
+
+          {/* Reply in Thread */}
           <button
             onClick={() => onOpenThread(message.id)}
             className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-text-primary transition-colors"
@@ -282,7 +296,7 @@ const MessageItem = memo(function MessageItem({
               </div>
             </button>
             <button
-              onClick={() => onOpenThread(message.id)}
+              onClick={() => onOpenThread(message.replyToId!)}
               className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium text-accent-primary hover:bg-accent-primary/15"
               title="Reply in thread"
             >
@@ -425,6 +439,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     getMessageById,
     setActiveChannel,
     setActiveThread,
+    setReplyingTo,
     onlineUsers,
     setSearchOpen,
     scrollToMessageId,
@@ -455,8 +470,8 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
   } | null>(null);
 
   const allChannelMessages = activeChannelId ? messages[activeChannelId] || [] : [];
-  // Filter out thread replies from main view — they only show in ThreadPanel
-  const channelMessages = allChannelMessages.filter((m) => !m.replyToId);
+  // Filter out thread replies from main view — inline replies (isThreadReply=false) stay visible
+  const channelMessages = allChannelMessages.filter((m) => !m.isThreadReply);
   const communityMembers = activeCommunityId ? members[activeCommunityId] || [] : [];
   const channelTypingUsers = activeChannelId ? typingUsers[activeChannelId] || [] : [];
   const activeChannel =
@@ -657,6 +672,13 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     [user, activeChannelId]
   );
 
+  const handleReply = useCallback(
+    (message: Message) => {
+      setReplyingTo(message);
+    },
+    [setReplyingTo]
+  );
+
   const onlineUserIds = activeCommunityId ? onlineUsers[activeCommunityId] || [] : [];
 
   const handleUsernameClick = useCallback(
@@ -802,6 +824,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                 onToggleEmojiPicker={setShowEmojiPicker}
                 onCloseEmojiPicker={() => setShowEmojiPicker(null)}
                 onOpenThread={setActiveThread}
+                onReply={handleReply}
                 onUsernameClick={handleUsernameClick}
                 getMember={getMember}
                 replyCount={replyCount}

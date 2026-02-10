@@ -209,6 +209,8 @@ export const api = {
           channelId: string;
           senderId: string;
           ciphertext: string;
+          replyToId?: string | null;
+          isThreadReply?: boolean;
           createdAt: string;
         }[];
         nextCursor: string | null;
@@ -222,6 +224,7 @@ export const api = {
           senderId: string;
           ciphertext: string;
           replyToId: string;
+          isThreadReply?: boolean;
           createdAt: string;
         }[];
       }>(`/messages/${messageId}/replies`),
@@ -302,8 +305,8 @@ export const api = {
 
     uploadImage: (file: File, communityId: string) => {
       const formData = new FormData();
-      formData.append("file", file);
       formData.append("communityId", communityId);
+      formData.append("file", file);
 
       const token = useAuthStore.getState().token;
       return fetch(`${API_BASE}/files/emoji-upload`, {

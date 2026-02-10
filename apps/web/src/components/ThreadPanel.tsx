@@ -130,7 +130,7 @@ export function ThreadPanel() {
         membersWithSelf,
         user.id
       );
-      wsClient.sendMessage(activeChannelId, ciphertext, activeThreadId);
+      wsClient.sendMessage(activeChannelId, ciphertext, activeThreadId, undefined, true);
     } catch (err) {
       logger.error("Failed to send thread reply:", err);
       setReplyText(plaintext);

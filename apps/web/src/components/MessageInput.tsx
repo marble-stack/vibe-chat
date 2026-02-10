@@ -113,6 +113,7 @@ export function MessageInput() {
       ciphertext: "",
       plaintext,
       replyToId,
+      isThreadReply: false,
       createdAt: new Date().toISOString(),
       pending: true,
     });
@@ -129,7 +130,7 @@ export function MessageInput() {
       );
       endTimer("encrypt-message");
 
-      const sent = wsClient.sendMessage(activeChannelId, ciphertext, replyToId, clientId);
+      const sent = wsClient.sendMessage(activeChannelId, ciphertext, replyToId, clientId, replyToId ? false : undefined);
       endTimer("message-send-total");
       if (!sent) {
         setSendError("Message queued - connection issue. Will send when reconnected.");

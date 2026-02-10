@@ -9,6 +9,7 @@ const sendMessageSchema = z.object({
   senderId: z.string().uuid(),
   ciphertext: z.string(),
   replyToId: z.string().uuid().optional(),
+  isThreadReply: z.boolean().optional(),
 });
 
 export const messageRoutes: FastifyPluginAsync = async (fastify) => {
@@ -39,6 +40,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify) => {
         senderId: body.senderId,
         ciphertext: body.ciphertext,
         replyToId: body.replyToId,
+        isThreadReply: body.isThreadReply ?? false,
       })
       .returning();
 

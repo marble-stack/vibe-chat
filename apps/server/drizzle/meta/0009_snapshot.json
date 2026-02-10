@@ -1,6 +1,6 @@
 {
-  "id": "be532765-3cc2-4bfc-b101-081447f8166d",
-  "prevId": "cc019682-7380-4d50-af88-41e355be6eb1",
+  "id": "81b8740e-2e86-4657-bbc7-93965283bf48",
+  "prevId": "be532765-3cc2-4bfc-b101-081447f8166d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -506,6 +506,13 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "is_thread_reply": {
+          "name": "is_thread_reply",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "edited_at": {
           "name": "edited_at",

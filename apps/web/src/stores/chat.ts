@@ -27,6 +27,7 @@ interface Message {
   ciphertext: string;
   plaintext?: string; // Decrypted content
   replyToId?: string;
+  isThreadReply?: boolean;
   editedAt?: string | null;
   createdAt: string;
   reactions?: Reaction[];

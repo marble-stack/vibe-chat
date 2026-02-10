@@ -181,10 +181,10 @@ class WebSocketClient {
     this.send({ type: "community:leave", payload: { communityId } });
   }
 
-  sendMessage(channelId: string, ciphertext: string, replyToId?: string, clientId?: string): boolean {
+  sendMessage(channelId: string, ciphertext: string, replyToId?: string, clientId?: string, isThreadReply?: boolean): boolean {
     return this.send({
       type: "message:send",
-      payload: { channelId, ciphertext, replyToId, clientId },
+      payload: { channelId, ciphertext, replyToId, clientId, isThreadReply },
     });
   }
 

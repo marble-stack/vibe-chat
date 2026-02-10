@@ -227,7 +227,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
         sendValidationError();
         return;
       }
-      const { channelId, ciphertext, replyToId, clientId } = sendPayload;
+      const { channelId, ciphertext, replyToId, isThreadReply, clientId } = sendPayload;
       const user = socketUsers.get(socket);
 
       if (!user) {
@@ -264,6 +264,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
             senderId: user.userId,
             ciphertext,
             replyToId,
+            isThreadReply: isThreadReply ?? false,
           })
           .returning(),
         cachedDisplayName
@@ -295,6 +296,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
           senderDisplayName: sender?.displayName,
           ciphertext,
           replyToId,
+          isThreadReply: savedMessage.isThreadReply,
           clientId,
           createdAt: savedMessage.createdAt.toISOString(),
         },

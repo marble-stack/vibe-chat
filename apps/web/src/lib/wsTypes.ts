@@ -61,6 +61,7 @@ export interface WsMessagePayloads {
     channelId: string;
     ciphertext: string;
     replyToId?: string;
+    isThreadReply?: boolean;
   };
   [WS_CLIENT_MESSAGES.MESSAGE_EDIT]: {
     channelId: string;

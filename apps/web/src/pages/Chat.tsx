@@ -236,6 +236,7 @@ export function Chat() {
         senderDisplayName?: string;
         ciphertext: string;
         replyToId?: string;
+        isThreadReply?: boolean;
         clientId?: string;
         createdAt: string;
       };
@@ -255,6 +256,7 @@ export function Chat() {
           senderId: payload.senderId,
           ciphertext: payload.ciphertext,
           replyToId: payload.replyToId,
+          isThreadReply: payload.isThreadReply,
           createdAt: payload.createdAt,
           pending: false,
           sendFailed: false,
@@ -303,6 +305,7 @@ export function Chat() {
         plaintext,
         decryptionFailed,
         replyToId: payload.replyToId,
+        isThreadReply: payload.isThreadReply,
         createdAt: payload.createdAt,
       });
 
