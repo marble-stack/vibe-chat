@@ -17,11 +17,13 @@ export function MessageInput() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showPollCreator, setShowPollCreator] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [plusMenuPos, setPlusMenuPos] = useState<{ x: number; y: number } | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const plusBtnRef = useRef<HTMLButtonElement>(null);
+  const emojiBtnRef = useRef<HTMLButtonElement>(null);
   const { activeChannelId, channels, activeCommunityId, members, replyingTo, setReplyingTo, addMessage, updateMessage } =
     useChatStore();
   const user = useAuthStore((state) => state.user);
@@ -114,7 +116,22 @@ export function MessageInput() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = Math.min(textarea.scrollHeight, 200) + "px";
+  }, [message]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
 
     if (!activeChannelId) return;
@@ -225,7 +242,37 @@ export function MessageInput() {
     }
   }, [sendError]);
 
+  const COMPOSE_EMOJIS = [
+    "\u{1F600}", "\u{1F603}", "\u{1F604}", "\u{1F601}", "\u{1F606}", "\u{1F605}", "\u{1F602}", "\u{1F923}", "\u{1F60A}", "\u{1F607}",
+    "\u{1F609}", "\u{1F60D}", "\u{1F929}", "\u{1F618}", "\u{1F617}", "\u{1F61A}", "\u{1F60B}", "\u{1F61C}", "\u{1F92A}", "\u{1F61D}",
+    "\u{1F60E}", "\u{1F913}", "\u{1F9D0}", "\u{1F60F}", "\u{1F612}", "\u{1F61E}", "\u{1F614}", "\u{1F61F}", "\u{1F622}", "\u{1F62D}",
+    "\u{1F624}", "\u{1F620}", "\u{1F621}", "\u{1F92C}", "\u{1F631}", "\u{1F628}", "\u{1F630}", "\u{1F625}", "\u{1F633}", "\u{1F914}",
+    "\u{1F644}", "\u{1F611}", "\u{1F636}", "\u{1F60C}", "\u{1F634}", "\u{1F637}", "\u{1F912}", "\u{1F915}", "\u{1F922}", "\u{1F92E}",
+    "\u{1F44D}", "\u{1F44E}", "\u{1F44A}", "\u270A", "\u{1F91E}", "\u270C\uFE0F", "\u{1F91F}", "\u{1F44B}", "\u{1F44F}", "\u{1F64C}",
+    "\u2764\uFE0F", "\u{1F9E1}", "\u{1F49B}", "\u{1F49A}", "\u{1F499}", "\u{1F49C}", "\u{1F5A4}", "\u{1F494}", "\u{1F4AF}", "\u{1F4A5}",
+    "\u{1F389}", "\u{1F38A}", "\u{1F525}", "\u2B50", "\u{1F31F}", "\u26A1", "\u{1F4A1}", "\u{1F3B5}", "\u{1F3B6}", "\u{1F4AC}",
+  ];
+
+  const insertEmoji = (emoji: string) => {
+    const textarea = inputRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newMessage = message.slice(0, start) + emoji + message.slice(end);
+      setMessage(newMessage);
+      // Set cursor position after emoji on next tick
+      requestAnimationFrame(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+        textarea.focus();
+      });
+    } else {
+      setMessage(message + emoji);
+    }
+    setShowEmojiPicker(false);
+  };
+
   return (
+    <>
     <form onSubmit={handleSubmit} className="px-4 pb-6">
       {/* Error message */}
       {sendError && (
@@ -265,7 +312,7 @@ export function MessageInput() {
       )}
 
       <div
-        className={`bg-background-tertiary flex items-center px-4 ${replyingTo ? "rounded-b-lg" : "rounded-lg"}`}
+        className={`bg-background-tertiary flex items-end px-4 ${replyingTo ? "rounded-b-lg" : "rounded-lg"}`}
       >
         <button
           ref={plusBtnRef}
@@ -329,25 +376,55 @@ export function MessageInput() {
           onChange={handleFileSelect}
         />
 
-        <input
+        <textarea
           ref={inputRef}
-          type="text"
+          rows={1}
           value={message}
           onChange={handleChange}
+          onKeyDown={handleKeyDown}
           placeholder={`Message #${activeChannel?.name || "channel"}`}
-          className="flex-1 bg-transparent text-text-primary py-3 px-2 outline-none"
+          className="flex-1 bg-transparent text-text-primary py-3 px-2 outline-none resize-none overflow-y-auto"
+          style={{ maxHeight: 200 }}
         />
 
-        <button type="button" className="text-text-muted hover:text-text-primary p-2" title="Emoji">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        </button>
+        <div className="relative">
+          <button
+            ref={emojiBtnRef}
+            type="button"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className="text-text-muted hover:text-text-primary p-2"
+            title="Emoji"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </button>
+
+          {showEmojiPicker && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)} />
+              <div className="absolute bottom-full right-0 mb-2 z-50 bg-background-secondary border border-background-tertiary rounded-lg shadow-lg p-3 w-[320px]">
+                <div className="grid grid-cols-8 gap-1 max-h-[200px] overflow-y-auto">
+                  {COMPOSE_EMOJIS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => insertEmoji(emoji)}
+                      className="w-8 h-8 flex items-center justify-center rounded hover:bg-background-primary/50 transition-colors text-lg"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
 
         <button
           type="submit"
@@ -365,6 +442,7 @@ export function MessageInput() {
           </svg>
         </button>
       </div>
+    </form>
 
       {showPollCreator && activeChannelId && (
         <PollCreator
@@ -372,6 +450,6 @@ export function MessageInput() {
           onClose={() => setShowPollCreator(false)}
         />
       )}
-    </form>
+    </>
   );
 }

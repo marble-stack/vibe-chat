@@ -1,7 +1,13 @@
+import { useState } from "react";
 import { useChatStore } from "../stores/chat";
+import { ProfileCard } from "./ProfileCard";
 
 export function MemberList() {
   const { members, activeCommunityId, onlineUsers } = useChatStore();
+  const [profileCard, setProfileCard] = useState<{
+    userId: string;
+    position: { x: number; y: number };
+  } | null>(null);
   const communityMembers = activeCommunityId ? members[activeCommunityId] || [] : [];
   const onlineUserIds = activeCommunityId ? onlineUsers[activeCommunityId] || [] : [];
 
@@ -25,6 +31,12 @@ export function MemberList() {
         className={`flex items-center gap-3 px-2 py-1 rounded hover:bg-background-primary/30 cursor-pointer ${
           !isOnline ? "opacity-50" : ""
         }`}
+        onClick={(e) =>
+          setProfileCard({
+            userId: member.id,
+            position: { x: e.clientX, y: e.clientY },
+          })
+        }
       >
         <div className="relative">
           <div className="w-8 h-8 rounded-full bg-accent-primary flex items-center justify-center text-white text-sm font-medium">
@@ -53,8 +65,21 @@ export function MemberList() {
   const onlineMembers = sortedMembers.filter((m) => onlineUserIds.includes(m.id));
   const offlineMembers = sortedMembers.filter((m) => !onlineUserIds.includes(m.id));
 
+  const profileMember = profileCard
+    ? communityMembers.find((m) => m.id === profileCard.userId)
+    : null;
+
   return (
     <div className="w-60 bg-background-secondary hidden lg:block overflow-y-auto">
+      {profileCard && profileMember && (
+        <ProfileCard
+          displayName={profileMember.displayName}
+          avatarUrl={profileMember.avatarUrl}
+          isOnline={onlineUserIds.includes(profileCard.userId)}
+          position={profileCard.position}
+          onClose={() => setProfileCard(null)}
+        />
+      )}
       <div className="p-4">
         {/* Online members */}
         {onlineMembers.length > 0 && (

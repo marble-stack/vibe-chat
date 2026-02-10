@@ -231,10 +231,10 @@ export const api = {
   },
 
   polls: {
-    vote: (messageId: string, optionIndex: number) =>
+    vote: (messageId: string, optionIndex: number, exclusive?: boolean) =>
       request<{ success: boolean }>("/polls/vote", {
         method: "POST",
-        body: JSON.stringify({ messageId, optionIndex }),
+        body: JSON.stringify({ messageId, optionIndex, exclusive }),
       }),
 
     removeVote: (messageId: string, optionIndex: number) =>

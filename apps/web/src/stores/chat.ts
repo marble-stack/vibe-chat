@@ -60,6 +60,11 @@ interface ChatState {
   onlineUsers: Record<string, string[]>; // communityId -> userIds
   activeThreadId: string | null; // Message ID of the thread being viewed
   pollVotes: Record<string, PollVote[]>; // messageId -> votes
+  unreadCounts: Record<string, number>; // channelId -> unread count
+  searchQuery: string;
+  searchResults: Message[];
+  isSearchOpen: boolean;
+  scrollToMessageId: string | null;
 
   setCommunities: (communities: Community[]) => void;
   addCommunity: (community: Community) => void;
@@ -85,6 +90,11 @@ interface ChatState {
   setActiveThread: (messageId: string | null) => void;
   setPollVotes: (messageId: string, votes: PollVote[]) => void;
   updatePollVote: (messageId: string, userId: string, optionIndex: number, action: "add" | "remove") => void;
+  markChannelRead: (channelId: string) => void;
+  incrementUnread: (channelId: string) => void;
+  setSearchOpen: (open: boolean) => void;
+  searchMessages: (query: string) => void;
+  setScrollToMessage: (messageId: string | null) => void;
   // Cleanup methods to prevent memory leaks
   clearChannelMessages: (channelId: string) => void;
   clearTypingUsers: (channelId: string) => void;
@@ -103,6 +113,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   onlineUsers: {},
   activeThreadId: null,
   pollVotes: {},
+  unreadCounts: {},
+  searchQuery: "",
+  searchResults: [],
+  isSearchOpen: false,
+  scrollToMessageId: null,
 
   setCommunities: (communities) => set({ communities }),
 
@@ -174,15 +189,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
         );
         if (optimisticIndex !== -1) {
           const updated = [...channelMessages];
-          updated[optimisticIndex] = { ...message, pending: false, sendFailed: false };
+          // Merge: keep optimistic fields (like plaintext) and overlay server fields
+          updated[optimisticIndex] = {
+            ...channelMessages[optimisticIndex],
+            ...message,
+            pending: false,
+            sendFailed: false,
+          };
           return {
             messages: { ...state.messages, [message.channelId]: updated },
           };
         }
       }
 
-      // Deduplicate - check if message already exists by id
-      if (channelMessages.some((m) => m.id === message.id)) {
+      // Deduplicate - check if message already exists by id or clientId
+      if (channelMessages.some((m) => m.id === message.id || (message.clientId && m.clientId === message.clientId))) {
         return state;
       }
       return {
@@ -383,6 +404,40 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       return { pollVotes: { ...state.pollVotes, [messageId]: currentVotes } };
     }),
+
+  markChannelRead: (channelId) =>
+    set((state) => ({
+      unreadCounts: { ...state.unreadCounts, [channelId]: 0 },
+    })),
+
+  incrementUnread: (channelId) =>
+    set((state) => ({
+      unreadCounts: {
+        ...state.unreadCounts,
+        [channelId]: (state.unreadCounts[channelId] || 0) + 1,
+      },
+    })),
+
+  setSearchOpen: (open) =>
+    set({ isSearchOpen: open, searchQuery: open ? "" : "", searchResults: [] }),
+
+  searchMessages: (query) => {
+    const state = get();
+    const channelId = state.activeChannelId;
+    if (!channelId || !query.trim()) {
+      set({ searchQuery: query, searchResults: [] });
+      return;
+    }
+    const channelMessages = state.messages[channelId] || [];
+    const lowerQuery = query.toLowerCase();
+    const results = channelMessages.filter((m) => {
+      const text = m.plaintext || m.ciphertext;
+      return text.toLowerCase().includes(lowerQuery);
+    });
+    set({ searchQuery: query, searchResults: results });
+  },
+
+  setScrollToMessage: (messageId) => set({ scrollToMessageId: messageId }),
 
   // Cleanup methods to prevent memory leaks
 

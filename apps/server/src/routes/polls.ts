@@ -7,6 +7,7 @@ import { canUserAccessChannel } from "../lib/authorization.js";
 const voteSchema = z.object({
   messageId: z.string().uuid(),
   optionIndex: z.number().int().min(0).max(9),
+  exclusive: z.boolean().optional(), // If true, remove all other votes by this user first
 });
 
 export const pollRoutes: FastifyPluginAsync = async (fastify) => {
@@ -45,6 +46,18 @@ export const pollRoutes: FastifyPluginAsync = async (fastify) => {
       // Toggle off - remove the vote
       await db.delete(pollVotes).where(eq(pollVotes.id, existing.id));
       return { success: true, action: "removed" };
+    }
+
+    // If exclusive mode, remove all other votes by this user for this poll first
+    if (body.exclusive) {
+      await db
+        .delete(pollVotes)
+        .where(
+          and(
+            eq(pollVotes.messageId, body.messageId),
+            eq(pollVotes.userId, request.user.userId)
+          )
+        );
     }
 
     // Add vote

@@ -18,6 +18,8 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListP
     activeChannelId,
     setActiveChannel,
     addChannel,
+    unreadCounts,
+    markChannelRead,
   } = useChatStore();
 
   const [showCreate, setShowCreate] = useState(false);
@@ -144,20 +146,33 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListP
           </button>
         </div>
 
-        {communityChannels.map((channel) => (
-          <button
-            key={channel.id}
-            onClick={() => setActiveChannel(channel.id)}
-            className={`w-full px-2 py-1 rounded flex items-center gap-2 ${
-              activeChannelId === channel.id
-                ? "bg-background-primary/50 text-text-primary"
-                : "text-channel-default hover:text-channel-hover hover:bg-background-primary/30"
-            }`}
-          >
-            <span className="text-lg">#</span>
-            <span className="truncate">{channel.name}</span>
-          </button>
-        ))}
+        {communityChannels.map((channel) => {
+          const unread = unreadCounts[channel.id] || 0;
+          return (
+            <button
+              key={channel.id}
+              onClick={() => {
+                setActiveChannel(channel.id);
+                markChannelRead(channel.id);
+              }}
+              className={`w-full px-2 py-1 rounded flex items-center gap-2 ${
+                activeChannelId === channel.id
+                  ? "bg-background-primary/50 text-text-primary"
+                  : unread > 0
+                    ? "text-text-primary font-semibold hover:bg-background-primary/30"
+                    : "text-channel-default hover:text-channel-hover hover:bg-background-primary/30"
+              }`}
+            >
+              <span className="text-lg">#</span>
+              <span className="truncate flex-1 text-left">{channel.name}</span>
+              {unread > 0 && (
+                <span className="bg-accent-primary text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* User info */}
