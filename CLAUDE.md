@@ -113,7 +113,7 @@ vibe-chat/
 
 Messages use `{ type: string, payload: object }` format:
 
-- `message:send` / `message:new` - Chat messages
+- `message:send` / `message:new` - Chat messages (supports optional `clientId` for optimistic update reconciliation)
 - `message:edit` / `message:edited` - Edit messages
 - `message:delete` / `message:deleted` - Delete messages
 - `typing:start` / `typing:stop` / `typing:update` - Typing indicators
