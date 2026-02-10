@@ -203,28 +203,34 @@ const MessageItem = memo(function MessageItem({
       <div className="flex-1 min-w-0">
         {/* Reply context */}
         {replyMessage && (
-          <button
-            onClick={() => onScrollToMessage(replyMessage.id)}
-            className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary mb-1 cursor-pointer"
-          >
-            <svg
-              className="w-3 h-3 rotate-180"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="mb-1 flex w-fit items-center gap-1.5 rounded-md bg-background-tertiary/70 px-2 py-1 text-xs text-text-muted">
+            <button
+              onClick={() => onScrollToMessage(replyMessage.id)}
+              className="group flex min-w-0 items-center gap-2 text-left text-text-muted transition-colors hover:text-text-primary"
+              title="Jump to referenced message"
+              aria-label="Jump to referenced message"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-              />
-            </svg>
-            <span className="font-medium">{replySender?.displayName || "Unknown"}</span>
-            <span className="truncate max-w-[200px]">
-              {replyMessage.plaintext || replyMessage.ciphertext}
-            </span>
-          </button>
+              <svg className="h-5 w-5 flex-shrink-0 text-text-muted/80 group-hover:text-accent-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path
+                  strokeLinecap="round"
+                  d="M20 5c-4 0-4 4-8 4s-4 4-8 4"
+                />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 13l2.5 2.5L8 13" />
+              </svg>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="font-medium text-text-primary/90">{replySender?.displayName || "Unknown"}</span>
+                <span className="truncate max-w-[220px]">{replyMessage.plaintext || replyMessage.ciphertext}</span>
+              </div>
+            </button>
+            <button
+              onClick={() => onOpenThread(message.id)}
+              className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium text-accent-primary hover:bg-accent-primary/15"
+              title="Reply in thread"
+              aria-label="Reply in thread"
+            >
+              Reply
+            </button>
+          </div>
         )}
 
         {showHeader && (
