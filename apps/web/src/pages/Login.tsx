@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
-import { generateIdentityKeys } from "../lib/crypto";
+import { generateIdentityKeys, encryptKeyBackup, decryptKeyBackup } from "../lib/crypto";
 import { storeIdentityKeys, clearAllKeys, getIdentityKeys } from "../lib/keyStore";
 
 export function Login() {
@@ -18,22 +18,55 @@ export function Login() {
     setLoading(true);
 
     try {
-      const { user, token } = await api.auth.login(email, password);
+      const { user, token, hasKeyBackup } = await api.auth.login(email, password);
 
       // Check if we already have identity keys for this user
       const existingKeys = await getIdentityKeys();
 
       if (existingKeys && existingKeys.userId === user.id) {
-        // Reuse existing keys - preserves ability to decrypt old messages
+        // Same device — reuse existing keys
         console.log("Reusing existing identity keys for user:", user.id);
+      } else if (hasKeyBackup) {
+        // New device with backup available — restore identity keys
+        console.log("Restoring identity keys from backup for user:", user.id);
+        try {
+          const { encryptedKeyBackup, salt } = await api.auth.getKeyBackup(token);
+          if (encryptedKeyBackup && salt) {
+            const restoredKeys = await decryptKeyBackup(encryptedKeyBackup, password, salt);
+            await clearAllKeys();
+            await storeIdentityKeys(user.id, restoredKeys);
+            console.log("Identity keys restored from backup successfully");
+          } else {
+            // Backup data missing — fall through to new key generation
+            throw new Error("Backup data missing");
+          }
+        } catch (backupErr) {
+          // Backup restore failed — generate new keys as fallback
+          console.warn("Backup restore failed, generating new keys:", backupErr);
+          await clearAllKeys();
+          const { keys, publicBundle } = await generateIdentityKeys();
+          await api.auth.updateKeys(publicBundle, token);
+          await storeIdentityKeys(user.id, keys);
+          // Upload new backup
+          encryptKeyBackup(keys, password)
+            .then(({ ciphertext, salt: s }) =>
+              api.auth.uploadKeyBackup({ encryptedKeyBackup: ciphertext, salt: s }, token)
+            )
+            .catch((err) => console.warn("Failed to upload key backup:", err));
+        }
       } else {
-        // Different user or no keys - clear and regenerate
+        // No backup — generate new keys (existing behavior)
         console.log("Generating new identity keys for user:", user.id);
         await clearAllKeys();
-
         const { keys, publicBundle } = await generateIdentityKeys();
         await api.auth.updateKeys(publicBundle, token);
         await storeIdentityKeys(user.id, keys);
+        // Upload backup for future device logins
+        encryptKeyBackup(keys, password)
+          .then(({ ciphertext, salt }) =>
+            api.auth.uploadKeyBackup({ encryptedKeyBackup: ciphertext, salt }, token)
+          )
+          .catch((err) => console.warn("Failed to upload key backup:", err));
       }
 
       setAuth(user, token);

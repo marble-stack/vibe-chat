@@ -11,6 +11,9 @@ export const users = pgTable("users", {
   identityKeyPublic: text("identity_key_public"),
   signedPreKeyPublic: text("signed_prekey_public"),
   signedPreKeySignature: text("signed_prekey_signature"),
+  // Encrypted identity key backup (for cross-device restore)
+  encryptedKeyBackup: text("encrypted_key_backup"),
+  keyBackupSalt: text("key_backup_salt"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

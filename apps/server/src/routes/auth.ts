@@ -24,6 +24,11 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
+const keyBackupSchema = z.object({
+  encryptedKeyBackup: z.string(),
+  salt: z.string(),
+});
+
 const updateKeysSchema = z.object({
   identityKeyPublic: z.string(),
   signedPreKeyPublic: z.string(),
@@ -111,6 +116,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       user: { id: user.id, email: user.email, displayName: user.displayName },
       token,
+      hasKeyBackup: !!user.encryptedKeyBackup,
     };
   });
 
@@ -165,6 +171,45 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     return { success: true };
+  });
+
+  // Store encrypted key backup
+  fastify.put("/key-backup", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Not authenticated" });
+    }
+
+    const body = keyBackupSchema.parse(request.body);
+
+    await db
+      .update(users)
+      .set({
+        encryptedKeyBackup: body.encryptedKeyBackup,
+        keyBackupSalt: body.salt,
+      })
+      .where(eq(users.id, request.user.userId));
+
+    return { success: true };
+  });
+
+  // Get encrypted key backup
+  fastify.get("/key-backup", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Not authenticated" });
+    }
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, request.user.userId),
+    });
+
+    if (!user) {
+      return reply.status(404).send({ error: "User not found" });
+    }
+
+    return {
+      encryptedKeyBackup: user.encryptedKeyBackup,
+      salt: user.keyBackupSalt,
+    };
   });
 
   // Get user's key bundle (for establishing encrypted session)

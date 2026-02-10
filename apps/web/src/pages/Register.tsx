@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
-import { generateIdentityKeys } from "../lib/crypto";
+import { generateIdentityKeys, encryptKeyBackup } from "../lib/crypto";
 import { storeIdentityKeys } from "../lib/keyStore";
 
 export function Register() {
@@ -45,6 +45,13 @@ export function Register() {
 
       // Store private keys locally in IndexedDB
       await storeIdentityKeys(user.id, keys);
+
+      // Upload encrypted key backup for cross-device restore (fire-and-forget)
+      encryptKeyBackup(keys, password)
+        .then(({ ciphertext, salt }) =>
+          api.auth.uploadKeyBackup({ encryptedKeyBackup: ciphertext, salt }, token)
+        )
+        .catch((err) => console.warn("Failed to upload key backup:", err));
 
       setAuth(user, token);
     } catch (err) {
@@ -107,6 +114,10 @@ export function Register() {
               minLength={8}
             />
             <p className="text-text-muted text-xs mt-1">At least 8 characters</p>
+            <p className="text-text-muted text-xs mt-1">
+              Your password also protects your encryption keys across devices. Use a strong, unique
+              password.
+            </p>
           </div>
 
           <div className="mb-4">

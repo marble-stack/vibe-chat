@@ -50,13 +50,14 @@ export const api = {
       ),
 
     login: (email: string, password: string) =>
-      request<{ user: { id: string; email: string; displayName: string }; token: string }>(
-        "/auth/login",
-        {
-          method: "POST",
-          body: JSON.stringify({ email, password }),
-        }
-      ),
+      request<{
+        user: { id: string; email: string; displayName: string };
+        token: string;
+        hasKeyBackup: boolean;
+      }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      }),
 
     getUserKeys: (userId: string) =>
       request<{
@@ -83,6 +84,35 @@ export const api = {
         body: JSON.stringify(data),
       }).then((res) => {
         if (!res.ok) throw new Error("Failed to update keys");
+        return res.json();
+      }),
+
+    getKeyBackup: (token: string) =>
+      fetch(`${API_BASE}/auth/key-backup`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }).then(async (res) => {
+        if (!res.ok) throw new Error("Failed to get key backup");
+        return res.json() as Promise<{
+          encryptedKeyBackup: string | null;
+          salt: string | null;
+        }>;
+      }),
+
+    uploadKeyBackup: (
+      data: { encryptedKeyBackup: string; salt: string },
+      token: string
+    ) =>
+      fetch(`${API_BASE}/auth/key-backup`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      }).then((res) => {
+        if (!res.ok) throw new Error("Failed to upload key backup");
         return res.json();
       }),
   },

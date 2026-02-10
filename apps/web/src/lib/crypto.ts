@@ -255,6 +255,90 @@ export async function generateIdentityKeys(): Promise<{
 }
 
 /**
+ * Derive a backup encryption key from a password using PBKDF2
+ */
+export async function deriveBackupKey(
+  password: string,
+  salt: Uint8Array
+): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  return await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: 600000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+/**
+ * Encrypt identity keys for server-side backup (password-derived)
+ */
+export async function encryptKeyBackup(
+  keys: IdentityKeys,
+  password: string
+): Promise<{ ciphertext: string; salt: string }> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const backupKey = await deriveBackupKey(password, salt);
+
+  const plaintext = new TextEncoder().encode(JSON.stringify(keys));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    backupKey,
+    plaintext
+  );
+
+  // Combine IV + ciphertext
+  const combined = new Uint8Array(iv.length + encrypted.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(encrypted), iv.length);
+
+  return {
+    ciphertext: arrayBufferToBase64(combined.buffer),
+    salt: arrayBufferToBase64(salt.buffer),
+  };
+}
+
+/**
+ * Decrypt identity keys from server-side backup (password-derived)
+ */
+export async function decryptKeyBackup(
+  ciphertextBase64: string,
+  password: string,
+  saltBase64: string
+): Promise<IdentityKeys> {
+  const salt = new Uint8Array(base64ToArrayBuffer(saltBase64));
+  const backupKey = await deriveBackupKey(password, salt);
+
+  const combined = new Uint8Array(base64ToArrayBuffer(ciphertextBase64));
+  const iv = combined.slice(0, 12);
+  const ciphertext = combined.slice(12);
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    backupKey,
+    ciphertext
+  );
+
+  return JSON.parse(new TextDecoder().decode(decrypted)) as IdentityKeys;
+}
+
+/**
  * Encrypt a channel key for a recipient using their public key
  */
 export async function encryptChannelKeyForRecipient(
