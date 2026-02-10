@@ -291,30 +291,18 @@ const MessageItem = memo(function MessageItem({
           );
         })()}
 
-        {/* Thread actions */}
-        <div className="mt-1 flex items-center gap-3 text-xs">
-          <button
-            onClick={() => onOpenThread(message.id)}
-            className="text-accent-primary hover:underline"
-            title="Reply in thread"
-            aria-label="Reply in thread"
-          >
-            Reply
-          </button>
-          {replyCount > 0 && (
-            <button
-              onClick={() => onOpenThread(message.id)}
-              className="flex items-center gap-1 text-accent-primary hover:underline"
-              title="View thread replies"
-              aria-label="View thread replies"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-              </svg>
-              {replyCount} {replyCount === 1 ? "reply" : "replies"}
-            </button>
-          )}
-        </div>
+        {/* Thread reply actions */}
+        <button
+          onClick={() => onOpenThread(message.id)}
+          className="mt-1 flex items-center gap-1 text-xs text-accent-primary hover:underline"
+          title={replyCount > 0 ? "View thread replies" : "Reply in thread"}
+          aria-label={replyCount > 0 ? "View thread replies" : "Reply in thread"}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+          </svg>
+          {replyCount > 0 ? `${replyCount} ${replyCount === 1 ? "reply" : "replies"}` : "Reply"}
+        </button>
 
         {/* Existing reactions display */}
         {message.reactions && message.reactions.length > 0 && (
