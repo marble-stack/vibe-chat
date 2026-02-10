@@ -416,6 +416,12 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
       ? channels[activeCommunityId]?.find((c) => c.id === activeChannelId)
       : null;
 
+  // Use a ref for communityMembers so loadMessages doesn't re-run when members change
+  const communityMembersRef = useRef(communityMembers);
+  useEffect(() => {
+    communityMembersRef.current = communityMembers;
+  }, [communityMembers]);
+
   // Load and decrypt messages when channel changes
   useEffect(() => {
     if (!activeChannelId || !user) return;
@@ -426,10 +432,13 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     const loadMessages = async () => {
       const { messages: msgs } = await api.messages.list(activeChannelId);
 
+      // Use ref to get latest members without triggering effect re-runs
+      const currentMembers = communityMembersRef.current;
+
       // Ensure current user is in members list for key distribution/retrieval
-      const membersForDecryption = communityMembers.some((m) => m.id === user.id)
-        ? communityMembers
-        : [...communityMembers, { id: user.id, displayName: user.displayName || "Me" }];
+      const membersForDecryption = currentMembers.some((m) => m.id === user.id)
+        ? currentMembers
+        : [...currentMembers, { id: user.id, displayName: user.displayName || "Me" }];
 
       // Decrypt each message
       const decrypted = await Promise.all(
@@ -459,7 +468,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     };
 
     loadMessages();
-  }, [activeChannelId, user, setMessages, communityMembers]);
+  }, [activeChannelId, user, setMessages]);
 
   // Smart auto-scroll: only scroll when a new message is added AND user is near the bottom
   useEffect(() => {
