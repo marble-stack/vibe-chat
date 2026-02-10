@@ -283,10 +283,99 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                   if (el) messageRefs.current.set(message.id, el);
                   else messageRefs.current.delete(message.id);
                 }}
-                className={`group flex gap-4 hover:bg-background-primary/30 px-2 py-0.5 rounded transition-colors ${
+                className={`group relative flex gap-4 hover:bg-background-primary/30 px-2 py-0.5 rounded transition-colors ${
                   showHeader ? "mt-4" : ""
                 }`}
               >
+                {/* Discord-style floating toolbar - top right on hover */}
+                {editingMessageId !== message.id && (
+                  <div className="absolute -top-3 right-2 hidden group-hover:flex items-center bg-background-tertiary border border-background-secondary rounded shadow-lg z-10">
+                    {/* Add reaction */}
+                    <div className="relative">
+                      <button
+                        onClick={() =>
+                          setShowEmojiPicker(showEmojiPicker === message.id ? null : message.id)
+                        }
+                        className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-text-primary transition-colors rounded-l"
+                        title="Add Reaction"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </button>
+
+                      {/* Emoji picker dropdown */}
+                      {showEmojiPicker === message.id && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setShowEmojiPicker(null)}
+                          />
+                          <div className="absolute right-0 top-full mt-1 z-20 bg-background-secondary border border-background-tertiary rounded-lg shadow-lg p-2 flex gap-1">
+                            {EMOJI_OPTIONS.map((emoji) => {
+                              const existingReaction = message.reactions?.find(
+                                (r) => r.emoji === emoji
+                              );
+                              const userReactionId =
+                                user && existingReaction
+                                  ? existingReaction.reactionIds[user.id]
+                                  : undefined;
+
+                              return (
+                                <button
+                                  key={emoji}
+                                  onClick={() =>
+                                    handleReactionClick(message.id, emoji, userReactionId)
+                                  }
+                                  className="w-8 h-8 flex items-center justify-center rounded hover:bg-background-primary/50 transition-colors text-lg"
+                                  title={emoji}
+                                >
+                                  {emoji}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Reply */}
+                    <button
+                      onClick={() => setReplyingTo(message)}
+                      className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-text-primary transition-colors"
+                      title="Reply"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                      </svg>
+                    </button>
+
+                    {/* Edit and delete - only for own messages */}
+                    {user && message.senderId === user.id && (
+                      <>
+                        <button
+                          onClick={() => startEditing(message)}
+                          className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-text-primary transition-colors"
+                          title="Edit"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setDeletingMessageId(message.id)}
+                          className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-red-400 transition-colors rounded-r"
+                          title="Delete"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {showHeader ? (
                   <div className="w-10 h-10 rounded-full bg-accent-primary flex-shrink-0 flex items-center justify-center text-white font-medium">
                     {sender?.displayName?.charAt(0).toUpperCase() || "?"}
@@ -367,150 +456,36 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                     </p>
                   )}
 
-                  {/* Reactions */}
-                  <div className={`flex flex-wrap items-center gap-1 relative ${message.reactions?.length ? "mt-1" : "hidden group-hover:flex mt-1"}`}>
-                    {message.reactions?.map((reaction) => {
-                      const userReacted = user && reaction.userIds.includes(user.id);
-                      const userReactionId = user ? reaction.reactionIds[user.id] : undefined;
+                  {/* Existing reactions display */}
+                  {message.reactions && message.reactions.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1 mt-1">
+                      {message.reactions.map((reaction) => {
+                        const userReacted = user && reaction.userIds.includes(user.id);
+                        const userReactionId = user ? reaction.reactionIds[user.id] : undefined;
 
-                      return (
-                        <button
-                          key={reaction.emoji}
-                          onClick={() =>
-                            handleReactionClick(message.id, reaction.emoji, userReactionId)
-                          }
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm transition-colors ${
-                            userReacted
-                              ? "bg-accent-primary/20 border border-accent-primary text-accent-primary"
-                              : "bg-background-tertiary border border-background-tertiary text-text-primary hover:border-text-muted"
-                          }`}
-                          title={reaction.userIds
-                            .map((id) => getMember(id)?.displayName || "Unknown")
-                            .join(", ")}
-                        >
-                          <span>{reaction.emoji}</span>
-                          <span className="text-xs">{reaction.count}</span>
-                        </button>
-                      );
-                    })}
-
-                    {/* Add reaction button */}
-                    <div className="relative">
-                      <button
-                        onClick={() =>
-                          setShowEmojiPicker(showEmojiPicker === message.id ? null : message.id)
-                        }
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-background-tertiary hover:bg-background-modifier-hover text-text-muted hover:text-text-primary transition-colors opacity-0 group-hover:opacity-100"
-                        title="Add reaction"
-                      >
-                        <span className="text-sm">+</span>
-                      </button>
-
-                      {/* Emoji picker */}
-                      {showEmojiPicker === message.id && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-10"
-                            onClick={() => setShowEmojiPicker(null)}
-                          />
-                          <div className="absolute left-0 top-full mt-1 z-20 bg-background-secondary border border-background-tertiary rounded-lg shadow-lg p-2 flex gap-1">
-                            {EMOJI_OPTIONS.map((emoji) => {
-                              const existingReaction = message.reactions?.find(
-                                (r) => r.emoji === emoji
-                              );
-                              const userReactionId =
-                                user && existingReaction
-                                  ? existingReaction.reactionIds[user.id]
-                                  : undefined;
-
-                              return (
-                                <button
-                                  key={emoji}
-                                  onClick={() =>
-                                    handleReactionClick(message.id, emoji, userReactionId)
-                                  }
-                                  className="w-8 h-8 flex items-center justify-center rounded hover:bg-background-modifier-hover transition-colors text-lg"
-                                  title={emoji}
-                                >
-                                  {emoji}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </>
-                      )}
+                        return (
+                          <button
+                            key={reaction.emoji}
+                            onClick={() =>
+                              handleReactionClick(message.id, reaction.emoji, userReactionId)
+                            }
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm transition-colors ${
+                              userReacted
+                                ? "bg-accent-primary/20 border border-accent-primary text-accent-primary"
+                                : "bg-background-tertiary border border-background-tertiary text-text-primary hover:border-text-muted"
+                            }`}
+                            title={reaction.userIds
+                              .map((id) => getMember(id)?.displayName || "Unknown")
+                              .join(", ")}
+                          >
+                            <span>{reaction.emoji}</span>
+                            <span className="text-xs">{reaction.count}</span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  </div>
+                  )}
                 </div>
-
-                {/* Action buttons (reply, edit, delete) - visible on hover */}
-                {editingMessageId !== message.id && (
-                  <div className="opacity-0 group-hover:opacity-100 flex items-start pt-1 gap-1 transition-opacity">
-                    <button
-                      onClick={() => setReplyingTo(message)}
-                      className="p-1.5 rounded hover:bg-background-tertiary text-text-muted hover:text-text-primary"
-                      title="Reply"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-                        />
-                      </svg>
-                    </button>
-
-                    {/* Edit and delete buttons - only for own messages */}
-                    {user && message.senderId === user.id && (
-                      <>
-                        <button
-                          onClick={() => startEditing(message)}
-                          className="p-1.5 rounded hover:bg-background-tertiary text-text-muted hover:text-text-primary"
-                          title="Edit"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => setDeletingMessageId(message.id)}
-                          className="p-1.5 rounded hover:bg-background-tertiary text-text-muted hover:text-red-400"
-                          title="Delete"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
               </div>
             );
           })
