@@ -554,6 +554,13 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
       return;
     }
 
+    // If the latest message was sent by the current user, always scroll to bottom
+    const latestMessage = channelMessages[channelMessages.length - 1];
+    if (latestMessage?.pending && latestMessage?.senderId === user?.id) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
     // Subsequent messages — only auto-scroll if user is within 100px of the bottom
     const distanceFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
