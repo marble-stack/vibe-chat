@@ -39,6 +39,12 @@ interface Member {
   avatarUrl?: string;
 }
 
+interface PollVote {
+  optionIndex: number;
+  count: number;
+  userIds: string[];
+}
+
 interface ChatState {
   communities: Community[];
   channels: Record<string, Channel[]>; // communityId -> channels
@@ -49,6 +55,8 @@ interface ChatState {
   typingUsers: Record<string, string[]>; // channelId -> userIds
   replyingTo: Message | null; // Message being replied to
   onlineUsers: Record<string, string[]>; // communityId -> userIds
+  activeThreadId: string | null; // Message ID of the thread being viewed
+  pollVotes: Record<string, PollVote[]>; // messageId -> votes
 
   setCommunities: (communities: Community[]) => void;
   addCommunity: (community: Community) => void;
@@ -71,6 +79,9 @@ interface ChatState {
   deleteMessage: (channelId: string, messageId: string) => void;
   addReaction: (messageId: string, reactionId: string, userId: string, emoji: string) => void;
   removeReaction: (messageId: string, userId: string, emoji: string) => void;
+  setActiveThread: (messageId: string | null) => void;
+  setPollVotes: (messageId: string, votes: PollVote[]) => void;
+  updatePollVote: (messageId: string, userId: string, optionIndex: number, action: "add" | "remove") => void;
   // Cleanup methods to prevent memory leaks
   clearChannelMessages: (channelId: string) => void;
   clearTypingUsers: (channelId: string) => void;
@@ -87,6 +98,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   typingUsers: {},
   replyingTo: null,
   onlineUsers: {},
+  activeThreadId: null,
+  pollVotes: {},
 
   setCommunities: (communities) => set({ communities }),
 
@@ -311,6 +324,45 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       return { messages: newMessages };
+    }),
+
+  setActiveThread: (messageId) => set({ activeThreadId: messageId }),
+
+  setPollVotes: (messageId, votes) =>
+    set((state) => ({
+      pollVotes: { ...state.pollVotes, [messageId]: votes },
+    })),
+
+  updatePollVote: (messageId, userId, optionIndex, action) =>
+    set((state) => {
+      const currentVotes = [...(state.pollVotes[messageId] || [])];
+      const existingIdx = currentVotes.findIndex((v) => v.optionIndex === optionIndex);
+
+      if (action === "add") {
+        if (existingIdx !== -1) {
+          const vote = { ...currentVotes[existingIdx] };
+          if (!vote.userIds.includes(userId)) {
+            vote.count++;
+            vote.userIds = [...vote.userIds, userId];
+          }
+          currentVotes[existingIdx] = vote;
+        } else {
+          currentVotes.push({ optionIndex, count: 1, userIds: [userId] });
+        }
+      } else {
+        if (existingIdx !== -1) {
+          const vote = { ...currentVotes[existingIdx] };
+          vote.count = Math.max(0, vote.count - 1);
+          vote.userIds = vote.userIds.filter((id) => id !== userId);
+          if (vote.count === 0) {
+            currentVotes.splice(existingIdx, 1);
+          } else {
+            currentVotes[existingIdx] = vote;
+          }
+        }
+      }
+
+      return { pollVotes: { ...state.pollVotes, [messageId]: currentVotes } };
     }),
 
   // Cleanup methods to prevent memory leaks

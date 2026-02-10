@@ -214,6 +214,10 @@ class WebSocketClient {
     this.send({ type: "key:request", payload: { channelId, fromUserId } });
   }
 
+  votePoll(messageId: string, channelId: string, optionIndex: number) {
+    this.send({ type: "poll:vote", payload: { messageId, channelId, optionIndex } });
+  }
+
   on(type: string, handler: MessageHandler) {
     if (!this.handlers.has(type)) {
       this.handlers.set(type, new Set());

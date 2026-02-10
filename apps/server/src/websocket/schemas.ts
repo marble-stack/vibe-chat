@@ -72,6 +72,13 @@ export const keyRequestPayloadSchema = z.object({
   fromUserId: z.string().uuid().optional(), // Deprecated - server broadcasts to all key holders
 });
 
+// Poll vote
+export const pollVotePayloadSchema = z.object({
+  messageId: z.string().uuid(),
+  channelId: z.string().uuid(),
+  optionIndex: z.number().int().min(0).max(9),
+});
+
 // Message type to schema mapping
 export const payloadSchemas = {
   auth: authPayloadSchema,
@@ -87,6 +94,7 @@ export const payloadSchemas = {
   "reaction:add": reactionAddPayloadSchema,
   "reaction:remove": reactionRemovePayloadSchema,
   "key:request": keyRequestPayloadSchema,
+  "poll:vote": pollVotePayloadSchema,
 } as const;
 
 export type MessageType = keyof typeof payloadSchemas;

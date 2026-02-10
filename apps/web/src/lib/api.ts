@@ -183,6 +183,70 @@ export const api = {
         }[];
         nextCursor: string | null;
       }>(`/messages/channel/${channelId}${cursor ? `?cursor=${cursor}` : ""}`),
+
+    getReplies: (messageId: string) =>
+      request<{
+        replies: {
+          id: string;
+          channelId: string;
+          senderId: string;
+          ciphertext: string;
+          replyToId: string;
+          createdAt: string;
+        }[];
+      }>(`/messages/${messageId}/replies`),
+  },
+
+  files: {
+    upload: (encryptedBlob: Blob, channelId: string, iv: string) => {
+      const formData = new FormData();
+      formData.append("file", encryptedBlob);
+      formData.append("channelId", channelId);
+      formData.append("iv", iv);
+
+      const token = useAuthStore.getState().token;
+      return fetch(`${API_BASE}/files/upload`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      }).then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: "Upload failed" }));
+          throw new Error(err.error || "Upload failed");
+        }
+        return res.json() as Promise<{ fileId: string }>;
+      });
+    },
+
+    download: async (fileId: string): Promise<{ blob: Blob; iv: string }> => {
+      const token = useAuthStore.getState().token;
+      const res = await fetch(`${API_BASE}/files/${fileId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const iv = res.headers.get("X-File-IV") || "";
+      const blob = await res.blob();
+      return { blob, iv };
+    },
+  },
+
+  polls: {
+    vote: (messageId: string, optionIndex: number) =>
+      request<{ success: boolean }>("/polls/vote", {
+        method: "POST",
+        body: JSON.stringify({ messageId, optionIndex }),
+      }),
+
+    removeVote: (messageId: string, optionIndex: number) =>
+      request<{ success: boolean }>("/polls/vote", {
+        method: "DELETE",
+        body: JSON.stringify({ messageId, optionIndex }),
+      }),
+
+    getResults: (messageId: string) =>
+      request<{
+        votes: { optionIndex: number; count: number; userIds: string[] }[];
+      }>(`/polls/${messageId}/results`),
   },
 
   emojis: {

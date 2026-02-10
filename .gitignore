@@ -33,6 +33,9 @@ coverage/
 *.sqlite
 *.sqlite3
 
+# Uploaded files (encrypted)
+uploads/
+
 # Misc
 .turbo/
 nul

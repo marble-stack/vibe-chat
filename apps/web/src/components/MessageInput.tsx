@@ -2,16 +2,22 @@ import { useState, useRef, useEffect } from "react";
 import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { wsClient } from "../lib/websocket";
-import { encryptChannelMessage } from "../lib/channelCrypto";
+import { encryptChannelMessage, ensureChannelKey } from "../lib/channelCrypto";
+import { encryptFile } from "../lib/fileCrypto";
+import { api } from "../lib/api";
 import { logger } from "../lib/logger";
+import { PollCreator } from "./PollCreator";
 
 export function MessageInput() {
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [showPollCreator, setShowPollCreator] = useState(false);
   const typingTimeoutRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { activeChannelId, channels, activeCommunityId, members, replyingTo, setReplyingTo } =
     useChatStore();
   const user = useAuthStore((state) => state.user);
@@ -115,6 +121,64 @@ export function MessageInput() {
     }, 3000);
   };
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeChannelId || !user || isSending) return;
+
+    // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    if (file.size > 25 * 1024 * 1024) {
+      setSendError("File too large. Maximum size is 25MB.");
+      return;
+    }
+
+    setSendError(null);
+    setIsSending(true);
+
+    const membersWithSelf = communityMembers.some((m) => m.id === user.id)
+      ? communityMembers
+      : [...communityMembers, { id: user.id, displayName: user.displayName || "Me" }];
+
+    try {
+      // Get channel key for encryption
+      const { key: channelKey } = await ensureChannelKey(
+        activeChannelId,
+        membersWithSelf,
+        user.id
+      );
+
+      // Encrypt file
+      const { encryptedBlob, iv } = await encryptFile(file, channelKey);
+
+      // Upload encrypted file
+      const { fileId } = await api.files.upload(encryptedBlob, activeChannelId, iv);
+
+      // Send message with file metadata
+      const fileMetadata = JSON.stringify({
+        type: "file",
+        filename: file.name,
+        size: file.size,
+        mimeType: file.type || "application/octet-stream",
+        fileId,
+      });
+
+      const ciphertext = await encryptChannelMessage(
+        activeChannelId,
+        fileMetadata,
+        membersWithSelf,
+        user.id
+      );
+
+      wsClient.sendMessage(activeChannelId, ciphertext);
+    } catch (err) {
+      logger.error("Failed to upload file:", err);
+      setSendError("Failed to upload file. Please try again.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   // Cleanup typing timeout on unmount
   useEffect(() => {
     return () => {
@@ -186,15 +250,59 @@ export function MessageInput() {
       <div
         className={`bg-background-tertiary flex items-center px-4 ${replyingTo ? "rounded-b-lg" : "rounded-lg"}`}
       >
-        <button
-          type="button"
-          className="text-text-muted hover:text-text-primary p-2"
-          title="Attach file"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowPlusMenu(!showPlusMenu)}
+            className="text-text-muted hover:text-text-primary p-2"
+            title="More options"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+
+          {showPlusMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowPlusMenu(false)} />
+              <div className="absolute bottom-full left-0 mb-2 z-20 bg-background-secondary border border-background-tertiary rounded-lg shadow-lg py-1 min-w-[160px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPlusMenu(false);
+                    fileInputRef.current?.click();
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-background-tertiary flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  Upload File
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPlusMenu(false);
+                    setShowPollCreator(true);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-background-tertiary flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  Create Poll
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
 
         <input
           ref={inputRef}
@@ -232,6 +340,13 @@ export function MessageInput() {
           </svg>
         </button>
       </div>
+
+      {showPollCreator && activeChannelId && (
+        <PollCreator
+          channelId={activeChannelId}
+          onClose={() => setShowPollCreator(false)}
+        />
+      )}
     </form>
   );
 }

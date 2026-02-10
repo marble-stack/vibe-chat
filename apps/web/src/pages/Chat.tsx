@@ -18,6 +18,7 @@ import { MessageList } from "../components/MessageList";
 import { MessageInput } from "../components/MessageInput";
 import { MemberList } from "../components/MemberList";
 import { KeyRecoveryBanner } from "../components/KeyRecoveryBanner";
+import { ThreadPanel } from "../components/ThreadPanel";
 
 export function Chat() {
   const navigate = useNavigate();
@@ -42,6 +43,8 @@ export function Chat() {
     deleteMessage,
     addReaction,
     removeReaction,
+    activeThreadId,
+    updatePollVote,
   } = useChatStore();
 
   // Mobile navigation state
@@ -431,6 +434,18 @@ export function Chat() {
       }
     };
 
+    // Handle poll voted
+    const handlePollVoted = (msg: { payload: Record<string, unknown> }) => {
+      const { messageId, userId, optionIndex, action } = msg.payload as {
+        messageId: string;
+        channelId: string;
+        userId: string;
+        optionIndex: number;
+        action: "add" | "remove";
+      };
+      updatePollVote(messageId, userId, optionIndex, action);
+    };
+
     // Handle new member joining a community - update local member list
     const handleMemberJoined = (msg: { payload: Record<string, unknown> }) => {
       const { communityId, member } = msg.payload as {
@@ -453,6 +468,7 @@ export function Chat() {
     wsClient.on("key:requested", handleKeyRequested);
     wsClient.on("key:available", handleKeyAvailable);
     wsClient.on("member:joined", handleMemberJoined);
+    wsClient.on("poll:voted", handlePollVoted);
 
     return () => {
       wsClient.off("message:new", handleNewMessage);
@@ -467,6 +483,7 @@ export function Chat() {
       wsClient.off("key:requested", handleKeyRequested);
       wsClient.off("key:available", handleKeyAvailable);
       wsClient.off("member:joined", handleMemberJoined);
+      wsClient.off("poll:voted", handlePollVoted);
       wsClient.disconnect();
     };
   }, [
@@ -484,6 +501,7 @@ export function Chat() {
     removeReaction,
     addMemberIfMissing,
     addMemberToCommunity,
+    updatePollVote,
   ]);
 
   // Join active community for presence updates
@@ -612,6 +630,9 @@ export function Chat() {
           </div>
         )}
       </div>
+
+      {/* Thread panel */}
+      {activeThreadId && <ThreadPanel />}
 
       {/* Member list */}
       {activeCommunityId && <MemberList />}

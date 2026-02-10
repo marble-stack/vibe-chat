@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 import { WebSocket } from "ws";
-import { db, messages, users, reactions, senderKeys, pendingKeyRequests } from "../db/index.js";
+import { db, messages, users, reactions, senderKeys, pendingKeyRequests, pollVotes } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { validatePayload } from "./schemas.js";
@@ -584,6 +584,64 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
           payload: { channelId, sentToOnlineKeyHolder: sentToSomeone },
         })
       );
+      break;
+    }
+
+    case "poll:vote": {
+      const pollPayload = validatePayload("poll:vote", message.payload);
+      if (!pollPayload) {
+        sendValidationError();
+        return;
+      }
+      const { messageId, channelId, optionIndex } = pollPayload;
+      const user = socketUsers.get(socket);
+
+      if (!user) {
+        socket.send(JSON.stringify({ type: "error", payload: { message: "Not authenticated" } }));
+        return;
+      }
+
+      const canAccess = await canUserAccessChannel(user.userId, channelId);
+      if (!canAccess) {
+        socket.send(
+          JSON.stringify({ type: "error", payload: { message: "Cannot access this channel" } })
+        );
+        return;
+      }
+
+      // Check if already voted for this option
+      const existing = await db.query.pollVotes.findFirst({
+        where: and(
+          eq(pollVotes.messageId, messageId),
+          eq(pollVotes.userId, user.userId),
+          eq(pollVotes.optionIndex, optionIndex)
+        ),
+      });
+
+      let action: "add" | "remove";
+      if (existing) {
+        await db.delete(pollVotes).where(eq(pollVotes.id, existing.id));
+        action = "remove";
+      } else {
+        await db.insert(pollVotes).values({
+          messageId,
+          userId: user.userId,
+          optionIndex,
+        });
+        action = "add";
+      }
+
+      // Broadcast to channel
+      broadcastToChannel(channelId, {
+        type: "poll:voted",
+        payload: {
+          messageId,
+          channelId,
+          userId: user.userId,
+          optionIndex,
+          action,
+        },
+      });
       break;
     }
 

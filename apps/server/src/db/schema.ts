@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, boolean, index, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, boolean, index, unique, integer } from "drizzle-orm/pg-core";
 
 // Users
 export const users = pgTable("users", {
@@ -198,5 +198,49 @@ export const pendingKeyRequests = pgTable(
       table.channelId,
       table.requestingUserId
     ),
+  })
+);
+
+// File attachments (encrypted files)
+export const fileAttachments = pgTable(
+  "file_attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    messageId: uuid("message_id")
+      .references(() => messages.id, { onDelete: "cascade" }),
+    channelId: uuid("channel_id")
+      .references(() => channels.id)
+      .notNull(),
+    storagePath: text("storage_path").notNull(),
+    encryptedSize: integer("encrypted_size").notNull(),
+    iv: text("iv").notNull(),
+    uploadedBy: uuid("uploaded_by")
+      .references(() => users.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    messageIdx: index("file_attachments_message_idx").on(table.messageId),
+    channelIdx: index("file_attachments_channel_idx").on(table.channelId),
+  })
+);
+
+// Poll votes
+export const pollVotes = pgTable(
+  "poll_votes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    messageId: uuid("message_id")
+      .references(() => messages.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    optionIndex: integer("option_index").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    messageIdx: index("poll_votes_message_idx").on(table.messageId),
+    uniqueVote: unique("poll_votes_unique").on(table.messageId, table.userId, table.optionIndex),
   })
 );

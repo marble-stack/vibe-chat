@@ -6,6 +6,8 @@ import { decryptChannelMessage, encryptChannelMessage, isDecryptionError } from 
 import { wsClient } from "../lib/websocket";
 import { logger } from "../lib/logger";
 import { DecryptionErrorMessage } from "./DecryptionErrorMessage";
+import { FileMessage } from "./FileMessage";
+import { PollMessage } from "./PollMessage";
 
 interface MessageListProps {
   onOpenSidebar: () => void;
@@ -23,6 +25,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     setReplyingTo,
     getMessageById,
     setActiveChannel,
+    setActiveThread,
   } = useChatStore();
   const user = useAuthStore((state) => state.user);
 
@@ -350,6 +353,17 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                       </svg>
                     </button>
 
+                    {/* Thread */}
+                    <button
+                      onClick={() => setActiveThread(message.id)}
+                      className="p-1.5 hover:bg-background-primary/50 text-text-muted hover:text-text-primary transition-colors"
+                      title="Thread"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                      </svg>
+                    </button>
+
                     {/* Edit and delete - only for own messages */}
                     {user && message.senderId === user.id && (
                       <>
@@ -447,14 +461,46 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                     </div>
                   ) : message.decryptionFailed ? (
                     <DecryptionErrorMessage errorType={message.plaintext} />
-                  ) : (
-                    <p className="text-text-primary break-words">
-                      {message.plaintext || message.ciphertext}
-                      {message.editedAt && (
-                        <span className="text-xs text-text-muted ml-1">(edited)</span>
-                      )}
-                    </p>
-                  )}
+                  ) : (() => {
+                    // Try to parse as structured content (file, poll)
+                    const plaintext = message.plaintext || message.ciphertext;
+                    try {
+                      const parsed = JSON.parse(plaintext);
+                      if (parsed.type === "file") {
+                        return <FileMessage metadata={parsed} channelId={message.channelId} />;
+                      }
+                      if (parsed.type === "poll") {
+                        return <PollMessage metadata={parsed} messageId={message.id} channelId={message.channelId} />;
+                      }
+                    } catch {
+                      // Not JSON, render as text
+                    }
+                    return (
+                      <p className="text-text-primary break-words">
+                        {plaintext}
+                        {message.editedAt && (
+                          <span className="text-xs text-text-muted ml-1">(edited)</span>
+                        )}
+                      </p>
+                    );
+                  })()}
+
+                  {/* Thread reply count indicator */}
+                  {(() => {
+                    const replyCount = channelMessages.filter((m) => m.replyToId === message.id).length;
+                    if (replyCount === 0) return null;
+                    return (
+                      <button
+                        onClick={() => setActiveThread(message.id)}
+                        className="flex items-center gap-1 text-xs text-accent-primary hover:underline mt-1"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                        </svg>
+                        {replyCount} {replyCount === 1 ? "reply" : "replies"}
+                      </button>
+                    );
+                  })()}
 
                   {/* Existing reactions display */}
                   {message.reactions && message.reactions.length > 0 && (

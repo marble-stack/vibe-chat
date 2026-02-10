@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { db, messages } from "../db/index.js";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, asc, and, isNull } from "drizzle-orm";
 import { canUserAccessChannel } from "../lib/authorization.js";
 
 const sendMessageSchema = z.object({
@@ -128,5 +128,35 @@ export const messageRoutes: FastifyPluginAsync = async (fastify) => {
       nextCursor:
         channelMessages.length === limitNum ? channelMessages[0]?.createdAt.toISOString() : null,
     };
+  });
+
+  // Get replies to a message (thread)
+  fastify.get("/:messageId/replies", async (request, reply) => {
+    const { messageId } = request.params as { messageId: string };
+
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
+    // Get the parent message to verify channel access
+    const parentMessage = await db.query.messages.findFirst({
+      where: eq(messages.id, messageId),
+    });
+
+    if (!parentMessage) {
+      return reply.status(404).send({ error: "Message not found" });
+    }
+
+    const canAccess = await canUserAccessChannel(request.user.userId, parentMessage.channelId);
+    if (!canAccess) {
+      return reply.status(403).send({ error: "Cannot access this channel" });
+    }
+
+    const replies = await db.query.messages.findMany({
+      where: and(eq(messages.replyToId, messageId), isNull(messages.deletedAt)),
+      orderBy: asc(messages.createdAt),
+    });
+
+    return { replies };
   });
 };
