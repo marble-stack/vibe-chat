@@ -526,6 +526,10 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
         })
       );
 
+      // Reset counter before setting messages so the scroll effect treats
+      // the fresh API data as an initial load — this prevents the last few
+      // messages from being hidden when cached messages already bumped the count
+      prevMessageCountRef.current = 0;
       setMessages(activeChannelId, decrypted);
     };
 
@@ -547,9 +551,13 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
 
     // Initial load (channel just opened) — jump to bottom instantly
     if (prevCount === 0) {
-      // Use rAF to ensure DOM has laid out the new messages
+      // Use double rAF to ensure mobile browsers have fully completed layout
+      // before reading scrollHeight (single rAF can fire before layout settles
+      // on iOS Safari and some Android browsers)
       requestAnimationFrame(() => {
-        container.scrollTop = container.scrollHeight;
+        requestAnimationFrame(() => {
+          container.scrollTop = container.scrollHeight;
+        });
       });
       return;
     }
