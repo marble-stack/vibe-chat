@@ -10,7 +10,7 @@ import { FileMessage } from "./FileMessage";
 import { PollMessage } from "./PollMessage";
 import { ProfileCard } from "./ProfileCard";
 import { MentionText } from "./MentionText";
-import { EmojiDisplay } from "./CustomEmojiText";
+import { CustomEmojiText, EmojiDisplay } from "./CustomEmojiText";
 
 interface Member {
   id: string;
@@ -368,7 +368,7 @@ const MessageItem = memo(function MessageItem({
           }
           return (
             <p className="text-text-primary break-words whitespace-pre-wrap">
-              <MentionText text={plaintext} currentUserId={userId} />
+              <CustomEmojiText text={plaintext} currentUserId={userId} />
               {message.editedAt && (
                 <span className="text-xs text-text-muted ml-1">(edited)</span>
               )}

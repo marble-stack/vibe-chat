@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useChatStore } from "../stores/chat";
+import { api } from "../lib/api";
 import { EmojiUploadModal } from "./EmojiUploadModal";
 
 const UNICODE_EMOJIS = [
@@ -21,9 +22,23 @@ interface EmojiPickerProps {
 export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
   const [activeTab, setActiveTab] = useState<"unicode" | "custom">("unicode");
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const { activeCommunityId, customEmojis } = useChatStore();
+  const { activeCommunityId, customEmojis, removeCustomEmoji } = useChatStore();
 
   const communityEmojis = activeCommunityId ? customEmojis[activeCommunityId] || [] : [];
+
+  const handleDeleteEmoji = async (emojiId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!activeCommunityId) return;
+    try {
+      await api.emojis.delete(emojiId);
+      removeCustomEmoji(activeCommunityId, emojiId);
+    } catch (err: unknown) {
+      const status = (err as { status?: number }).status;
+      if (status === 403) {
+        alert("You can only delete emojis you uploaded.");
+      }
+    }
+  };
 
   return (
     <>
@@ -79,19 +94,28 @@ export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
               ) : (
                 <div className="grid grid-cols-8 gap-1 max-h-[200px] overflow-y-auto">
                   {communityEmojis.map((emoji) => (
-                    <button
-                      key={emoji.id}
-                      type="button"
-                      onClick={() => onSelect(`:${emoji.name}:`)}
-                      className="w-8 h-8 flex items-center justify-center rounded hover:bg-background-primary/50 transition-colors"
-                      title={`:${emoji.name}:`}
-                    >
-                      <img
-                        src={emoji.fileUrl}
-                        alt={emoji.name}
-                        className="w-6 h-6 object-contain"
-                      />
-                    </button>
+                    <div key={emoji.id} className="relative group/emoji">
+                      <button
+                        type="button"
+                        onClick={() => onSelect(`:${emoji.name}:`)}
+                        className="w-8 h-8 flex items-center justify-center rounded hover:bg-background-primary/50 transition-colors"
+                        title={`:${emoji.name}:`}
+                      >
+                        <img
+                          src={emoji.fileUrl}
+                          alt={emoji.name}
+                          className="w-6 h-6 object-contain"
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteEmoji(emoji.id, e)}
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] leading-none flex items-center justify-center opacity-0 group-hover/emoji:opacity-100 transition-opacity hover:bg-red-600"
+                        title={`Delete :${emoji.name}:`}
+                      >
+                        &times;
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}

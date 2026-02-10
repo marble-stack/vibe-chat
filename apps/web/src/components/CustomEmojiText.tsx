@@ -1,21 +1,24 @@
 import { useChatStore } from "../stores/chat";
+import { MentionText } from "./MentionText";
 
 const CUSTOM_EMOJI_REGEX = /:([a-z0-9_]+):/g;
 
 interface CustomEmojiTextProps {
   text: string;
+  currentUserId?: string;
 }
 
 /**
  * Renders text with :custom_emoji: patterns replaced by <img> tags.
+ * Text segments are rendered through MentionText so @mentions still work.
  * Falls back to the raw text if no matching emoji is found.
  */
-export function CustomEmojiText({ text }: CustomEmojiTextProps) {
+export function CustomEmojiText({ text, currentUserId }: CustomEmojiTextProps) {
   const { activeCommunityId, customEmojis } = useChatStore();
   const communityEmojis = activeCommunityId ? customEmojis[activeCommunityId] || [] : [];
 
   if (communityEmojis.length === 0 || !text.includes(":")) {
-    return <>{text}</>;
+    return <MentionText text={text} currentUserId={currentUserId} />;
   }
 
   const parts: (string | { name: string; url: string })[] = [];
@@ -34,9 +37,9 @@ export function CustomEmojiText({ text }: CustomEmojiTextProps) {
     }
   }
 
-  // If no custom emojis were found, return plain text
+  // If no custom emojis were found, render through MentionText
   if (parts.length === 0) {
-    return <>{text}</>;
+    return <MentionText text={text} currentUserId={currentUserId} />;
   }
 
   if (lastIndex < text.length) {
@@ -47,7 +50,7 @@ export function CustomEmojiText({ text }: CustomEmojiTextProps) {
     <>
       {parts.map((part, i) =>
         typeof part === "string" ? (
-          <span key={i}>{part}</span>
+          <MentionText key={i} text={part} currentUserId={currentUserId} />
         ) : (
           <img
             key={i}
