@@ -332,7 +332,7 @@ export function MessageInput() {
 
   return (
     <>
-    <form onSubmit={handleSubmit} className="px-4 pb-6">
+    <form onSubmit={handleSubmit} className="px-4 pb-2 md:pb-6">
       {/* Error message */}
       {sendError && (
         <div className="bg-red-500/20 border border-red-500/50 text-red-400 text-sm px-4 py-2 rounded-lg mb-2">
@@ -450,7 +450,7 @@ export function MessageInput() {
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             placeholder={`Message #${activeChannel?.name || "channel"}`}
-            className="w-full bg-transparent text-text-primary py-3 px-2 outline-none resize-none overflow-y-auto"
+            className="w-full bg-transparent text-text-primary py-3 px-2 outline-none resize-none overflow-y-auto placeholder:truncate"
             style={{ maxHeight: 200 }}
           />
         </div>

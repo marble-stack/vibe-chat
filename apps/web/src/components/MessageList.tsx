@@ -769,7 +769,16 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
       </div>
 
       {/* Messages */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto p-4"
+        onTouchMove={() => {
+          // Dismiss keyboard on scroll for smooth mobile experience
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+        }}
+      >
         {channelMessages.length === 0 ? (
           <div className="text-center text-text-muted py-8">
             <div className="text-4xl mb-4">#</div>
