@@ -532,18 +532,29 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     loadMessages();
   }, [activeChannelId, user, setMessages]);
 
-  // Smart auto-scroll: only scroll when a new message is added AND user is near the bottom
+  // Smart auto-scroll: scroll to bottom on initial load, or when a new message
+  // arrives and the user is already near the bottom
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const newCount = channelMessages.length;
-    const wasNewMessage = newCount > prevMessageCountRef.current;
+    const prevCount = prevMessageCountRef.current;
+    const wasNewMessage = newCount > prevCount;
     prevMessageCountRef.current = newCount;
 
     if (!wasNewMessage) return;
 
-    // Only auto-scroll if user is within 100px of the bottom
+    // Initial load (channel just opened) — jump to bottom instantly
+    if (prevCount === 0) {
+      // Use rAF to ensure DOM has laid out the new messages
+      requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+      });
+      return;
+    }
+
+    // Subsequent messages — only auto-scroll if user is within 100px of the bottom
     const distanceFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
     if (distanceFromBottom < 100) {

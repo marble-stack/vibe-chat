@@ -701,7 +701,7 @@ export function Chat() {
   }, [user, activeChannelId, updateMessage]);
 
   return (
-    <div className="h-screen flex bg-background-primary">
+    <div className="h-screen-safe flex bg-background-primary overflow-hidden">
       {/* Mobile backdrop overlay */}
       {showMobileSidebar && (
         <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={handleBackdropClick} />
