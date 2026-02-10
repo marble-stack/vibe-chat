@@ -18,6 +18,12 @@ import {
   base64ToArrayBuffer,
   encryptChannelKeyForRecipient,
   decryptChannelKey,
+  generateSigningKeyPair,
+  signData,
+  generateIdentityKeys,
+  deriveBackupKey,
+  encryptKeyBackup,
+  decryptKeyBackup,
 } from "../../lib/crypto.js";
 
 describe("Crypto Module", () => {
@@ -293,6 +299,113 @@ describe("Crypto Module", () => {
       // Recipient tries to decrypt with wrong sender public key - should fail
       await expect(
         decryptChannelKey(encrypted, recipient.privateKey, wrongSenderPublicBase64)
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("Signing Keys", () => {
+    it("should generate ECDSA signing key pair", async () => {
+      const keyPair = await generateSigningKeyPair();
+      expect(keyPair).toHaveProperty("publicKey");
+      expect(keyPair).toHaveProperty("privateKey");
+      expect(keyPair.publicKey.algorithm.name).toBe("ECDSA");
+      expect(keyPair.privateKey.algorithm.name).toBe("ECDSA");
+    });
+
+    it("should sign data and return base64 string", async () => {
+      const keyPair = await generateSigningKeyPair();
+      const data = new TextEncoder().encode("test data").buffer;
+      const signature = await signData(data, keyPair.privateKey);
+      expect(typeof signature).toBe("string");
+      expect(signature.length).toBeGreaterThan(0);
+    });
+
+    it("should produce different signatures for different data", async () => {
+      const keyPair = await generateSigningKeyPair();
+      const data1 = new TextEncoder().encode("data 1").buffer;
+      const data2 = new TextEncoder().encode("data 2").buffer;
+      const sig1 = await signData(data1, keyPair.privateKey);
+      const sig2 = await signData(data2, keyPair.privateKey);
+      expect(sig1).not.toBe(sig2);
+    });
+  });
+
+  describe("Identity Key Generation", () => {
+    it("should generate complete identity keys", async () => {
+      const result = await generateIdentityKeys();
+
+      expect(result.keys.identityKeyPair).toHaveProperty("publicKey");
+      expect(result.keys.identityKeyPair).toHaveProperty("privateKey");
+      expect(result.keys.signedPreKeyPair).toHaveProperty("publicKey");
+      expect(result.keys.signedPreKeyPair).toHaveProperty("privateKey");
+      expect(typeof result.keys.signedPreKeySignature).toBe("string");
+      expect(result.keys.preKeyPairs).toHaveLength(10);
+    });
+
+    it("should generate valid public bundle", async () => {
+      const result = await generateIdentityKeys();
+
+      expect(typeof result.publicBundle.identityKeyPublic).toBe("string");
+      expect(typeof result.publicBundle.signedPreKeyPublic).toBe("string");
+      expect(typeof result.publicBundle.signedPreKeySignature).toBe("string");
+      expect(result.publicBundle.preKeys).toHaveLength(10);
+
+      for (const preKey of result.publicBundle.preKeys) {
+        expect(typeof preKey.keyId).toBe("string");
+        expect(typeof preKey.publicKey).toBe("string");
+      }
+    });
+
+    it("should generate importable keys", async () => {
+      const result = await generateIdentityKeys();
+
+      const importedPub = await importPublicKey(result.keys.identityKeyPair.publicKey);
+      expect(importedPub.algorithm.name).toBe("ECDH");
+
+      const importedPriv = await importPrivateKey(result.keys.identityKeyPair.privateKey);
+      expect(importedPriv.algorithm.name).toBe("ECDH");
+    });
+  });
+
+  describe("Key Backup", () => {
+    it("should derive a backup key from password and salt", async () => {
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const key = await deriveBackupKey("test-password", salt);
+      expect(key.algorithm.name).toBe("AES-GCM");
+    });
+
+    it("should derive same key for same password and salt", async () => {
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const key1 = await deriveBackupKey("password", salt);
+      const key2 = await deriveBackupKey("password", salt);
+
+      // Encrypt with key1, decrypt with key2
+      const msg = "test";
+      const encrypted = await encryptMessage(msg, key1);
+      const decrypted = await decryptMessage(encrypted, key2);
+      expect(decrypted).toBe(msg);
+    });
+
+    it("should encrypt and decrypt key backup round-trip", async () => {
+      const identityKeys = await generateIdentityKeys();
+      const password = "strong-password-123";
+
+      const backup = await encryptKeyBackup(identityKeys.keys, password);
+      expect(typeof backup.ciphertext).toBe("string");
+      expect(typeof backup.salt).toBe("string");
+
+      const restored = await decryptKeyBackup(backup.ciphertext, password, backup.salt);
+      expect(restored.identityKeyPair.publicKey).toBe(identityKeys.keys.identityKeyPair.publicKey);
+      expect(restored.signedPreKeySignature).toBe(identityKeys.keys.signedPreKeySignature);
+      expect(restored.preKeyPairs).toHaveLength(10);
+    });
+
+    it("should fail decryption with wrong password", async () => {
+      const identityKeys = await generateIdentityKeys();
+      const backup = await encryptKeyBackup(identityKeys.keys, "correct-password");
+
+      await expect(
+        decryptKeyBackup(backup.ciphertext, "wrong-password", backup.salt)
       ).rejects.toThrow();
     });
   });
