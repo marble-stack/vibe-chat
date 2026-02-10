@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Vibe Chat is an end-to-end encrypted messaging app with Discord-style channels within communities. It uses the Signal Protocol (Sender Keys) for E2E encryption.
 
+## Pre-Commit Rule
+
+**Always run `pnpm --filter @vibe-chat/server build` before committing any server-side changes.** This catches TypeScript errors (e.g. missing properties in test mocks after schema changes) that would fail the Railway build. Do not commit until the build passes.
+
 ## Commands
 
 ```bash
