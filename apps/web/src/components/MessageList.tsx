@@ -203,34 +203,24 @@ const MessageItem = memo(function MessageItem({
       <div className="flex-1 min-w-0">
         {/* Reply context */}
         {replyMessage && (
-          <div className="mb-1 flex w-fit items-center gap-1.5 rounded-md bg-background-tertiary/70 px-2 py-1 text-xs text-text-muted">
-            <button
-              onClick={() => onScrollToMessage(replyMessage.id)}
-              className="group flex min-w-0 items-center gap-2 text-left text-text-muted transition-colors hover:text-text-primary"
-              title="Jump to referenced message"
-              aria-label="Jump to referenced message"
-            >
-              <svg className="h-5 w-5 flex-shrink-0 text-text-muted/80 group-hover:text-accent-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path
-                  strokeLinecap="round"
-                  d="M20 5c-4 0-4 4-8 4s-4 4-8 4"
-                />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 13l2.5 2.5L8 13" />
-              </svg>
-              <div className="flex min-w-0 items-center gap-1.5">
-                <span className="font-medium text-text-primary/90">{replySender?.displayName || "Unknown"}</span>
-                <span className="truncate max-w-[220px]">{replyMessage.plaintext || replyMessage.ciphertext}</span>
-              </div>
-            </button>
-            <button
-              onClick={() => onOpenThread(message.id)}
-              className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium text-accent-primary hover:bg-accent-primary/15"
-              title="Reply in thread"
-              aria-label="Reply in thread"
-            >
-              Reply
-            </button>
-          </div>
+          <button
+            onClick={() => onScrollToMessage(replyMessage.id)}
+            className="group mb-1 flex w-fit items-center gap-2 rounded-md bg-background-tertiary/70 px-2 py-1 text-xs text-text-muted transition-colors hover:text-text-primary"
+            title="Jump to referenced message"
+            aria-label="Jump to referenced message"
+          >
+            <svg className="h-5 w-5 flex-shrink-0 text-text-muted/80 group-hover:text-accent-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path
+                strokeLinecap="round"
+                d="M20 5c-4 0-4 4-8 4s-4 4-8 4"
+              />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 13l2.5 2.5L8 13" />
+            </svg>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="font-medium text-text-primary/90">{replySender?.displayName || "Unknown"}</span>
+              <span className="truncate max-w-[220px]">{replyMessage.plaintext || replyMessage.ciphertext}</span>
+            </div>
+          </button>
         )}
 
         {showHeader && (
@@ -301,18 +291,30 @@ const MessageItem = memo(function MessageItem({
           );
         })()}
 
-        {/* Thread reply count indicator */}
-        {replyCount > 0 && (
+        {/* Thread actions */}
+        <div className="mt-1 flex items-center gap-3 text-xs">
           <button
             onClick={() => onOpenThread(message.id)}
-            className="flex items-center gap-1 text-xs text-accent-primary hover:underline mt-1"
+            className="text-accent-primary hover:underline"
+            title="Reply in thread"
+            aria-label="Reply in thread"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-            </svg>
-            {replyCount} {replyCount === 1 ? "reply" : "replies"}
+            Reply
           </button>
-        )}
+          {replyCount > 0 && (
+            <button
+              onClick={() => onOpenThread(message.id)}
+              className="flex items-center gap-1 text-accent-primary hover:underline"
+              title="View thread replies"
+              aria-label="View thread replies"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              {replyCount} {replyCount === 1 ? "reply" : "replies"}
+            </button>
+          )}
+        </div>
 
         {/* Existing reactions display */}
         {message.reactions && message.reactions.length > 0 && (
