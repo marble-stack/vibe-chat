@@ -6,6 +6,10 @@ import { encryptChannelMessage, ensureChannelKey } from "../lib/channelCrypto";
 import { encryptFile } from "../lib/fileCrypto";
 import { api } from "../lib/api";
 import { logger } from "../lib/logger";
+import { startTimer, endTimer } from "../lib/perfLogger";
+import { getActiveMentionQuery, filterMembers, buildMentionText } from "../lib/mentions";
+import { MentionAutocomplete } from "./MentionAutocomplete";
+import { EmojiPicker } from "./EmojiPicker";
 import { PollCreator } from "./PollCreator";
 
 let messageCounter = 0;
@@ -19,6 +23,8 @@ export function MessageInput() {
   const [showPollCreator, setShowPollCreator] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [plusMenuPos, setPlusMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [mentionQuery, setMentionQuery] = useState<{ query: string; startIndex: number } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
   const typingTimeoutRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -34,6 +40,28 @@ export function MessageInput() {
       : null;
 
   const communityMembers = activeCommunityId ? members[activeCommunityId] || [] : [];
+  const filteredMentionMembers = mentionQuery
+    ? filterMembers(communityMembers, mentionQuery.query)
+    : [];
+
+  const insertMention = (member: { id: string; displayName: string }) => {
+    if (!mentionQuery || !inputRef.current) return;
+    const before = message.slice(0, mentionQuery.startIndex);
+    const after = message.slice(inputRef.current.selectionStart);
+    const mention = buildMentionText(member.displayName, member.id) + " ";
+    const newMessage = before + mention + after;
+    setMessage(newMessage);
+    setMentionQuery(null);
+    setMentionIndex(0);
+    // Set cursor after the inserted mention
+    const cursorPos = before.length + mention.length;
+    requestAnimationFrame(() => {
+      if (inputRef.current) {
+        inputRef.current.selectionStart = inputRef.current.selectionEnd = cursorPos;
+        inputRef.current.focus();
+      }
+    });
+  };
 
   // Get the display name of the user being replied to
   const getReplyingSenderName = () => {
@@ -45,6 +73,7 @@ export function MessageInput() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || !activeChannelId || !user || isSending) return;
+    startTimer("message-send-total");
 
     // Clear any previous error
     setSendError(null);
@@ -75,6 +104,7 @@ export function MessageInput() {
     setIsSending(true);
 
     // Insert optimistic message immediately (appears instantly for the sender)
+    startTimer("optimistic-render");
     addMessage({
       id: clientId, // temporary id, replaced when server confirms
       clientId,
@@ -86,17 +116,21 @@ export function MessageInput() {
       createdAt: new Date().toISOString(),
       pending: true,
     });
+    endTimer("optimistic-render");
 
     try {
       // Encrypt message with channel key
+      startTimer("encrypt-message");
       const ciphertext = await encryptChannelMessage(
         activeChannelId,
         plaintext,
         membersWithSelf,
         user.id
       );
+      endTimer("encrypt-message");
 
       const sent = wsClient.sendMessage(activeChannelId, ciphertext, replyToId, clientId);
+      endTimer("message-send-total");
       if (!sent) {
         setSendError("Message queued - connection issue. Will send when reconnected.");
       }
@@ -117,6 +151,32 @@ export function MessageInput() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Handle mention autocomplete navigation
+    if (mentionQuery && filteredMentionMembers.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMentionIndex((prev) => (prev + 1) % filteredMentionMembers.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMentionIndex((prev) =>
+          prev <= 0 ? filteredMentionMembers.length - 1 : prev - 1
+        );
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        insertMention(filteredMentionMembers[mentionIndex]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setMentionQuery(null);
+        return;
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
@@ -133,6 +193,16 @@ export function MessageInput() {
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
+
+    // Detect mention query
+    const cursorPos = e.target.selectionStart;
+    const query = getActiveMentionQuery(e.target.value, cursorPos);
+    if (query) {
+      setMentionQuery(query);
+      setMentionIndex(0);
+    } else {
+      setMentionQuery(null);
+    }
 
     if (!activeChannelId) return;
 
@@ -242,17 +312,6 @@ export function MessageInput() {
     }
   }, [sendError]);
 
-  const COMPOSE_EMOJIS = [
-    "\u{1F600}", "\u{1F603}", "\u{1F604}", "\u{1F601}", "\u{1F606}", "\u{1F605}", "\u{1F602}", "\u{1F923}", "\u{1F60A}", "\u{1F607}",
-    "\u{1F609}", "\u{1F60D}", "\u{1F929}", "\u{1F618}", "\u{1F617}", "\u{1F61A}", "\u{1F60B}", "\u{1F61C}", "\u{1F92A}", "\u{1F61D}",
-    "\u{1F60E}", "\u{1F913}", "\u{1F9D0}", "\u{1F60F}", "\u{1F612}", "\u{1F61E}", "\u{1F614}", "\u{1F61F}", "\u{1F622}", "\u{1F62D}",
-    "\u{1F624}", "\u{1F620}", "\u{1F621}", "\u{1F92C}", "\u{1F631}", "\u{1F628}", "\u{1F630}", "\u{1F625}", "\u{1F633}", "\u{1F914}",
-    "\u{1F644}", "\u{1F611}", "\u{1F636}", "\u{1F60C}", "\u{1F634}", "\u{1F637}", "\u{1F912}", "\u{1F915}", "\u{1F922}", "\u{1F92E}",
-    "\u{1F44D}", "\u{1F44E}", "\u{1F44A}", "\u270A", "\u{1F91E}", "\u270C\uFE0F", "\u{1F91F}", "\u{1F44B}", "\u{1F44F}", "\u{1F64C}",
-    "\u2764\uFE0F", "\u{1F9E1}", "\u{1F49B}", "\u{1F49A}", "\u{1F499}", "\u{1F49C}", "\u{1F5A4}", "\u{1F494}", "\u{1F4AF}", "\u{1F4A5}",
-    "\u{1F389}", "\u{1F38A}", "\u{1F525}", "\u2B50", "\u{1F31F}", "\u26A1", "\u{1F4A1}", "\u{1F3B5}", "\u{1F3B6}", "\u{1F4AC}",
-  ];
-
   const insertEmoji = (emoji: string) => {
     const textarea = inputRef.current;
     if (textarea) {
@@ -260,7 +319,6 @@ export function MessageInput() {
       const end = textarea.selectionEnd;
       const newMessage = message.slice(0, start) + emoji + message.slice(end);
       setMessage(newMessage);
-      // Set cursor position after emoji on next tick
       requestAnimationFrame(() => {
         textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
         textarea.focus();
@@ -376,16 +434,25 @@ export function MessageInput() {
           onChange={handleFileSelect}
         />
 
-        <textarea
-          ref={inputRef}
-          rows={1}
-          value={message}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          placeholder={`Message #${activeChannel?.name || "channel"}`}
-          className="flex-1 bg-transparent text-text-primary py-3 px-2 outline-none resize-none overflow-y-auto"
-          style={{ maxHeight: 200 }}
-        />
+        <div className="relative flex-1">
+          {mentionQuery && filteredMentionMembers.length > 0 && (
+            <MentionAutocomplete
+              members={filteredMentionMembers}
+              selectedIndex={mentionIndex}
+              onSelect={insertMention}
+            />
+          )}
+          <textarea
+            ref={inputRef}
+            rows={1}
+            value={message}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            placeholder={`Message #${activeChannel?.name || "channel"}`}
+            className="w-full bg-transparent text-text-primary py-3 px-2 outline-none resize-none overflow-y-auto"
+            style={{ maxHeight: 200 }}
+          />
+        </div>
 
         <div className="relative">
           <button
@@ -406,23 +473,10 @@ export function MessageInput() {
           </button>
 
           {showEmojiPicker && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)} />
-              <div className="absolute bottom-full right-0 mb-2 z-50 bg-background-secondary border border-background-tertiary rounded-lg shadow-lg p-3 w-[320px]">
-                <div className="grid grid-cols-8 gap-1 max-h-[200px] overflow-y-auto">
-                  {COMPOSE_EMOJIS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => insertEmoji(emoji)}
-                      className="w-8 h-8 flex items-center justify-center rounded hover:bg-background-primary/50 transition-colors text-lg"
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
+            <EmojiPicker
+              onSelect={insertEmoji}
+              onClose={() => setShowEmojiPicker(false)}
+            />
           )}
         </div>
 

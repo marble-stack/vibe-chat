@@ -93,7 +93,9 @@
       "Bash(pnpm format:*)",
       "Bash(curl:*)",
       "Bash(pnpm --filter @vibe-chat/server build:*)",
-      "Bash(pnpm --filter @vibe-chat/web build:*)"
+      "Bash(pnpm --filter @vibe-chat/web build:*)",
+      "Bash(git rebase:*)",
+      "Bash(GIT_EDITOR=true git rebase:*)"
     ]
   }
 }

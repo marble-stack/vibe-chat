@@ -1,14 +1,21 @@
 import { FastifyPluginAsync } from "fastify";
 import { db, fileAttachments } from "../db/index.js";
 import { eq } from "drizzle-orm";
-import { canUserAccessChannel } from "../lib/authorization.js";
+import { canUserAccessChannel, isUserInCommunity } from "../lib/authorization.js";
 import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import { createReadStream, existsSync } from "fs";
-import { join } from "path";
+import { join, extname } from "path";
 
 const UPLOADS_DIR = join(process.cwd(), "uploads");
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+const MAX_EMOJI_SIZE = 256 * 1024; // 256KB
+const ALLOWED_EMOJI_MIMES = new Set(["image/png", "image/gif", "image/webp"]);
+const MIME_TO_EXT: Record<string, string> = {
+  "image/png": ".png",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+};
 
 export const fileRoutes: FastifyPluginAsync = async (fastify) => {
   // Upload an encrypted file
@@ -65,6 +72,73 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
       .returning();
 
     return { fileId: attachment.id };
+  });
+
+  // Upload a custom emoji image (not encrypted)
+  fastify.post("/emoji-upload", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
+    const data = await request.file();
+    if (!data) {
+      return reply.status(400).send({ error: "No file uploaded" });
+    }
+
+    const communityId = (data.fields.communityId as { value: string } | undefined)?.value;
+    if (!communityId) {
+      return reply.status(400).send({ error: "communityId is required" });
+    }
+
+    const isMember = await isUserInCommunity(request.user.userId, communityId);
+    if (!isMember) {
+      return reply.status(403).send({ error: "Not a member of this community" });
+    }
+
+    if (!ALLOWED_EMOJI_MIMES.has(data.mimetype)) {
+      return reply.status(400).send({ error: "Only PNG, GIF, and WebP images are allowed" });
+    }
+
+    const buffer = await data.toBuffer();
+    if (buffer.length > MAX_EMOJI_SIZE) {
+      return reply.status(413).send({ error: "Emoji too large. Maximum size is 256KB." });
+    }
+
+    const emojiId = randomUUID();
+    const ext = MIME_TO_EXT[data.mimetype] || extname(data.filename || ".png");
+    const fileName = `${emojiId}${ext}`;
+
+    const emojiDir = join(UPLOADS_DIR, "emojis");
+    await mkdir(emojiDir, { recursive: true });
+    await writeFile(join(emojiDir, fileName), buffer);
+
+    return { fileUrl: `/api/files/emoji/${fileName}` };
+  });
+
+  // Serve a custom emoji image
+  fastify.get("/emoji/:filename", async (request, reply) => {
+    const { filename } = request.params as { filename: string };
+
+    // Sanitize filename (only allow uuid.ext pattern)
+    if (!/^[a-f0-9-]+\.(png|gif|webp)$/.test(filename)) {
+      return reply.status(400).send({ error: "Invalid filename" });
+    }
+
+    const filePath = join(UPLOADS_DIR, "emojis", filename);
+    if (!existsSync(filePath)) {
+      return reply.status(404).send({ error: "Emoji not found" });
+    }
+
+    const ext = extname(filename).toLowerCase();
+    const mimeMap: Record<string, string> = {
+      ".png": "image/png",
+      ".gif": "image/gif",
+      ".webp": "image/webp",
+    };
+
+    reply.header("Content-Type", mimeMap[ext] || "application/octet-stream");
+    reply.header("Cache-Control", "public, max-age=31536000, immutable");
+    return reply.send(createReadStream(filePath));
   });
 
   // Download an encrypted file

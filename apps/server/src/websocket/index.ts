@@ -220,6 +220,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
     }
 
     case "message:send": {
+      const msgStart = performance.now();
       // Validate payload
       const sendPayload = validatePayload("message:send", message.payload);
       if (!sendPayload) {
@@ -236,6 +237,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
 
       // Fast-path: if socket is already in channelConnections for this channel,
       // it was authorized at channel:join time — skip the DB query
+      const authStart = performance.now();
       const isAlreadyInChannel = channelConnections.get(channelId)?.has(socket);
       if (!isAlreadyInChannel) {
         const canSend = await canUserAccessChannel(user.userId, channelId);
@@ -249,8 +251,10 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
           return;
         }
       }
+      const authTime = performance.now() - authStart;
 
       // Run DB insert and display name lookup in parallel
+      const dbStart = performance.now();
       const cachedDisplayName = displayNameCache.get(user.userId);
       const [insertResult, senderResult] = await Promise.all([
         db
@@ -269,6 +273,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
               columns: { displayName: true },
             }),
       ]);
+      const dbTime = performance.now() - dbStart;
 
       const savedMessage = insertResult[0];
       const sender = senderResult;
@@ -279,6 +284,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       }
 
       // Broadcast to all users in channel
+      const broadcastStart = performance.now();
       const channelSockets = channelConnections.get(channelId);
       const broadcastMsg = JSON.stringify({
         type: "message:new",
@@ -308,6 +314,15 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
             clientSocket.send(broadcastMsg);
           }
         }
+      }
+      const broadcastTime = performance.now() - broadcastStart;
+      const totalTime = performance.now() - msgStart;
+
+      if (process.env.NODE_ENV !== "production") {
+        logger.debug(
+          `[PERF] message:send total=${totalTime.toFixed(1)}ms ` +
+          `(auth=${authTime.toFixed(1)}ms, db=${dbTime.toFixed(1)}ms, broadcast=${broadcastTime.toFixed(1)}ms)`
+        );
       }
       break;
     }

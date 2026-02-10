@@ -38,6 +38,7 @@ export function Chat() {
     setCommunities,
     setChannels,
     setMembers,
+    setCustomEmojis,
     addMessage,
     addMemberIfMissing,
     addMemberToCommunity,
@@ -75,6 +76,7 @@ export function Chat() {
   }, [members, activeCommunityId, activeChannelId]);
 
   // Load communities on mount (wait for auth store to rehydrate first)
+  // After loading, validate and restore the last-visited community/channel from localStorage
   useEffect(() => {
     if (!user || !hasHydrated) return;
 
@@ -82,6 +84,13 @@ export function Chat() {
       try {
         const { communities } = await api.communities.list(user.id);
         setCommunities(communities);
+
+        // Restore last-visited community from localStorage
+        const { activeCommunityId: savedCommunityId } = useChatStore.getState();
+        if (savedCommunityId && communities.some((c) => c.id === savedCommunityId)) {
+          // Community exists — select it (triggers channel load via the community effect)
+          useChatStore.getState().setActiveCommunity(savedCommunityId);
+        }
       } catch (err) {
         logger.error("Failed to load communities:", err);
         // Retry once after a short delay (helps with mobile auth timing)
@@ -89,6 +98,11 @@ export function Chat() {
           try {
             const { communities } = await api.communities.list(user.id);
             setCommunities(communities);
+
+            const { activeCommunityId: savedCommunityId } = useChatStore.getState();
+            if (savedCommunityId && communities.some((c) => c.id === savedCommunityId)) {
+              useChatStore.getState().setActiveCommunity(savedCommunityId);
+            }
           } catch (retryErr) {
             logger.error("Failed to load communities on retry:", retryErr);
           }
@@ -175,14 +189,32 @@ export function Chat() {
   }, [user, hasHydrated]);
 
   // Load community details when active community changes
+  // Validates and restores the saved channel from localStorage
   useEffect(() => {
     if (!activeCommunityId) return;
 
     api.communities.get(activeCommunityId).then(({ channels, members }) => {
       setChannels(activeCommunityId, channels);
       setMembers(activeCommunityId, members);
+
+      // Fetch custom emojis for this community
+      api.emojis.list(activeCommunityId).then(({ emojis }) => {
+        setCustomEmojis(activeCommunityId, emojis);
+      }).catch(() => {
+        // Emoji fetch is non-critical
+      });
+
+      // Restore last-visited channel if valid, otherwise select first channel
+      const { activeChannelId: savedChannelId } = useChatStore.getState();
+      if (savedChannelId && channels.some((c) => c.id === savedChannelId)) {
+        // Saved channel exists in this community — keep it selected
+        useChatStore.getState().setActiveChannel(savedChannelId);
+      } else if (channels.length > 0 && !savedChannelId) {
+        // No saved channel — auto-select first channel (mobile convenience)
+        useChatStore.getState().setActiveChannel(channels[0].id);
+      }
     });
-  }, [activeCommunityId, setChannels, setMembers]);
+  }, [activeCommunityId, setChannels, setMembers, setCustomEmojis]);
 
   // Connect WebSocket
   useEffect(() => {

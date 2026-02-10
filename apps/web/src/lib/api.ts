@@ -269,5 +269,27 @@ export const api = {
           body: JSON.stringify(data),
         }
       ),
+
+    uploadImage: (file: File, communityId: string) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("communityId", communityId);
+
+      const token = useAuthStore.getState().token;
+      return fetch(`${API_BASE}/files/emoji-upload`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      }).then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: "Upload failed" }));
+          throw new Error(err.error || "Upload failed");
+        }
+        return res.json() as Promise<{ fileUrl: string }>;
+      });
+    },
+
+    delete: (emojiId: string) =>
+      request<{ success: boolean }>(`/emojis/${emojiId}`, { method: "DELETE" }),
   },
 };

@@ -18,6 +18,7 @@ import {
   decryptChannelKey,
   importPrivateKey,
 } from "./crypto";
+import { startTimer, endTimer } from "./perfLogger";
 import {
   getChannelKey,
   storeChannelKey,
@@ -278,8 +279,11 @@ export async function encryptChannelMessage(
   members: { id: string; displayName: string }[],
   currentUserId: string
 ): Promise<string> {
+  startTimer("encrypt-channel-message");
   const { key } = await ensureChannelKey(channelId, members, currentUserId);
-  return await encryptMessage(plaintext, key);
+  const result = await encryptMessage(plaintext, key);
+  endTimer("encrypt-channel-message");
+  return result;
 }
 
 /**
@@ -303,7 +307,10 @@ export async function decryptChannelMessage(
   const localKey = await getChannelKey(channelId);
   if (localKey) {
     try {
-      return await decryptMessage(ciphertext, localKey);
+      startTimer("decrypt-message");
+      const result = await decryptMessage(ciphertext, localKey);
+      endTimer("decrypt-message");
+      return result;
     } catch {
       // Local key didn't work - might be stale, try fetching fresh key from server
       logger.debug("Local key failed to decrypt, trying to fetch fresh key from server");

@@ -48,11 +48,19 @@ interface PollVote {
   userIds: string[];
 }
 
+interface CustomEmoji {
+  id: string;
+  name: string;
+  fileUrl: string;
+  animated: boolean;
+}
+
 interface ChatState {
   communities: Community[];
   channels: Record<string, Channel[]>; // communityId -> channels
   messages: Record<string, Message[]>; // channelId -> messages
   members: Record<string, Member[]>; // communityId -> members
+  customEmojis: Record<string, CustomEmoji[]>; // communityId -> emojis
   activeCommunityId: string | null;
   activeChannelId: string | null;
   typingUsers: Record<string, string[]>; // channelId -> userIds
@@ -95,19 +103,49 @@ interface ChatState {
   setSearchOpen: (open: boolean) => void;
   searchMessages: (query: string) => void;
   setScrollToMessage: (messageId: string | null) => void;
+  setCustomEmojis: (communityId: string, emojis: CustomEmoji[]) => void;
+  addCustomEmoji: (communityId: string, emoji: CustomEmoji) => void;
+  removeCustomEmoji: (communityId: string, emojiId: string) => void;
   // Cleanup methods to prevent memory leaks
   clearChannelMessages: (channelId: string) => void;
   clearTypingUsers: (channelId: string) => void;
   clearChannelState: (channelId: string) => void;
 }
 
+// Lightweight localStorage persist for last-visited channel (not the entire store)
+const LAST_CHANNEL_KEY = "vibe-chat-last-channel";
+
+function loadLastChannel(): { communityId: string | null; channelId: string | null } {
+  try {
+    const saved = localStorage.getItem(LAST_CHANNEL_KEY);
+    if (saved) {
+      const { communityId, channelId } = JSON.parse(saved);
+      return { communityId: communityId || null, channelId: channelId || null };
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return { communityId: null, channelId: null };
+}
+
+function saveLastChannel(communityId: string | null, channelId: string | null): void {
+  try {
+    localStorage.setItem(LAST_CHANNEL_KEY, JSON.stringify({ communityId, channelId }));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+const savedState = loadLastChannel();
+
 export const useChatStore = create<ChatState>((set, get) => ({
   communities: [],
   channels: {},
   messages: {},
   members: {},
-  activeCommunityId: null,
-  activeChannelId: null,
+  customEmojis: {},
+  activeCommunityId: savedState.communityId,
+  activeChannelId: savedState.channelId,
   typingUsers: {},
   replyingTo: null,
   onlineUsers: {},
@@ -214,9 +252,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
       };
     }),
 
-  setActiveCommunity: (communityId) => set({ activeCommunityId: communityId }),
+  setActiveCommunity: (communityId) => {
+    set({ activeCommunityId: communityId });
+    const channelId = get().activeChannelId;
+    saveLastChannel(communityId, channelId);
+  },
 
-  setActiveChannel: (channelId) => set({ activeChannelId: channelId }),
+  setActiveChannel: (channelId) => {
+    set({ activeChannelId: channelId });
+    const communityId = get().activeCommunityId;
+    saveLastChannel(communityId, channelId);
+  },
 
   setTypingUser: (channelId, userId, isTyping) =>
     set((state) => {
@@ -438,6 +484,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setScrollToMessage: (messageId) => set({ scrollToMessageId: messageId }),
+
+  setCustomEmojis: (communityId, emojis) =>
+    set((state) => ({
+      customEmojis: { ...state.customEmojis, [communityId]: emojis },
+    })),
+
+  addCustomEmoji: (communityId, emoji) =>
+    set((state) => ({
+      customEmojis: {
+        ...state.customEmojis,
+        [communityId]: [...(state.customEmojis[communityId] || []), emoji],
+      },
+    })),
+
+  removeCustomEmoji: (communityId, emojiId) =>
+    set((state) => ({
+      customEmojis: {
+        ...state.customEmojis,
+        [communityId]: (state.customEmojis[communityId] || []).filter((e) => e.id !== emojiId),
+      },
+    })),
 
   // Cleanup methods to prevent memory leaks
 

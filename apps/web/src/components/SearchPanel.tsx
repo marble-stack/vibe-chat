@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useChatStore } from "../stores/chat";
+import { MentionText } from "./MentionText";
+import { useAuthStore } from "../stores/auth";
 
 const formatTime = (dateStr: string) => {
   const date = new Date(dateStr);
@@ -13,6 +15,7 @@ export function SearchPanel() {
   const { searchQuery, searchResults, searchMessages, setSearchOpen, setScrollToMessage, members, activeCommunityId } =
     useChatStore();
   const inputRef = useRef<HTMLInputElement>(null);
+  const user = useAuthStore((state) => state.user);
   const communityMembers = activeCommunityId ? members[activeCommunityId] || [] : [];
 
   useEffect(() => {
@@ -96,7 +99,9 @@ export function SearchPanel() {
                 </span>
                 <span className="text-xs text-text-muted">{formatTime(msg.createdAt)}</span>
               </div>
-              <p className="text-sm text-text-secondary truncate">{displayText}</p>
+              <p className="text-sm text-text-secondary truncate">
+                <MentionText text={displayText} currentUserId={user?.id} />
+              </p>
             </button>
           );
         })}

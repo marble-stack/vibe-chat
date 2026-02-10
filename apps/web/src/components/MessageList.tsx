@@ -9,6 +9,8 @@ import { DecryptionErrorMessage } from "./DecryptionErrorMessage";
 import { FileMessage } from "./FileMessage";
 import { PollMessage } from "./PollMessage";
 import { ProfileCard } from "./ProfileCard";
+import { MentionText } from "./MentionText";
+import { EmojiDisplay } from "./CustomEmojiText";
 
 interface Member {
   id: string;
@@ -57,6 +59,61 @@ const formatDateSeparator = (date: Date) => {
     day: "numeric",
   });
 };
+
+function ReactionPickerDropdown({
+  message,
+  userId,
+  onReactionClick,
+}: {
+  message: Message;
+  userId: string | undefined;
+  onReactionClick: (messageId: string, emoji: string, userReactionId?: string) => void;
+}) {
+  const { activeCommunityId, customEmojis } = useChatStore();
+  const communityEmojis = activeCommunityId ? customEmojis[activeCommunityId] || [] : [];
+
+  return (
+    <div className="absolute right-0 top-full mt-1 z-20 bg-background-secondary border border-background-tertiary rounded-lg shadow-lg p-2">
+      <div className="flex gap-1">
+        {EMOJI_OPTIONS.map((emoji) => {
+          const existingReaction = message.reactions?.find((r) => r.emoji === emoji);
+          const emojiUserReactionId =
+            userId && existingReaction ? existingReaction.reactionIds[userId] : undefined;
+          return (
+            <button
+              key={emoji}
+              onClick={() => onReactionClick(message.id, emoji, emojiUserReactionId)}
+              className="w-8 h-8 flex items-center justify-center rounded hover:bg-background-primary/50 transition-colors text-lg"
+              title={emoji}
+            >
+              {emoji}
+            </button>
+          );
+        })}
+      </div>
+      {communityEmojis.length > 0 && (
+        <div className="flex gap-1 mt-1 pt-1 border-t border-background-tertiary flex-wrap max-w-[240px]">
+          {communityEmojis.map((ce) => {
+            const emojiStr = `:${ce.name}:`;
+            const existingReaction = message.reactions?.find((r) => r.emoji === emojiStr);
+            const emojiUserReactionId =
+              userId && existingReaction ? existingReaction.reactionIds[userId] : undefined;
+            return (
+              <button
+                key={ce.id}
+                onClick={() => onReactionClick(message.id, emojiStr, emojiUserReactionId)}
+                className="w-8 h-8 flex items-center justify-center rounded hover:bg-background-primary/50 transition-colors"
+                title={emojiStr}
+              >
+                <img src={ce.fileUrl} alt={ce.name} className="w-5 h-5 object-contain" />
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface MessageItemProps {
   message: Message;
@@ -150,30 +207,11 @@ const MessageItem = memo(function MessageItem({
                   className="fixed inset-0 z-10"
                   onClick={onCloseEmojiPicker}
                 />
-                <div className="absolute right-0 top-full mt-1 z-20 bg-background-secondary border border-background-tertiary rounded-lg shadow-lg p-2 flex gap-1">
-                  {EMOJI_OPTIONS.map((emoji) => {
-                    const existingReaction = message.reactions?.find(
-                      (r) => r.emoji === emoji
-                    );
-                    const emojiUserReactionId =
-                      userId && existingReaction
-                        ? existingReaction.reactionIds[userId]
-                        : undefined;
-
-                    return (
-                      <button
-                        key={emoji}
-                        onClick={() =>
-                          onReactionClick(message.id, emoji, emojiUserReactionId)
-                        }
-                        className="w-8 h-8 flex items-center justify-center rounded hover:bg-background-primary/50 transition-colors text-lg"
-                        title={emoji}
-                      >
-                        {emoji}
-                      </button>
-                    );
-                  })}
-                </div>
+                <ReactionPickerDropdown
+                  message={message}
+                  userId={userId}
+                  onReactionClick={onReactionClick}
+                />
               </>
             )}
           </div>
@@ -316,7 +354,7 @@ const MessageItem = memo(function MessageItem({
           }
           return (
             <p className="text-text-primary break-words whitespace-pre-wrap">
-              {plaintext}
+              <MentionText text={plaintext} currentUserId={userId} />
               {message.editedAt && (
                 <span className="text-xs text-text-muted ml-1">(edited)</span>
               )}
@@ -359,7 +397,7 @@ const MessageItem = memo(function MessageItem({
                     .map((id) => getMember(id)?.displayName || "Unknown")
                     .join(", ")}
                 >
-                  <span>{reaction.emoji}</span>
+                  <EmojiDisplay emoji={reaction.emoji} />
                   <span className="text-xs">{reaction.count}</span>
                 </button>
               );
