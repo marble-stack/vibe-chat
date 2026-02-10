@@ -8,6 +8,7 @@ import { logger } from "../lib/logger";
 import { DecryptionErrorMessage } from "./DecryptionErrorMessage";
 import { FileMessage } from "./FileMessage";
 import { PollMessage } from "./PollMessage";
+import { ProfileCard } from "./ProfileCard";
 
 interface Member {
   id: string;
@@ -38,6 +39,25 @@ const formatTime = (dateStr: string) => {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 };
 
+const isSameDay = (d1: Date, d2: Date) =>
+  d1.getFullYear() === d2.getFullYear() &&
+  d1.getMonth() === d2.getMonth() &&
+  d1.getDate() === d2.getDate();
+
+const formatDateSeparator = (date: Date) => {
+  const now = new Date();
+  if (isSameDay(date, now)) return "Today";
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (isSameDay(date, yesterday)) return "Yesterday";
+  return date.toLocaleDateString(undefined, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+};
+
 interface MessageItemProps {
   message: Message;
   sender: Member | undefined;
@@ -62,6 +82,7 @@ interface MessageItemProps {
   onToggleEmojiPicker: (id: string | null) => void;
   onCloseEmojiPicker: () => void;
   onOpenThread: (messageId: string) => void;
+  onUsernameClick: (userId: string, e: React.MouseEvent) => void;
   getMember: (userId: string) => Member | undefined;
   replyCount: number;
   channelMessages: Message[];
@@ -91,6 +112,7 @@ const MessageItem = memo(function MessageItem({
   onToggleEmojiPicker,
   onCloseEmojiPicker,
   onOpenThread,
+  onUsernameClick,
   getMember,
   replyCount,
 }: MessageItemProps) {
@@ -229,7 +251,10 @@ const MessageItem = memo(function MessageItem({
 
         {showHeader && (
           <div className="flex items-baseline gap-2">
-            <span className="font-medium text-text-primary hover:underline cursor-pointer">
+            <span
+              className="font-medium text-text-primary hover:underline cursor-pointer"
+              onClick={(e) => onUsernameClick(message.senderId, e)}
+            >
               {sender?.displayName || "Unknown"}
             </span>
             <span className="text-xs text-text-muted">
@@ -264,7 +289,7 @@ const MessageItem = memo(function MessageItem({
           </div>
         ) : message.sendFailed ? (
           <div>
-            <p className="text-text-primary break-words">
+            <p className="text-text-primary break-words whitespace-pre-wrap">
               {message.plaintext || message.ciphertext}
             </p>
             <span className="text-xs text-red-400">Failed to send</span>
@@ -286,7 +311,7 @@ const MessageItem = memo(function MessageItem({
             // Not JSON, render as text
           }
           return (
-            <p className="text-text-primary break-words">
+            <p className="text-text-primary break-words whitespace-pre-wrap">
               {plaintext}
               {message.editedAt && (
                 <span className="text-xs text-text-muted ml-1">(edited)</span>
@@ -358,6 +383,10 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     getMessageById,
     setActiveChannel,
     setActiveThread,
+    onlineUsers,
+    setSearchOpen,
+    scrollToMessageId,
+    setScrollToMessage,
   } = useChatStore();
   const user = useAuthStore((state) => state.user);
 
@@ -376,6 +405,12 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
 
   // Reaction emoji picker state
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+
+  // Profile card state
+  const [profileCard, setProfileCard] = useState<{
+    userId: string;
+    position: { x: number; y: number };
+  } | null>(null);
 
   const allChannelMessages = activeChannelId ? messages[activeChannelId] || [] : [];
   // Filter out thread replies from main view — they only show in ThreadPanel
@@ -549,6 +584,14 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     setActiveChannel(null);
   };
 
+  // Handle scroll-to-message from search
+  useEffect(() => {
+    if (scrollToMessageId) {
+      scrollToMessage(scrollToMessageId);
+      setScrollToMessage(null);
+    }
+  }, [scrollToMessageId, scrollToMessage, setScrollToMessage]);
+
   const handleReactionClick = useCallback(
     (messageId: string, emoji: string, userReactionId?: string) => {
       if (!user || !activeChannelId) return;
@@ -563,8 +606,33 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     [user, activeChannelId]
   );
 
+  const onlineUserIds = activeCommunityId ? onlineUsers[activeCommunityId] || [] : [];
+
+  const handleUsernameClick = useCallback(
+    (userId: string, e: React.MouseEvent) => {
+      setProfileCard({
+        userId,
+        position: { x: e.clientX, y: e.clientY },
+      });
+    },
+    []
+  );
+
+  const profileMember = profileCard ? getMember(profileCard.userId) : null;
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Profile card popover */}
+      {profileCard && profileMember && (
+        <ProfileCard
+          displayName={profileMember.displayName}
+          avatarUrl={profileMember.avatarUrl}
+          isOnline={onlineUserIds.includes(profileCard.userId)}
+          position={profileCard.position}
+          onClose={() => setProfileCard(null)}
+        />
+      )}
+
       {/* Channel header */}
       <div className="h-12 px-4 flex items-center border-b border-background-tertiary shadow-sm">
         {/* Back button - only on mobile */}
@@ -600,7 +668,21 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
         </button>
 
         <span className="text-text-muted text-lg mr-2">#</span>
-        <span className="font-semibold text-text-primary">{activeChannel?.name}</span>
+        <span className="font-semibold text-text-primary flex-1">{activeChannel?.name}</span>
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="text-text-muted hover:text-text-primary p-1 ml-auto"
+          title="Search messages"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+        </button>
       </div>
 
       {/* Messages */}
@@ -617,12 +699,16 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
           channelMessages.map((message, index) => {
             const sender = getMember(message.senderId);
             const prevMessage = channelMessages[index - 1];
+            const currentDate = new Date(message.createdAt);
+            const prevDate = prevMessage ? new Date(prevMessage.createdAt) : null;
+            const showDateSeparator = !prevDate || !isSameDay(currentDate, prevDate);
             const showHeader =
               !prevMessage ||
               prevMessage.senderId !== message.senderId ||
               new Date(message.createdAt).getTime() - new Date(prevMessage.createdAt).getTime() >
                 5 * 60 * 1000 ||
-              message.replyToId; // Always show header for replies
+              message.replyToId || // Always show header for replies
+              showDateSeparator; // Always show header after date boundary
 
             // Get the message being replied to
             const replyMessage = getReplyMessage(message.replyToId);
@@ -631,8 +717,17 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
             const replyCount = allChannelMessages.filter((m) => m.replyToId === message.id).length;
 
             return (
+              <div key={`wrapper-${message.clientId || message.id}`}>
+                {showDateSeparator && (
+                  <div className="flex items-center gap-4 my-4 px-2">
+                    <div className="flex-1 h-px bg-background-tertiary" />
+                    <span className="text-xs font-semibold text-text-muted">
+                      {formatDateSeparator(currentDate)}
+                    </span>
+                    <div className="flex-1 h-px bg-background-tertiary" />
+                  </div>
+                )}
               <MessageItem
-                key={message.clientId || message.id}
                 message={message}
                 sender={sender}
                 showHeader={!!showHeader}
@@ -656,10 +751,12 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
                 onToggleEmojiPicker={setShowEmojiPicker}
                 onCloseEmojiPicker={() => setShowEmojiPicker(null)}
                 onOpenThread={setActiveThread}
+                onUsernameClick={handleUsernameClick}
                 getMember={getMember}
                 replyCount={replyCount}
                 channelMessages={channelMessages}
               />
+              </div>
             );
           })
         )}

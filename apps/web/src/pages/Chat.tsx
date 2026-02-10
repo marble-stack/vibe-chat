@@ -19,6 +19,11 @@ import { MessageInput } from "../components/MessageInput";
 import { MemberList } from "../components/MemberList";
 import { KeyRecoveryBanner } from "../components/KeyRecoveryBanner";
 import { ThreadPanel } from "../components/ThreadPanel";
+import { SearchPanel } from "../components/SearchPanel";
+import {
+  requestNotificationPermission,
+  showMessageNotification,
+} from "../lib/notifications";
 
 export function Chat() {
   const navigate = useNavigate();
@@ -45,6 +50,9 @@ export function Chat() {
     removeReaction,
     activeThreadId,
     updatePollVote,
+    incrementUnread,
+    markChannelRead,
+    isSearchOpen,
   } = useChatStore();
 
   // Mobile navigation state
@@ -58,11 +66,13 @@ export function Chat() {
   // Ref to track current members for the WebSocket handler
   const membersRef = useRef(members);
   const activeCommunityRef = useRef(activeCommunityId);
+  const activeChannelRef = useRef(activeChannelId);
 
   useEffect(() => {
     membersRef.current = members;
     activeCommunityRef.current = activeCommunityId;
-  }, [members, activeCommunityId]);
+    activeChannelRef.current = activeChannelId;
+  }, [members, activeCommunityId, activeChannelId]);
 
   // Load communities on mount (wait for auth store to rehydrate first)
   useEffect(() => {
@@ -88,6 +98,13 @@ export function Chat() {
 
     loadCommunities();
   }, [user, hasHydrated, setCommunities]);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if (user) {
+      requestNotificationPermission();
+    }
+  }, [user]);
 
   // Process pending key requests on login (for offline key sync)
   // When a key holder comes online, they should redistribute keys to users who requested while offline
@@ -251,6 +268,31 @@ export function Chat() {
         replyToId: payload.replyToId,
         createdAt: payload.createdAt,
       });
+
+      // Increment unread count if message is for a non-active channel
+      if (payload.channelId !== activeChannelRef.current) {
+        incrementUnread(payload.channelId);
+      }
+
+      // Show desktop notification when tab is not focused
+      if (!document.hasFocus() && user && payload.senderId !== user.id) {
+        const senderName = payload.senderDisplayName || "Someone";
+        const preview = decryptionFailed ? "New message" : (plaintext || "New message");
+        // Try to parse as structured content for better preview
+        let displayPreview = preview;
+        try {
+          const parsed = JSON.parse(preview);
+          if (parsed.type === "file") displayPreview = `Sent a file: ${parsed.filename}`;
+          else if (parsed.type === "poll") displayPreview = `Created a poll: ${parsed.question}`;
+        } catch {
+          // Not JSON, use as-is
+        }
+        const channels = useChatStore.getState().channels;
+        const currentCommunityId = activeCommunityRef.current;
+        const channelList = currentCommunityId ? channels[currentCommunityId] || [] : [];
+        const channel = channelList.find((c) => c.id === payload.channelId);
+        showMessageNotification(senderName, displayPreview, channel?.name || "channel");
+      }
     };
 
     // Handle typing indicators
@@ -520,6 +562,7 @@ export function Chat() {
     addMemberIfMissing,
     addMemberToCommunity,
     updatePollVote,
+    incrementUnread,
   ]);
 
   // Join active community for presence updates
@@ -529,12 +572,13 @@ export function Chat() {
     }
   }, [activeCommunityId]);
 
-  // Join active channel
+  // Join active channel and mark as read
   useEffect(() => {
     if (activeChannelId) {
       wsClient.joinChannel(activeChannelId);
+      markChannelRead(activeChannelId);
     }
-  }, [activeChannelId]);
+  }, [activeChannelId, markChannelRead]);
 
   // Polling fallback for key sync when key owner might be offline
   useEffect(() => {
@@ -648,6 +692,9 @@ export function Chat() {
           </div>
         )}
       </div>
+
+      {/* Search panel */}
+      {isSearchOpen && <SearchPanel />}
 
       {/* Thread panel */}
       {activeThreadId && <ThreadPanel />}
