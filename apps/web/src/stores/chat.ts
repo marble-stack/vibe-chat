@@ -174,15 +174,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
         );
         if (optimisticIndex !== -1) {
           const updated = [...channelMessages];
-          updated[optimisticIndex] = { ...message, pending: false, sendFailed: false };
+          // Merge: keep optimistic fields (like plaintext) and overlay server fields
+          updated[optimisticIndex] = {
+            ...channelMessages[optimisticIndex],
+            ...message,
+            pending: false,
+            sendFailed: false,
+          };
           return {
             messages: { ...state.messages, [message.channelId]: updated },
           };
         }
       }
 
-      // Deduplicate - check if message already exists by id
-      if (channelMessages.some((m) => m.id === message.id)) {
+      // Deduplicate - check if message already exists by id or clientId
+      if (channelMessages.some((m) => m.id === message.id || (message.clientId && m.clientId === message.clientId))) {
         return state;
       }
       return {

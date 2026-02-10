@@ -24,6 +24,14 @@ class WebSocketClient {
     this.token = token;
     this.authenticated = false;
 
+    // Close existing WebSocket if any to prevent orphaned connections
+    if (this.ws) {
+      // Remove onclose handler to prevent reconnection loop from the old socket
+      this.ws.onclose = null;
+      this.ws.close();
+      this.ws = null;
+    }
+
     // Use environment variable if available, otherwise fall back to window.location
     const wsUrl =
       import.meta.env.VITE_WS_URL ||
