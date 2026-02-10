@@ -200,13 +200,32 @@ Copy `apps/web/.env.example` to `apps/web/.env` if you need to override default 
 - No forward secrecy - key compromise could expose past messages
 - No key verification mechanism for MITM detection
 
+## Deployment Environments
+
+**Railway Project: gleaming-respect**
+
+### Production (`main` branch)
+
+- **Backend (vibe-chat)**: Deploys from `main`
+- **Frontend (pleasant-motivation)**: Deploys from `main`
+- **Database**: Neon PostgreSQL (external, connection string in `apps/server/.env`)
+- **Redis**: Railway-managed
+
+### Staging (`staging` branch)
+
+- **Backend (vibe-chat)**: `vibe-chat-staging.up.railway.app` — deploys from `staging`
+- **Frontend (pleasant-motivation)**: `pleasant-motivation-staging.up.railway.app` — deploys from `staging`
+- **Database**: Railway-managed PostgreSQL (isolated from production)
+- **Redis**: Railway-managed (isolated from production)
+- Staging has its own database — no shared data with production. New accounts must be created separately.
+
+### Branch Workflow
+
+- Push to `staging` → deploys to QA/staging only
+- Push to `main` → deploys to production only
+- Feature branches → merge into `staging` for QA, then into `main` for release
+
 ## Current Status
-
-**Deployed and Live on Railway**
-
-- **Database**: Neon PostgreSQL (connection string in `apps/server/.env`)
-- **Backend**: Deployed on Railway with Redis
-- **Frontend**: Deployed on Railway
 
 ### Working Features
 
@@ -242,7 +261,8 @@ Copy `apps/web/.env.example` to `apps/web/.env` if you need to override default 
 
 ### Workflow Note
 
-Always push changes after making edits so Railway auto-deploys.
+- Push to `staging` branch for QA testing, push to `main` for production deploys.
+- Staging and production have fully isolated databases — no shared state.
 
 ## Local Development (Alternative)
 
