@@ -11,7 +11,7 @@ const createEmojiSchema = z.object({
     .min(1)
     .max(32)
     .regex(/^[a-z0-9_]+$/, "Emoji name must be lowercase alphanumeric with underscores"),
-  fileUrl: z.string().url(),
+  fileUrl: z.string().min(1),
   animated: z.boolean().default(false),
   uploadedBy: z.string().uuid(),
 });
