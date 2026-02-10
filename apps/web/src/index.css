@@ -12,8 +12,8 @@ body {
     Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #313338;
-  color: #f2f3f5;
+  background-color: #1a2e1a;
+  color: #e8f5e8;
 }
 
 /* Custom scrollbar */
@@ -27,10 +27,10 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e1f22;
+  background: #0f1a0f;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #35363c;
+  background: #2a4a2a;
 }

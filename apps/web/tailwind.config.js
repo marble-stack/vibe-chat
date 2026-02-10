@@ -4,24 +4,24 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Discord-inspired dark theme
+        // Green dark theme
         background: {
-          primary: "#313338",
-          secondary: "#2b2d31",
-          tertiary: "#1e1f22",
+          primary: "#1a2e1a",
+          secondary: "#152415",
+          tertiary: "#0f1a0f",
         },
         text: {
-          primary: "#f2f3f5",
-          secondary: "#b5bac1",
-          muted: "#949ba4",
+          primary: "#e8f5e8",
+          secondary: "#a8c5a8",
+          muted: "#7a9a7a",
         },
         accent: {
-          primary: "#5865f2",
-          hover: "#4752c4",
+          primary: "#4caf50",
+          hover: "#388e3c",
         },
         channel: {
-          default: "#80848e",
-          hover: "#dbdee1",
+          default: "#6b8f6b",
+          hover: "#c8e6c9",
         },
       },
     },
