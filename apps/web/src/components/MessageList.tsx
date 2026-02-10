@@ -280,7 +280,7 @@ const MessageItem = memo(function MessageItem({
               return <FileMessage metadata={parsed} channelId={message.channelId} />;
             }
             if (parsed.type === "poll") {
-              return <PollMessage metadata={parsed} messageId={message.id} channelId={message.channelId} />;
+              return <PollMessage metadata={parsed} messageId={message.id} />;
             }
           } catch {
             // Not JSON, render as text

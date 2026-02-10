@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
-import { wsClient } from "../lib/websocket";
 import { logger } from "../lib/logger";
 
 interface PollMetadata {
@@ -15,12 +14,11 @@ interface PollMetadata {
 interface PollMessageProps {
   metadata: PollMetadata;
   messageId: string;
-  channelId: string;
 }
 
-export function PollMessage({ metadata, messageId, channelId }: PollMessageProps) {
+export function PollMessage({ metadata, messageId }: PollMessageProps) {
   const user = useAuthStore((state) => state.user);
-  const { pollVotes, setPollVotes } = useChatStore();
+  const { pollVotes, setPollVotes, updatePollVote } = useChatStore();
   const votes = pollVotes[messageId] || [];
 
   // Fetch results on mount
@@ -48,13 +46,29 @@ export function PollMessage({ metadata, messageId, channelId }: PollMessageProps
     return votes.find((v) => v.optionIndex === index)?.userIds.includes(user.id) || false;
   };
 
-  const handleVote = (optionIndex: number) => {
+  const handleVote = async (optionIndex: number) => {
     if (!user) return;
 
-    wsClient.send({
-      type: "poll:vote",
-      payload: { messageId, channelId, optionIndex },
-    });
+    const alreadyVoted = hasUserVoted(optionIndex);
+
+    // Optimistic update
+    updatePollVote(messageId, user.id, optionIndex, alreadyVoted ? "remove" : "add");
+
+    try {
+      if (alreadyVoted) {
+        await api.polls.removeVote(messageId, optionIndex);
+      } else {
+        await api.polls.vote(messageId, optionIndex);
+      }
+
+      // Re-fetch to ensure consistency
+      const { votes: results } = await api.polls.getResults(messageId);
+      setPollVotes(messageId, results);
+    } catch (err) {
+      logger.error("Failed to vote:", err);
+      // Revert optimistic update
+      updatePollVote(messageId, user.id, optionIndex, alreadyVoted ? "add" : "remove");
+    }
   };
 
   return (
