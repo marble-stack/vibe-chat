@@ -620,6 +620,195 @@ describe("Channel Crypto Integration", () => {
     });
   });
 
+  describe("isDecryptionError", () => {
+    it("should return true for known error strings", async () => {
+      const { isDecryptionError } = await import("../../lib/channelCrypto");
+
+      expect(isDecryptionError("[Syncing keys...]")).toBe(true);
+      expect(isDecryptionError("[Unable to decrypt message]")).toBe(true);
+      expect(isDecryptionError("[Encryption not set up - please re-register]")).toBe(true);
+    });
+
+    it("should return false for normal text", async () => {
+      const { isDecryptionError } = await import("../../lib/channelCrypto");
+
+      expect(isDecryptionError("Hello world")).toBe(false);
+      expect(isDecryptionError("")).toBe(false);
+      expect(isDecryptionError(undefined)).toBe(false);
+    });
+  });
+
+  describe("ensureChannelKey deadlock recovery", () => {
+    it("should create new key when sender keys exist but decryption fails (deadlock recovery)", async () => {
+      const {
+        getChannelKey,
+        getIdentityKeys,
+        storeChannelKey,
+        storeUserKey,
+        getUserKey,
+      } = await import("../../lib/keyStore");
+      const { api } = await import("../../lib/api");
+      const { ensureChannelKey } = await import("../../lib/channelCrypto");
+
+      const userKeyPair = await generateKeyPair();
+      const userPublicKey = await exportPublicKey(userKeyPair.publicKey);
+      const userPrivateKey = await exportPrivateKey(userKeyPair.privateKey);
+
+      vi.mocked(getChannelKey).mockResolvedValue(null);
+      vi.mocked(getIdentityKeys).mockResolvedValue({
+        userId: "user-1",
+        identityKeyPair: {
+          publicKey: userPublicKey,
+          privateKey: userPrivateKey,
+        },
+        signedPreKeyPair: {
+          publicKey: "signed-pub",
+          privateKey: "signed-priv",
+        },
+      });
+      vi.mocked(getUserKey).mockResolvedValue(null);
+      vi.mocked(storeUserKey).mockResolvedValue(undefined);
+      vi.mocked(storeChannelKey).mockResolvedValue(undefined);
+
+      // Sender keys exist but are cryptographically broken (decryption will fail)
+      vi.mocked(api.channels.getSenderKeys).mockResolvedValue({
+        senderKeys: [
+          {
+            userId: "sender-1",
+            distributionId: "dist-1",
+            encryptedKey: "broken-encrypted-key-data",
+            senderPublicKey: userPublicKey, // Wrong key - will cause decryption failure
+          },
+        ],
+      });
+
+      // Key owners exist in the channel
+      vi.mocked(api.channels.getSenderKeyOwners).mockResolvedValue({
+        senderKeyOwners: [{ userId: "sender-1", senderPublicKey: userPublicKey }],
+      });
+
+      // Mock key distribution
+      vi.mocked(api.channels.getMembers).mockResolvedValue({
+        members: [{ id: "user-1", displayName: "User 1" }],
+      });
+      vi.mocked(api.auth.getUserKeys).mockResolvedValue({
+        identityKey: userPublicKey,
+        signedPreKey: { publicKey: "signed-pub", signature: "sig" },
+        preKey: null,
+      });
+      vi.mocked(api.channels.distributeSenderKey).mockResolvedValue({
+        success: true,
+      });
+
+      // createIfMissing=true (sending mode) - should create new key despite owners existing
+      const result = await ensureChannelKey(
+        "channel-123",
+        [{ id: "user-1", displayName: "User 1" }],
+        "user-1",
+        true
+      );
+
+      expect(result.key).toBeDefined();
+      expect(result.isNew).toBe(true);
+      expect(storeChannelKey).toHaveBeenCalled();
+      expect(api.channels.distributeSenderKey).toHaveBeenCalled();
+    });
+
+    it("should still throw syncing error when no sender keys exist for user but key owners exist", async () => {
+      const { getChannelKey, getIdentityKeys } = await import("../../lib/keyStore");
+      const { api } = await import("../../lib/api");
+      const { wsClient } = await import("../../lib/websocket");
+      const { ensureChannelKey } = await import("../../lib/channelCrypto");
+
+      const userKeyPair = await generateKeyPair();
+      const userPublicKey = await exportPublicKey(userKeyPair.publicKey);
+      const userPrivateKey = await exportPrivateKey(userKeyPair.privateKey);
+
+      vi.mocked(getChannelKey).mockResolvedValue(null);
+      vi.mocked(getIdentityKeys).mockResolvedValue({
+        userId: "user-1",
+        identityKeyPair: {
+          publicKey: userPublicKey,
+          privateKey: userPrivateKey,
+        },
+        signedPreKeyPair: {
+          publicKey: "signed-pub",
+          privateKey: "signed-priv",
+        },
+      });
+
+      // No sender keys for this user (empty array - no decryption attempted)
+      vi.mocked(api.channels.getSenderKeys).mockResolvedValue({ senderKeys: [] });
+
+      // But key owners exist
+      vi.mocked(api.channels.getSenderKeyOwners).mockResolvedValue({
+        senderKeyOwners: [{ userId: "owner-1", senderPublicKey: "owner-pub" }],
+      });
+
+      // Should still throw syncing error (anti-fragmentation preserved)
+      await expect(
+        ensureChannelKey("channel-123", [], "user-1", true)
+      ).rejects.toThrow("Syncing channel key");
+
+      expect(wsClient.requestKey).toHaveBeenCalledWith("channel-123", "owner-1");
+    });
+
+    it("should not create new key in receive mode even if decryption fails", async () => {
+      const {
+        getChannelKey,
+        getIdentityKeys,
+        getUserKey,
+        storeUserKey,
+      } = await import("../../lib/keyStore");
+      const { api } = await import("../../lib/api");
+      const { wsClient } = await import("../../lib/websocket");
+      const { ensureChannelKey } = await import("../../lib/channelCrypto");
+
+      const userKeyPair = await generateKeyPair();
+      const userPublicKey = await exportPublicKey(userKeyPair.publicKey);
+      const userPrivateKey = await exportPrivateKey(userKeyPair.privateKey);
+
+      vi.mocked(getChannelKey).mockResolvedValue(null);
+      vi.mocked(getIdentityKeys).mockResolvedValue({
+        userId: "user-1",
+        identityKeyPair: {
+          publicKey: userPublicKey,
+          privateKey: userPrivateKey,
+        },
+        signedPreKeyPair: {
+          publicKey: "signed-pub",
+          privateKey: "signed-priv",
+        },
+      });
+      vi.mocked(getUserKey).mockResolvedValue(null);
+      vi.mocked(storeUserKey).mockResolvedValue(undefined);
+
+      // Sender keys exist but are broken
+      vi.mocked(api.channels.getSenderKeys).mockResolvedValue({
+        senderKeys: [
+          {
+            userId: "sender-1",
+            distributionId: "dist-1",
+            encryptedKey: "broken-encrypted-key-data",
+            senderPublicKey: userPublicKey,
+          },
+        ],
+      });
+
+      // Key owners exist
+      vi.mocked(api.channels.getSenderKeyOwners).mockResolvedValue({
+        senderKeyOwners: [{ userId: "sender-1", senderPublicKey: userPublicKey }],
+      });
+
+      // createIfMissing=false (receive mode) - should NOT create new key, should throw
+      await expect(
+        ensureChannelKey("channel-123", [], "user-1", false)
+      ).rejects.toThrow("Syncing keys...");
+
+      expect(wsClient.requestKey).toHaveBeenCalled();
+    });
+  });
+
   describe("canEncryptInChannel", () => {
     it("should return true when channel key exists", async () => {
       const { hasChannelKey } = await import("../../lib/keyStore");

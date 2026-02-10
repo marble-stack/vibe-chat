@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
-import { decryptChannelMessage, encryptChannelMessage } from "../lib/channelCrypto";
+import { decryptChannelMessage, encryptChannelMessage, isDecryptionError } from "../lib/channelCrypto";
 import { wsClient } from "../lib/websocket";
 import { logger } from "../lib/logger";
 import { DecryptionErrorMessage } from "./DecryptionErrorMessage";
@@ -74,12 +74,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
               user.id,
               m.senderId
             );
-            // Check if decryption returned an error string (not an exception)
-            if (
-              plaintext === "[Syncing keys...]" ||
-              plaintext === "[Unable to decrypt message]" ||
-              plaintext === "[Encryption not set up - please re-register]"
-            ) {
+            if (isDecryptionError(plaintext)) {
               decryptionFailed = true;
             }
           } catch (err) {
