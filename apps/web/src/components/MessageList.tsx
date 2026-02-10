@@ -9,7 +9,6 @@ import { DecryptionErrorMessage } from "./DecryptionErrorMessage";
 import { FileMessage } from "./FileMessage";
 import { PollMessage } from "./PollMessage";
 import { ProfileCard } from "./ProfileCard";
-import { MentionText } from "./MentionText";
 import { CustomEmojiText, EmojiDisplay } from "./CustomEmojiText";
 
 interface Member {

@@ -8,7 +8,7 @@ import { logger } from "../lib/logger";
 import { DecryptionErrorMessage } from "./DecryptionErrorMessage";
 import { FileMessage } from "./FileMessage";
 import { PollMessage } from "./PollMessage";
-import { MentionText } from "./MentionText";
+import { CustomEmojiText } from "./CustomEmojiText";
 
 interface ThreadMessage {
   id: string;
@@ -187,7 +187,7 @@ export function ThreadPanel() {
           }
           return (
             <p className="text-text-primary text-sm break-words ml-10">
-              <MentionText text={plaintext} currentUserId={user?.id} />
+              <CustomEmojiText text={plaintext} currentUserId={user?.id} />
             </p>
           );
         })()}
@@ -220,7 +220,7 @@ export function ThreadPanel() {
                       <DecryptionErrorMessage errorType={reply.plaintext} />
                     ) : (
                       <p className="text-text-primary text-sm break-words">
-                        <MentionText text={reply.plaintext || reply.ciphertext} currentUserId={user?.id} />
+                        <CustomEmojiText text={reply.plaintext || reply.ciphertext} currentUserId={user?.id} />
                       </p>
                     )}
                   </div>
