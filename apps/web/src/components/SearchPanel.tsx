@@ -90,7 +90,7 @@ export function SearchPanel() {
             value={searchQuery}
             onChange={(e) => searchMessages(e.target.value)}
             placeholder="Search messages..."
-            className="flex-1 bg-transparent text-text-primary outline-none text-sm"
+            className="flex-1 bg-transparent text-text-primary outline-none text-base"
           />
         </div>
       </div>
