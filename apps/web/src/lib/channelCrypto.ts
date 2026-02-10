@@ -30,6 +30,22 @@ import {
 // Track pending key requests to avoid duplicate requests
 const pendingKeyRequests = new Set<string>();
 
+/** Error strings returned by decryption when it can't produce plaintext */
+const DECRYPTION_ERROR_STRINGS = [
+  "[Syncing keys...]",
+  "[Unable to decrypt message]",
+  "[Encryption not set up - please re-register]",
+] as const;
+
+/**
+ * Check if a decrypted text is actually a decryption error placeholder.
+ * Use this instead of hardcoding error strings in multiple places.
+ */
+export function isDecryptionError(text: string | undefined): boolean {
+  if (!text) return false;
+  return (DECRYPTION_ERROR_STRINGS as readonly string[]).includes(text);
+}
+
 /**
  * Get or create a channel key for sending messages
  * Returns the key and whether it was newly created
@@ -64,6 +80,8 @@ export async function ensureChannelKey(
   if (!identityKeys) {
     throw new Error("No identity keys found. Please log in again.");
   }
+
+  let senderKeyDecryptionFailed = false;
 
   try {
     const { senderKeys } = await api.channels.getSenderKeys(channelId, currentUserId);
@@ -106,8 +124,9 @@ export async function ensureChannelKey(
 
       return { key: channelKey, isNew: false };
     }
-  } catch (_err) {
-    logger.debug("No existing channel key found for current user");
+  } catch (err) {
+    senderKeyDecryptionFailed = true;
+    logger.warn("Sender key decryption failed, keys may be cryptographically broken:", err);
   }
 
   // No key exists on server for this user - check if ANY key exists in the channel
@@ -115,27 +134,37 @@ export async function ensureChannelKey(
     const { senderKeyOwners } = await api.channels.getSenderKeyOwners(channelId);
 
     if (senderKeyOwners.length > 0) {
-      // A key exists but we don't have it - request redistribution via WebSocket
-      const keyOwner = senderKeyOwners[0];
-      const requestKey = `${channelId}:${keyOwner.userId}`;
-
-      if (!pendingKeyRequests.has(requestKey)) {
-        pendingKeyRequests.add(requestKey);
-        logger.debug(
-          `Requesting key redistribution from ${keyOwner.userId} for channel ${channelId}`
+      // Deadlock recovery: if sender keys exist but decryption failed (cryptographically
+      // broken keys) AND we're trying to send, fall through to create a new key.
+      // This breaks the deadlock where neither user can decrypt the stored key.
+      if (senderKeyDecryptionFailed && createIfMissing) {
+        logger.warn(
+          `Deadlock recovery: sender keys exist but decryption failed for channel ${channelId}. Creating new channel key.`
         );
-        wsClient.requestKey(channelId, keyOwner.userId);
+        // Fall through to key creation below
+      } else {
+        // Normal path: A key exists but we don't have it - request redistribution via WebSocket
+        const keyOwner = senderKeyOwners[0];
+        const requestKey = `${channelId}:${keyOwner.userId}`;
 
-        // Remove from pending after 30 seconds to allow retry
-        setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+        if (!pendingKeyRequests.has(requestKey)) {
+          pendingKeyRequests.add(requestKey);
+          logger.debug(
+            `Requesting key redistribution from ${keyOwner.userId} for channel ${channelId}`
+          );
+          wsClient.requestKey(channelId, keyOwner.userId);
+
+          // Remove from pending after 30 seconds to allow retry
+          setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+        }
+
+        if (!createIfMissing) {
+          throw new Error("Syncing keys...");
+        }
+
+        // For sending: wait briefly for key redistribution, then retry
+        throw new Error("Syncing channel key. Please try again in a moment.");
       }
-
-      if (!createIfMissing) {
-        throw new Error("Syncing keys...");
-      }
-
-      // For sending: wait briefly for key redistribution, then retry
-      throw new Error("Syncing channel key. Please try again in a moment.");
     }
   } catch (err) {
     // If this is our "syncing keys" error, re-throw it

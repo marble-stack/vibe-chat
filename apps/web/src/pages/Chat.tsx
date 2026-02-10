@@ -8,9 +8,9 @@ import {
   decryptChannelMessage,
   distributeChannelKey,
   tryFetchChannelKey,
+  isDecryptionError,
 } from "../lib/channelCrypto";
 import { getChannelKey } from "../lib/keyStore";
-import { clearAllKeys } from "../lib/keyStore";
 import { logger } from "../lib/logger";
 import { Sidebar } from "../components/Sidebar";
 import { ChannelList } from "../components/ChannelList";
@@ -201,6 +201,7 @@ export function Chat() {
 
       // Decrypt the message
       let plaintext = payload.ciphertext;
+      let decryptionFailed = false;
       try {
         if (user) {
           plaintext = await decryptChannelMessage(
@@ -210,10 +211,13 @@ export function Chat() {
             user.id,
             payload.senderId
           );
+          if (isDecryptionError(plaintext)) {
+            decryptionFailed = true;
+          }
         }
       } catch (err) {
         logger.error("Failed to decrypt message:", err);
-        // Keep ciphertext as fallback
+        decryptionFailed = true;
       }
 
       addMessage({
@@ -222,6 +226,7 @@ export function Chat() {
         senderId: payload.senderId,
         ciphertext: payload.ciphertext,
         plaintext,
+        decryptionFailed,
         replyToId: payload.replyToId,
         createdAt: payload.createdAt,
       });
@@ -279,15 +284,20 @@ export function Chat() {
 
       // Decrypt the updated message
       let plaintext = ciphertext;
+      let decryptionFailed = false;
       try {
         if (user) {
           plaintext = await decryptChannelMessage(channelId, ciphertext, currentMembers, user.id);
+          if (isDecryptionError(plaintext)) {
+            decryptionFailed = true;
+          }
         }
       } catch (err) {
         logger.error("Failed to decrypt edited message:", err);
+        decryptionFailed = true;
       }
 
-      updateMessage(channelId, id, { ciphertext, plaintext, editedAt });
+      updateMessage(channelId, id, { ciphertext, plaintext, decryptionFailed, editedAt });
     };
 
     // Handle message deleted
@@ -321,10 +331,9 @@ export function Chat() {
     };
 
     // Handle auth failure - force re-login
-    const handleAuthFailed = async () => {
+    const handleAuthFailed = () => {
       logger.warn("WebSocket authentication failed - forcing re-login");
-      // Clear all keys and logout to force fresh login
-      await clearAllKeys();
+      // Only clear session - preserve identity keys so encryption continues working after re-login
       logout();
       navigate("/login");
     };
@@ -384,10 +393,7 @@ export function Chat() {
       // Get current messages for this channel
       const channelMsgs = useChatStore.getState().messages[channelId] || [];
       const failedMsgs = channelMsgs.filter(
-        (m) =>
-          m.plaintext === "[Syncing keys...]" ||
-          m.plaintext === "[Unable to decrypt message]" ||
-          m.decryptionFailed
+        (m) => isDecryptionError(m.plaintext) || m.decryptionFailed
       );
 
       if (failedMsgs.length === 0) return;
@@ -416,8 +422,7 @@ export function Chat() {
             user.id,
             failedMsg.senderId
           );
-          // Only update if decryption succeeded (not still syncing)
-          if (plaintext !== "[Syncing keys...]" && plaintext !== "[Unable to decrypt message]") {
+          if (!isDecryptionError(plaintext)) {
             updateMessage(channelId, failedMsg.id, { plaintext, decryptionFailed: false });
           }
         } catch {
@@ -503,10 +508,7 @@ export function Chat() {
       // Check if there are any messages stuck in syncing state for the active channel
       const channelMsgs = useChatStore.getState().messages[activeChannelId] || [];
       const hasSyncingMessages = channelMsgs.some(
-        (m) =>
-          m.plaintext === "[Syncing keys...]" ||
-          m.plaintext === "[Unable to decrypt message]" ||
-          m.decryptionFailed
+        (m) => isDecryptionError(m.plaintext) || m.decryptionFailed
       );
 
       if (!hasSyncingMessages) return;
@@ -547,10 +549,9 @@ export function Chat() {
       const failedMsgs =
         useChatStore
           .getState()
-          .messages[
-            activeChannelId
-          ]?.filter((m) => m.plaintext === "[Syncing keys...]" || m.plaintext === "[Unable to decrypt message]" || m.decryptionFailed) ||
-        [];
+          .messages[activeChannelId]?.filter(
+            (m) => isDecryptionError(m.plaintext) || m.decryptionFailed
+          ) || [];
 
       for (const failedMsg of failedMsgs) {
         try {
@@ -561,7 +562,7 @@ export function Chat() {
             user.id,
             failedMsg.senderId
           );
-          if (plaintext !== "[Syncing keys...]" && plaintext !== "[Unable to decrypt message]") {
+          if (!isDecryptionError(plaintext)) {
             updateMessage(activeChannelId, failedMsg.id, { plaintext, decryptionFailed: false });
           }
         } catch {
