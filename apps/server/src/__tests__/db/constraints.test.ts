@@ -153,6 +153,7 @@ describe("Database Constraints", () => {
       vi.mocked(db.query.messages.findFirst).mockResolvedValue({
         ...replyMessage,
         replyToId: null, // After delete, this should be null
+        isThreadReply: false,
         editedAt: null,
         deletedAt: null,
       });
