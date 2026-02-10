@@ -226,6 +226,7 @@ export function MessageInput() {
   }, [sendError]);
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="px-4 pb-6">
       {/* Error message */}
       {sendError && (
@@ -365,6 +366,7 @@ export function MessageInput() {
           </svg>
         </button>
       </div>
+    </form>
 
       {showPollCreator && activeChannelId && (
         <PollCreator
@@ -372,6 +374,6 @@ export function MessageInput() {
           onClose={() => setShowPollCreator(false)}
         />
       )}
-    </form>
+    </>
   );
 }
