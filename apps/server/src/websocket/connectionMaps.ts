@@ -15,6 +15,21 @@ export function sendToUser(userId: string, message: object): void {
 }
 
 /**
+ * Send a message to all connected sockets in a channel
+ */
+export function sendToChannel(channelId: string, message: object, excludeSocket?: WebSocket): void {
+  const sockets = channelConnections.get(channelId);
+  if (!sockets) return;
+
+  const messageStr = JSON.stringify(message);
+  for (const socket of sockets) {
+    if (socket !== excludeSocket && socket.readyState === WebSocket.OPEN) {
+      socket.send(messageStr);
+    }
+  }
+}
+
+/**
  * Send a message to all connected sockets in a community
  */
 export function sendToCommunity(communityId: string, message: object): void {
