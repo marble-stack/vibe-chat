@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
-import { generateIdentityKeys, encryptKeyBackup, decryptKeyBackup } from "../lib/crypto";
+import { generateIdentityKeys, decryptKeyBackup, uploadKeyBackupWithRetry } from "../lib/crypto";
 import { storeIdentityKeys, clearAllKeys, getIdentityKeys } from "../lib/keyStore";
 
 export function Login() {
@@ -19,25 +19,27 @@ export function Login() {
 
     try {
       const { user, token, hasKeyBackup } = await api.auth.login(email, password);
+      const { setKeyBackupStatus, setLastBackupAt } = useAuthStore.getState();
 
       // Check if we already have identity keys for this user
       const existingKeys = await getIdentityKeys();
 
+      let needsBackupUpload = false;
+      let keysForBackup: Awaited<ReturnType<typeof generateIdentityKeys>>["keys"] | null = null;
+
       if (existingKeys && existingKeys.userId === user.id) {
-        // Same device — reuse existing keys
-        console.log("Reusing existing identity keys for user:", user.id);
+        // Same device — reuse existing keys, mark backup as success (already backed up)
+        setKeyBackupStatus("success");
       } else if (hasKeyBackup) {
         // New device with backup available — restore identity keys
-        console.log("Restoring identity keys from backup for user:", user.id);
         try {
           const { encryptedKeyBackup, salt } = await api.auth.getKeyBackup(token);
           if (encryptedKeyBackup && salt) {
             const restoredKeys = await decryptKeyBackup(encryptedKeyBackup, password, salt);
             await clearAllKeys();
             await storeIdentityKeys(user.id, restoredKeys);
-            console.log("Identity keys restored from backup successfully");
+            setKeyBackupStatus("success");
           } else {
-            // Backup data missing — fall through to new key generation
             throw new Error("Backup data missing");
           }
         } catch (backupErr) {
@@ -47,29 +49,34 @@ export function Login() {
           const { keys, publicBundle } = await generateIdentityKeys();
           await api.auth.updateKeys(publicBundle, token);
           await storeIdentityKeys(user.id, keys);
-          // Upload new backup
-          encryptKeyBackup(keys, password)
-            .then(({ ciphertext, salt: s }) =>
-              api.auth.uploadKeyBackup({ encryptedKeyBackup: ciphertext, salt: s }, token)
-            )
-            .catch((err) => console.warn("Failed to upload key backup:", err));
+          keysForBackup = keys;
+          needsBackupUpload = true;
         }
       } else {
-        // No backup — generate new keys (existing behavior)
-        console.log("Generating new identity keys for user:", user.id);
+        // No backup — generate new keys
         await clearAllKeys();
         const { keys, publicBundle } = await generateIdentityKeys();
         await api.auth.updateKeys(publicBundle, token);
         await storeIdentityKeys(user.id, keys);
-        // Upload backup for future device logins
-        encryptKeyBackup(keys, password)
-          .then(({ ciphertext, salt }) =>
-            api.auth.uploadKeyBackup({ encryptedKeyBackup: ciphertext, salt }, token)
-          )
-          .catch((err) => console.warn("Failed to upload key backup:", err));
+        keysForBackup = keys;
+        needsBackupUpload = true;
       }
 
       setAuth(user, token);
+
+      // Upload backup with retry if needed (runs after auth is set)
+      if (needsBackupUpload && keysForBackup) {
+        setKeyBackupStatus("pending");
+        const backupKeys = keysForBackup;
+        uploadKeyBackupWithRetry(backupKeys, password, token).then((success) => {
+          if (success) {
+            setKeyBackupStatus("success");
+            setLastBackupAt(Date.now());
+          } else {
+            setKeyBackupStatus("failed");
+          }
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
