@@ -144,13 +144,24 @@ export function ThreadPanel() {
   const rootSender = getMember(rootMessage.senderId);
 
   return (
-    <div className="w-96 border-l border-background-tertiary flex flex-col bg-background-secondary">
+    <div className="fixed inset-0 z-50 md:static md:inset-auto md:z-auto md:w-96 border-l border-background-tertiary flex flex-col bg-background-secondary">
       {/* Header */}
       <div className="h-12 px-4 flex items-center justify-between border-b border-background-tertiary">
-        <h3 className="font-semibold text-text-primary">Thread</h3>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveThread(null)}
+            className="text-text-muted hover:text-text-primary p-1 md:hidden"
+            title="Back"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h3 className="font-semibold text-text-primary">Thread</h3>
+        </div>
         <button
           onClick={() => setActiveThread(null)}
-          className="text-text-muted hover:text-text-primary p-1"
+          className="text-text-muted hover:text-text-primary p-1 hidden md:block"
           title="Close thread"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

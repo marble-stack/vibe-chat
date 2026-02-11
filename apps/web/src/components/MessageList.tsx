@@ -526,24 +526,50 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
         })
       );
 
+      // Reset counter before setting messages so the scroll effect treats
+      // the fresh API data as an initial load — this prevents the last few
+      // messages from being hidden when cached messages already bumped the count
+      prevMessageCountRef.current = 0;
       setMessages(activeChannelId, decrypted);
     };
 
     loadMessages();
   }, [activeChannelId, user, setMessages]);
 
-  // Smart auto-scroll: only scroll when a new message is added AND user is near the bottom
+  // Smart auto-scroll: scroll to bottom on initial load, or when a new message
+  // arrives and the user is already near the bottom
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const newCount = channelMessages.length;
-    const wasNewMessage = newCount > prevMessageCountRef.current;
+    const prevCount = prevMessageCountRef.current;
+    const wasNewMessage = newCount > prevCount;
     prevMessageCountRef.current = newCount;
 
     if (!wasNewMessage) return;
 
-    // Only auto-scroll if user is within 100px of the bottom
+    // Initial load (channel just opened) — jump to bottom instantly
+    if (prevCount === 0) {
+      // Use double rAF to ensure mobile browsers have fully completed layout
+      // before reading scrollHeight (single rAF can fire before layout settles
+      // on iOS Safari and some Android browsers)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          container.scrollTop = container.scrollHeight;
+        });
+      });
+      return;
+    }
+
+    // If the latest message was sent by the current user, always scroll to bottom
+    const latestMessage = channelMessages[channelMessages.length - 1];
+    if (latestMessage?.pending && latestMessage?.senderId === user?.id) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
+    // Subsequent messages — only auto-scroll if user is within 100px of the bottom
     const distanceFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
     if (distanceFromBottom < 100) {
@@ -758,7 +784,16 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
       </div>
 
       {/* Messages */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto p-4"
+        onTouchMove={() => {
+          // Dismiss keyboard on scroll for smooth mobile experience
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+        }}
+      >
         {channelMessages.length === 0 ? (
           <div className="text-center text-text-muted py-8">
             <div className="text-4xl mb-4">#</div>

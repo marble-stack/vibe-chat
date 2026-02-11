@@ -620,10 +620,16 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       }
 
       // Store the request in database for offline key holders to process when they come online
-      await db
-        .insert(pendingKeyRequests)
-        .values({ channelId, requestingUserId: user.userId })
-        .onConflictDoNothing();
+      try {
+        await db
+          .insert(pendingKeyRequests)
+          .values({ channelId, requestingUserId: user.userId })
+          .onConflictDoNothing();
+      } catch (err) {
+        // Non-fatal: online key holders already received the request above.
+        // This can fail if the pending_key_requests table hasn't been migrated yet.
+        logger.error("Failed to store pending key request:", err);
+      }
 
       // Acknowledge the request was sent
       socket.send(
