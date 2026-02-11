@@ -339,6 +339,41 @@ export async function decryptKeyBackup(
 }
 
 /**
+ * Upload key backup with retry logic (exponential backoff).
+ * Retries up to 5 times: 1s, 2s, 4s, 8s, 16s delays.
+ * Returns true if backup succeeded, false if all retries exhausted.
+ */
+export async function uploadKeyBackupWithRetry(
+  keys: IdentityKeys,
+  password: string,
+  token: string
+): Promise<boolean> {
+  const { api } = await import("./api");
+  const maxRetries = 5;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const { ciphertext, salt } = await encryptKeyBackup(keys, password);
+      await api.auth.uploadKeyBackup(
+        { encryptedKeyBackup: ciphertext, salt },
+        token
+      );
+      return true;
+    } catch (err) {
+      const delay = 1000 * Math.pow(2, attempt);
+      console.warn(
+        `Key backup attempt ${attempt + 1}/${maxRetries} failed, retrying in ${delay}ms:`,
+        err
+      );
+      if (attempt < maxRetries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * Encrypt a channel key for a recipient using their public key
  */
 export async function encryptChannelKeyForRecipient(
