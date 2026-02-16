@@ -2,7 +2,7 @@ import { useAuthStore } from "../stores/auth";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}, retries = 3): Promise<T> {
   // Get token from auth store
   const token = useAuthStore.getState().token;
 
@@ -20,6 +20,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...options,
     headers,
   });
+
+  // Retry on 429 Too Many Requests with exponential backoff
+  if (response.status === 429 && retries > 0) {
+    const retryAfter = response.headers.get("retry-after");
+    const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : 1000 * (4 - retries);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    return request<T>(path, options, retries - 1);
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: "Request failed" }));
