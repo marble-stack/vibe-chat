@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import {
   generateKeyPair,
   exportPublicKey,
@@ -24,6 +24,7 @@ import {
   deriveBackupKey,
   encryptKeyBackup,
   decryptKeyBackup,
+  uploadKeyBackupWithRetry,
 } from "../../lib/crypto.js";
 
 describe("Crypto Module", () => {
@@ -407,6 +408,95 @@ describe("Crypto Module", () => {
       await expect(
         decryptKeyBackup(backup.ciphertext, "wrong-password", backup.salt)
       ).rejects.toThrow();
+    });
+  });
+
+  describe("uploadKeyBackupWithRetry", () => {
+    // Override setTimeout to skip delays during these tests
+    let origSetTimeout: typeof globalThis.setTimeout;
+
+    beforeAll(() => {
+      origSetTimeout = globalThis.setTimeout;
+    });
+
+    afterAll(() => {
+      globalThis.setTimeout = origSetTimeout;
+    });
+
+    it("should return true on successful upload", async () => {
+      vi.doMock("../../lib/api.js", () => ({
+        api: {
+          auth: {
+            uploadKeyBackup: vi.fn().mockResolvedValue({}),
+          },
+        },
+      }));
+
+      vi.resetModules();
+      const { uploadKeyBackupWithRetry: fn, generateIdentityKeys: genKeys } = await import(
+        "../../lib/crypto.js"
+      );
+
+      const { keys } = await genKeys();
+      const result = await fn(keys, "password", "fake-token");
+      expect(result).toBe(true);
+    });
+
+    it("should retry and succeed after transient failures", async () => {
+      // Skip retry delays
+      globalThis.setTimeout = ((fn: () => void) => origSetTimeout(fn, 0)) as any;
+
+      const mockUpload = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("Network error"))
+        .mockResolvedValueOnce({});
+
+      vi.doMock("../../lib/api.js", () => ({
+        api: {
+          auth: {
+            uploadKeyBackup: mockUpload,
+          },
+        },
+      }));
+
+      vi.resetModules();
+      const { uploadKeyBackupWithRetry: fn, generateIdentityKeys: genKeys } = await import(
+        "../../lib/crypto.js"
+      );
+
+      const { keys } = await genKeys();
+      const result = await fn(keys, "password", "fake-token");
+      expect(result).toBe(true);
+      expect(mockUpload).toHaveBeenCalledTimes(2);
+
+      globalThis.setTimeout = origSetTimeout;
+    });
+
+    it("should return false after exhausting all retries", async () => {
+      // Skip retry delays
+      globalThis.setTimeout = ((fn: () => void) => origSetTimeout(fn, 0)) as any;
+
+      const mockUpload = vi.fn().mockRejectedValue(new Error("Permanent failure"));
+
+      vi.doMock("../../lib/api.js", () => ({
+        api: {
+          auth: {
+            uploadKeyBackup: mockUpload,
+          },
+        },
+      }));
+
+      vi.resetModules();
+      const { uploadKeyBackupWithRetry: fn, generateIdentityKeys: genKeys } = await import(
+        "../../lib/crypto.js"
+      );
+
+      const { keys } = await genKeys();
+      const result = await fn(keys, "password", "fake-token");
+      expect(result).toBe(false);
+      expect(mockUpload).toHaveBeenCalledTimes(5);
+
+      globalThis.setTimeout = origSetTimeout;
     });
   });
 });

@@ -46,6 +46,185 @@ describe("WebSocket Connection Management", () => {
     });
   });
 
+  describe("sendToChannel", () => {
+    let sendToChannel: (channelId: string, message: object, excludeSocket?: WebSocket) => void;
+    let channelConnectionsMap: Map<string, Set<WebSocket>>;
+
+    beforeEach(async () => {
+      vi.resetModules();
+      const mod = await import("../../websocket/connectionMaps.js");
+      connectionMaps = mod;
+      sendToChannel = mod.sendToChannel;
+      channelConnectionsMap = mod.channelConnections;
+    });
+
+    it("should send message to all sockets in a channel", () => {
+      const channelId = "channel-1";
+      const message = { type: "test", payload: {} };
+      const socket1 = { readyState: WebSocket.OPEN, send: vi.fn() } as unknown as WebSocket;
+      const socket2 = { readyState: WebSocket.OPEN, send: vi.fn() } as unknown as WebSocket;
+
+      channelConnectionsMap.set(channelId, new Set([socket1, socket2]));
+      sendToChannel(channelId, message);
+
+      expect(socket1.send).toHaveBeenCalledWith(JSON.stringify(message));
+      expect(socket2.send).toHaveBeenCalledWith(JSON.stringify(message));
+    });
+
+    it("should exclude specified socket", () => {
+      const channelId = "channel-1";
+      const message = { type: "test", payload: {} };
+      const socket1 = { readyState: WebSocket.OPEN, send: vi.fn() } as unknown as WebSocket;
+      const socket2 = { readyState: WebSocket.OPEN, send: vi.fn() } as unknown as WebSocket;
+
+      channelConnectionsMap.set(channelId, new Set([socket1, socket2]));
+      sendToChannel(channelId, message, socket1);
+
+      expect(socket1.send).not.toHaveBeenCalled();
+      expect(socket2.send).toHaveBeenCalledWith(JSON.stringify(message));
+    });
+
+    it("should not send to closed sockets", () => {
+      const channelId = "channel-1";
+      const message = { type: "test", payload: {} };
+      const closedSocket = { readyState: WebSocket.CLOSED, send: vi.fn() } as unknown as WebSocket;
+
+      channelConnectionsMap.set(channelId, new Set([closedSocket]));
+      sendToChannel(channelId, message);
+
+      expect(closedSocket.send).not.toHaveBeenCalled();
+    });
+
+    it("should handle non-existent channel gracefully", () => {
+      expect(() => sendToChannel("nonexistent", { type: "test" })).not.toThrow();
+    });
+  });
+
+  describe("sendToCommunity", () => {
+    let sendToCommunity: (communityId: string, message: object) => void;
+    let communityConnectionsMap: Map<string, Set<WebSocket>>;
+
+    beforeEach(async () => {
+      vi.resetModules();
+      const mod = await import("../../websocket/connectionMaps.js");
+      connectionMaps = mod;
+      sendToCommunity = mod.sendToCommunity;
+      communityConnectionsMap = mod.communityConnections;
+    });
+
+    it("should send message to all sockets in a community", () => {
+      const communityId = "community-1";
+      const message = { type: "test", payload: {} };
+      const socket = { readyState: WebSocket.OPEN, send: vi.fn() } as unknown as WebSocket;
+
+      communityConnectionsMap.set(communityId, new Set([socket]));
+      sendToCommunity(communityId, message);
+
+      expect(socket.send).toHaveBeenCalledWith(JSON.stringify(message));
+    });
+
+    it("should not send to closed sockets", () => {
+      const communityId = "community-1";
+      const message = { type: "test", payload: {} };
+      const closedSocket = { readyState: WebSocket.CLOSED, send: vi.fn() } as unknown as WebSocket;
+
+      communityConnectionsMap.set(communityId, new Set([closedSocket]));
+      sendToCommunity(communityId, message);
+
+      expect(closedSocket.send).not.toHaveBeenCalled();
+    });
+
+    it("should handle non-existent community gracefully", () => {
+      expect(() => sendToCommunity("nonexistent", { type: "test" })).not.toThrow();
+    });
+  });
+
+  describe("cleanupEmptyMaps", () => {
+    let channelConnectionsMap: Map<string, Set<WebSocket>>;
+    let communityConnectionsMap: Map<string, Set<WebSocket>>;
+    let communityOnlineUsersMap: Map<string, Set<string>>;
+
+    beforeEach(async () => {
+      vi.resetModules();
+      const mod = await import("../../websocket/connectionMaps.js");
+      connectionMaps = mod;
+      channelConnectionsMap = mod.channelConnections;
+      communityConnectionsMap = mod.communityConnections;
+      communityOnlineUsersMap = mod.communityOnlineUsers;
+    });
+
+    it("should remove empty Sets from all maps", () => {
+      channelConnectionsMap.set("ch-1", new Set());
+      communityConnectionsMap.set("com-1", new Set());
+      communityOnlineUsersMap.set("com-1", new Set());
+
+      connectionMaps.cleanupEmptyMaps();
+
+      expect(channelConnectionsMap.size).toBe(0);
+      expect(communityConnectionsMap.size).toBe(0);
+      expect(communityOnlineUsersMap.size).toBe(0);
+    });
+
+    it("should keep non-empty Sets", () => {
+      const socket = { readyState: WebSocket.OPEN, send: vi.fn() } as unknown as WebSocket;
+      channelConnectionsMap.set("ch-1", new Set([socket]));
+      channelConnectionsMap.set("ch-2", new Set());
+
+      connectionMaps.cleanupEmptyMaps();
+
+      expect(channelConnectionsMap.size).toBe(1);
+      expect(channelConnectionsMap.has("ch-1")).toBe(true);
+    });
+  });
+
+  describe("cleanupSocket", () => {
+    let cleanupSocket: (socket: WebSocket) => void;
+    let channelConnectionsMap: Map<string, Set<WebSocket>>;
+    let socketUsersMap: Map<WebSocket, { userId: string; channelIds: Set<string>; communityIds: Set<string> }>;
+
+    beforeEach(async () => {
+      vi.resetModules();
+      const mod = await import("../../websocket/connectionMaps.js");
+      connectionMaps = mod;
+      cleanupSocket = mod.cleanupSocket;
+      channelConnectionsMap = mod.channelConnections;
+      socketUsersMap = mod.socketUsers;
+    });
+
+    it("should remove socket from all channels and socketUsers", () => {
+      const socket = { readyState: WebSocket.OPEN, send: vi.fn() } as unknown as WebSocket;
+      const channelIds = new Set(["ch-1", "ch-2"]);
+
+      socketUsersMap.set(socket, { userId: "user-1", channelIds, communityIds: new Set() });
+      channelConnectionsMap.set("ch-1", new Set([socket]));
+      channelConnectionsMap.set("ch-2", new Set([socket]));
+
+      cleanupSocket(socket);
+
+      expect(socketUsersMap.has(socket)).toBe(false);
+      expect(channelConnectionsMap.has("ch-1")).toBe(false);
+      expect(channelConnectionsMap.has("ch-2")).toBe(false);
+    });
+
+    it("should not remove other sockets from channels", () => {
+      const socket1 = { readyState: WebSocket.OPEN, send: vi.fn() } as unknown as WebSocket;
+      const socket2 = { readyState: WebSocket.OPEN, send: vi.fn() } as unknown as WebSocket;
+
+      socketUsersMap.set(socket1, { userId: "user-1", channelIds: new Set(["ch-1"]), communityIds: new Set() });
+      channelConnectionsMap.set("ch-1", new Set([socket1, socket2]));
+
+      cleanupSocket(socket1);
+
+      expect(channelConnectionsMap.has("ch-1")).toBe(true);
+      expect(channelConnectionsMap.get("ch-1")!.has(socket2)).toBe(true);
+    });
+
+    it("should handle socket not in socketUsers map", () => {
+      const socket = { readyState: WebSocket.OPEN, send: vi.fn() } as unknown as WebSocket;
+      expect(() => cleanupSocket(socket)).not.toThrow();
+    });
+  });
+
   describe("sendToUser", () => {
     it("should be defined as a function", () => {
       expect(connectionMaps.sendToUser).toBeDefined();

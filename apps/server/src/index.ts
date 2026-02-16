@@ -31,8 +31,8 @@ async function main() {
 
   // Rate limiting - protect against abuse
   await fastify.register(rateLimit, {
-    max: 100, // Maximum 100 requests
-    timeWindow: "1 minute", // Per minute
+    max: 300, // Maximum 300 requests per minute (key sync polling needs headroom)
+    timeWindow: "1 minute",
     // Skip rate limiting for WebSocket upgrade requests
     allowList: (req) => req.url === "/ws",
   });
