@@ -24,7 +24,6 @@ import {
   deriveBackupKey,
   encryptKeyBackup,
   decryptKeyBackup,
-  uploadKeyBackupWithRetry,
 } from "../../lib/crypto.js";
 
 describe("Crypto Module", () => {
