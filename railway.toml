@@ -1,7 +1,7 @@
 [build]
 builder = "NIXPACKS"
 # Install all dependencies and build the server
-buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @vibe-chat/server build"
+buildCommand = "NODE_ENV=development pnpm install --frozen-lockfile && pnpm --filter @vibe-chat/server build"
 
 [deploy]
 # Run migrations then start the server

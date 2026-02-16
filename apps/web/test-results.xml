@@ -1,65 +1,507 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="28" failures="0" errors="0" time="0.125869332">
-    <testsuite name="src/__tests__/placeholder.test.ts" timestamp="2026-01-27T00:50:30.249Z" hostname="MacBookPro.search.charter.net" tests="2" failures="0" errors="0" skipped="0" time="0.002069166">
-        <testcase classname="src/__tests__/placeholder.test.ts" name="Test Infrastructure &gt; should run a basic test" time="0.000785792">
+<testsuites name="vitest tests" tests="203" failures="0" errors="0" time="2.647285888">
+    <testsuite name="src/__tests__/placeholder.test.ts" timestamp="2026-02-16T17:17:40.087Z" hostname="runsc" tests="2" failures="0" errors="0" skipped="0" time="0.003113091">
+        <testcase classname="src/__tests__/placeholder.test.ts" name="Test Infrastructure &gt; should run a basic test" time="0.001127287">
         </testcase>
-        <testcase classname="src/__tests__/placeholder.test.ts" name="Test Infrastructure &gt; should have jsdom environment" time="0.000131583">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/__tests__/components/DecryptionErrorMessage.test.tsx" timestamp="2026-01-27T00:50:30.250Z" hostname="MacBookPro.search.charter.net" tests="6" failures="0" errors="0" skipped="0" time="0.105975916">
-        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should display error message when decryption fails" time="0.0175285">
-        </testcase>
-        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should show error icon" time="0.001694167">
-        </testcase>
-        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should not show retry button when onRetry is not provided" time="0.001454833">
-        </testcase>
-        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should show retry button when onRetry is provided" time="0.07244825">
-        </testcase>
-        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should call onRetry when retry button is clicked" time="0.010218583">
-        </testcase>
-        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should have appropriate error styling" time="0.001315375">
+        <testcase classname="src/__tests__/placeholder.test.ts" name="Test Infrastructure &gt; should have jsdom environment" time="0.00017212">
         </testcase>
     </testsuite>
-    <testsuite name="src/__tests__/lib/crypto.test.ts" timestamp="2026-01-27T00:50:30.250Z" hostname="MacBookPro.search.charter.net" tests="20" failures="0" errors="0" skipped="0" time="0.01782425">
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Base64 Encoding/Decoding &gt; should encode ArrayBuffer to base64" time="0.000843">
+    <testsuite name="src/__tests__/components/DecryptionErrorMessage.test.tsx" timestamp="2026-02-16T17:17:40.089Z" hostname="runsc" tests="9" failures="0" errors="0" skipped="0" time="0.203059129">
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should display error message when decryption fails" time="0.029528021">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Base64 Encoding/Decoding &gt; should decode base64 to ArrayBuffer" time="0.000603083">
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should show error icon" time="0.002804916">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Base64 Encoding/Decoding &gt; should round-trip encode/decode" time="0.000135916">
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should not show retry button when onRetry is not provided" time="0.002733858">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Generation &gt; should generate valid ECDH P-256 key pairs" time="0.00269325">
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should show retry button when onRetry is provided" time="0.136260053">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Generation &gt; should generate unique keys each call" time="0.000802542">
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should call onRetry when retry button is clicked" time="0.020165503">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Generation &gt; should export and import public keys correctly" time="0.001265417">
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should have appropriate error styling" time="0.00220525">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Generation &gt; should export and import private keys correctly" time="0.000879709">
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should show syncing message and yellow styling when syncing keys" time="0.002906947">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Exchange &gt; should derive same shared secret in both directions" time="0.001469792">
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should show setup required message for encryption not set up" time="0.002290614">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Exchange &gt; should derive different keys for different key pairs" time="0.000706292">
+        <testcase classname="src/__tests__/components/DecryptionErrorMessage.test.tsx" name="DecryptionErrorMessage &gt; should not show retry button when syncing keys" time="0.0020439">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; AES Key Management &gt; should generate channel keys" time="0.000335583">
+    </testsuite>
+    <testsuite name="src/__tests__/components/ErrorBoundary.test.tsx" timestamp="2026-02-16T17:17:40.092Z" hostname="runsc" tests="12" failures="0" errors="0" skipped="0" time="0.309243366">
+        <testcase classname="src/__tests__/components/ErrorBoundary.test.tsx" name="ErrorBoundary &gt; should render children when there is no error" time="0.026819417">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; AES Key Management &gt; should export and import AES keys" time="0.001147542">
+        <testcase classname="src/__tests__/components/ErrorBoundary.test.tsx" name="ErrorBoundary &gt; should render error UI when child throws" time="0.020524807">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should encrypt and decrypt round-trip correctly" time="0.000280917">
+        <testcase classname="src/__tests__/components/ErrorBoundary.test.tsx" name="ErrorBoundary &gt; should show error icon" time="0.00610088">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should handle empty strings" time="0.0002215">
+        <testcase classname="src/__tests__/components/ErrorBoundary.test.tsx" name="ErrorBoundary &gt; should show Try Again button" time="0.147567074">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should handle unicode characters" time="0.000205708">
+        <testcase classname="src/__tests__/components/ErrorBoundary.test.tsx" name="ErrorBoundary &gt; should show Reload Page button" time="0.023857707">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should fail decryption with wrong key" time="0.001067875">
+        <testcase classname="src/__tests__/components/ErrorBoundary.test.tsx" name="ErrorBoundary &gt; should reset error state when Try Again is clicked" time="0.031907861">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should use unique IV per encryption" time="0.000222625">
+        <testcase classname="src/__tests__/components/ErrorBoundary.test.tsx" name="ErrorBoundary &gt; should call window.location.reload when Reload Page is clicked" time="0.020685099">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should produce ciphertext with IV prefix" time="0.0001515">
+        <testcase classname="src/__tests__/components/ErrorBoundary.test.tsx" name="ErrorBoundary &gt; should render custom fallback when provided" time="0.003352015">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Channel Key Distribution &gt; should encrypt channel key for recipient" time="0.000886042">
+        <testcase classname="src/__tests__/components/ErrorBoundary.test.tsx" name="ErrorBoundary &gt; should log error to console" time="0.005014169">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Channel Key Distribution &gt; should decrypt channel key correctly" time="0.001126875">
+        <testcase classname="src/__tests__/components/ErrorBoundary.test.tsx" name="ErrorBoundary &gt; should show error details in development mode" time="0.005580843">
         </testcase>
-        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Channel Key Distribution &gt; should fail decryption with wrong sender public key" time="0.001184375">
+        <testcase classname="src/__tests__/components/ErrorBoundary.test.tsx" name="ErrorBoundary &gt; should handle nested errors" time="0.006101471">
+        </testcase>
+        <testcase classname="src/__tests__/components/ErrorBoundary.test.tsx" name="ErrorBoundary &gt; should not catch errors in event handlers" time="0.009524486">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/lib/channelCrypto.test.ts" timestamp="2026-02-16T17:17:40.095Z" hostname="runsc" tests="32" failures="0" errors="0" skipped="0" time="0.149693438">
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Module &gt; Channel Key Generation &gt; should generate a valid AES-256-GCM channel key" time="0.00596474">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Module &gt; Channel Key Generation &gt; should generate unique keys each time" time="0.002466511">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Module &gt; Channel Key Generation &gt; should export and import channel keys correctly" time="0.002913339">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Module &gt; Message Encryption/Decryption &gt; should encrypt and decrypt messages with channel key" time="0.000995539">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Module &gt; Message Encryption/Decryption &gt; should produce different ciphertext for same message (unique IV)" time="0.00106479">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Module &gt; Message Encryption/Decryption &gt; should fail to decrypt with wrong key" time="0.00270389">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Module &gt; Message Encryption/Decryption &gt; should handle empty messages" time="0.001009443">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Module &gt; Message Encryption/Decryption &gt; should handle unicode and emoji" time="0.004425073">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Module &gt; Message Encryption/Decryption &gt; should handle long messages" time="0.00240693">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Module &gt; Key Distribution Helpers &gt; should generate valid ECDH key pairs for key exchange" time="0.001764641">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Module &gt; Key Distribution Helpers &gt; should export public keys to base64 format" time="0.00114963">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Module &gt; Key Distribution Helpers &gt; should export private keys to JWK format" time="0.001280452">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; ensureChannelKey &gt; should return existing local key if available" time="0.079022402">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; ensureChannelKey &gt; should throw error when no identity keys exist" time="0.000986633">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; ensureChannelKey &gt; should fetch key from server when not available locally" time="0.006291491">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; ensureChannelKey &gt; should request key via WebSocket when key exists but not for current user" time="0.002148929">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; ensureChannelKey &gt; should create new key when no key exists in channel" time="0.002784866">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; decryptChannelMessage &gt; should return error message when no identity keys" time="0.000935321">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; decryptChannelMessage &gt; should decrypt with local key when available" time="0.002784985">
+            <system-out>
+[PERF] decrypt-message: 0.23ms
+
+            </system-out>
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; decryptChannelMessage &gt; should return syncing message when requesting key from sender" time="0.001661547">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; decryptChannelMessage &gt; should return unable to decrypt when no key available and no sender" time="0.001464142">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; tryFetchChannelKey &gt; should return false if key already exists locally" time="0.000995367">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; tryFetchChannelKey &gt; should return false if no identity keys" time="0.000826664">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; tryFetchChannelKey &gt; should fetch and store key from server successfully" time="0.003893421">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; clearPendingKeyRequest &gt; should clear pending request for channel and user" time="0.000838152">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; isDecryptionError &gt; should return true for known error strings" time="0.00100685">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; isDecryptionError &gt; should return false for normal text" time="0.001063972">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; ensureChannelKey deadlock recovery &gt; should create new key when sender keys exist but decryption fails (deadlock recovery)" time="0.004254261">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; ensureChannelKey deadlock recovery &gt; should still throw syncing error when no sender keys exist for user but key owners exist" time="0.002387116">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; ensureChannelKey deadlock recovery &gt; should not create new key in receive mode even if decryption fails" time="0.002646834">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; canEncryptInChannel &gt; should return true when channel key exists" time="0.00108466">
+        </testcase>
+        <testcase classname="src/__tests__/lib/channelCrypto.test.ts" name="Channel Crypto Integration &gt; canEncryptInChannel &gt; should return false when no channel key" time="0.00120335">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/lib/crypto.test.ts" timestamp="2026-02-16T17:17:40.101Z" hostname="runsc" tests="33" failures="0" errors="0" skipped="0" time="1.471445894">
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Base64 Encoding/Decoding &gt; should encode ArrayBuffer to base64" time="0.001538811">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Base64 Encoding/Decoding &gt; should decode base64 to ArrayBuffer" time="0.000926411">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Base64 Encoding/Decoding &gt; should round-trip encode/decode" time="0.000332126">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Generation &gt; should generate valid ECDH P-256 key pairs" time="0.005678987">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Generation &gt; should generate unique keys each call" time="0.002954915">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Generation &gt; should export and import public keys correctly" time="0.002380221">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Generation &gt; should export and import private keys correctly" time="0.002071295">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Exchange &gt; should derive same shared secret in both directions" time="0.006204432">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Exchange &gt; should derive different keys for different key pairs" time="0.001508979">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; AES Key Management &gt; should generate channel keys" time="0.000812942">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; AES Key Management &gt; should export and import AES keys" time="0.001663331">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should encrypt and decrypt round-trip correctly" time="0.000631536">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should handle empty strings" time="0.000668618">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should handle unicode characters" time="0.000537389">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should fail decryption with wrong key" time="0.001970353">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should use unique IV per encryption" time="0.001312033">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Encryption &gt; should produce ciphertext with IV prefix" time="0.000712099">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Channel Key Distribution &gt; should encrypt channel key for recipient" time="0.002506806">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Channel Key Distribution &gt; should decrypt channel key correctly" time="0.00402104">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Channel Key Distribution &gt; should fail decryption with wrong sender public key" time="0.002649521">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Signing Keys &gt; should generate ECDSA signing key pair" time="0.000660019">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Signing Keys &gt; should sign data and return base64 string" time="0.002460763">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Signing Keys &gt; should produce different signatures for different data" time="0.000874317">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Identity Key Generation &gt; should generate complete identity keys" time="0.008790337">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Identity Key Generation &gt; should generate valid public bundle" time="0.008400863">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Identity Key Generation &gt; should generate importable keys" time="0.007935945">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Backup &gt; should derive a backup key from password and salt" time="0.089530134">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Backup &gt; should derive same key for same password and salt" time="0.172185598">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Backup &gt; should encrypt and decrypt key backup round-trip" time="0.177104834">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; Key Backup &gt; should fail decryption with wrong password" time="0.190017925">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; uploadKeyBackupWithRetry &gt; should return true on successful upload" time="0.098817377">
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; uploadKeyBackupWithRetry &gt; should retry and succeed after transient failures" time="0.200360276">
+            <system-err>
+Key backup attempt 1/5 failed, retrying in 1000ms: Error: Network error
+    at [90m/home/user/vibe-chat/apps/web/[39msrc/__tests__/lib/crypto.test.ts:451:32
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:145:11
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:915:26
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1243:20
+    at new Promise (&lt;anonymous&gt;)
+    at runWithTimeout (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1209:10)
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1653:37
+    at Traces.$ (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/vitest@4.0.18_@types+node@20.19.27_happy-dom@20.3.9_jiti@1.21.7_jsdom@27.4.0_@noble+hashes@1.8.0__tsx@4.21.0/node_modules/[4mvitest[24m/dist/chunks/traces.CCmnQaNT.js:142:27)
+    at trace (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/vitest@4.0.18_@types+node@20.19.27_happy-dom@20.3.9_jiti@1.21.7_jsdom@27.4.0_@noble+hashes@1.8.0__tsx@4.21.0/node_modules/[4mvitest[24m/dist/chunks/test.B8ej_ZHS.js:239:21)
+    at runTest (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1653:12)
+
+            </system-err>
+        </testcase>
+        <testcase classname="src/__tests__/lib/crypto.test.ts" name="Crypto Module &gt; uploadKeyBackupWithRetry &gt; should return false after exhausting all retries" time="0.469779289">
+            <system-err>
+Key backup attempt 1/5 failed, retrying in 1000ms: Error: Permanent failure
+    at [90m/home/user/vibe-chat/apps/web/[39msrc/__tests__/lib/crypto.test.ts:479:52
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:145:11
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:915:26
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1243:20
+    at new Promise (&lt;anonymous&gt;)
+    at runWithTimeout (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1209:10)
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1653:37
+    at Traces.$ (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/vitest@4.0.18_@types+node@20.19.27_happy-dom@20.3.9_jiti@1.21.7_jsdom@27.4.0_@noble+hashes@1.8.0__tsx@4.21.0/node_modules/[4mvitest[24m/dist/chunks/traces.CCmnQaNT.js:142:27)
+    at trace (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/vitest@4.0.18_@types+node@20.19.27_happy-dom@20.3.9_jiti@1.21.7_jsdom@27.4.0_@noble+hashes@1.8.0__tsx@4.21.0/node_modules/[4mvitest[24m/dist/chunks/test.B8ej_ZHS.js:239:21)
+    at runTest (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1653:12)
+
+Key backup attempt 2/5 failed, retrying in 2000ms: Error: Permanent failure
+    at [90m/home/user/vibe-chat/apps/web/[39msrc/__tests__/lib/crypto.test.ts:479:52
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:145:11
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:915:26
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1243:20
+    at new Promise (&lt;anonymous&gt;)
+    at runWithTimeout (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1209:10)
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1653:37
+    at Traces.$ (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/vitest@4.0.18_@types+node@20.19.27_happy-dom@20.3.9_jiti@1.21.7_jsdom@27.4.0_@noble+hashes@1.8.0__tsx@4.21.0/node_modules/[4mvitest[24m/dist/chunks/traces.CCmnQaNT.js:142:27)
+    at trace (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/vitest@4.0.18_@types+node@20.19.27_happy-dom@20.3.9_jiti@1.21.7_jsdom@27.4.0_@noble+hashes@1.8.0__tsx@4.21.0/node_modules/[4mvitest[24m/dist/chunks/test.B8ej_ZHS.js:239:21)
+    at runTest (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1653:12)
+
+Key backup attempt 3/5 failed, retrying in 4000ms: Error: Permanent failure
+    at [90m/home/user/vibe-chat/apps/web/[39msrc/__tests__/lib/crypto.test.ts:479:52
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:145:11
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:915:26
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1243:20
+    at new Promise (&lt;anonymous&gt;)
+    at runWithTimeout (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1209:10)
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1653:37
+    at Traces.$ (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/vitest@4.0.18_@types+node@20.19.27_happy-dom@20.3.9_jiti@1.21.7_jsdom@27.4.0_@noble+hashes@1.8.0__tsx@4.21.0/node_modules/[4mvitest[24m/dist/chunks/traces.CCmnQaNT.js:142:27)
+    at trace (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/vitest@4.0.18_@types+node@20.19.27_happy-dom@20.3.9_jiti@1.21.7_jsdom@27.4.0_@noble+hashes@1.8.0__tsx@4.21.0/node_modules/[4mvitest[24m/dist/chunks/test.B8ej_ZHS.js:239:21)
+    at runTest (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1653:12)
+
+Key backup attempt 4/5 failed, retrying in 8000ms: Error: Permanent failure
+    at [90m/home/user/vibe-chat/apps/web/[39msrc/__tests__/lib/crypto.test.ts:479:52
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:145:11
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:915:26
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1243:20
+    at new Promise (&lt;anonymous&gt;)
+    at runWithTimeout (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1209:10)
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1653:37
+    at Traces.$ (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/vitest@4.0.18_@types+node@20.19.27_happy-dom@20.3.9_jiti@1.21.7_jsdom@27.4.0_@noble+hashes@1.8.0__tsx@4.21.0/node_modules/[4mvitest[24m/dist/chunks/traces.CCmnQaNT.js:142:27)
+    at trace (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/vitest@4.0.18_@types+node@20.19.27_happy-dom@20.3.9_jiti@1.21.7_jsdom@27.4.0_@noble+hashes@1.8.0__tsx@4.21.0/node_modules/[4mvitest[24m/dist/chunks/test.B8ej_ZHS.js:239:21)
+    at runTest (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1653:12)
+
+Key backup attempt 5/5 failed, retrying in 16000ms: Error: Permanent failure
+    at [90m/home/user/vibe-chat/apps/web/[39msrc/__tests__/lib/crypto.test.ts:479:52
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:145:11
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:915:26
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1243:20
+    at new Promise (&lt;anonymous&gt;)
+    at runWithTimeout (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1209:10)
+    at file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1653:37
+    at Traces.$ (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/vitest@4.0.18_@types+node@20.19.27_happy-dom@20.3.9_jiti@1.21.7_jsdom@27.4.0_@noble+hashes@1.8.0__tsx@4.21.0/node_modules/[4mvitest[24m/dist/chunks/traces.CCmnQaNT.js:142:27)
+    at trace (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/vitest@4.0.18_@types+node@20.19.27_happy-dom@20.3.9_jiti@1.21.7_jsdom@27.4.0_@noble+hashes@1.8.0__tsx@4.21.0/node_modules/[4mvitest[24m/dist/chunks/test.B8ej_ZHS.js:239:21)
+    at runTest (file:///home/user/vibe-chat/node_modules/[4m.pnpm[24m/@vitest+runner@4.0.18/node_modules/[4m@vitest/runner[24m/dist/index.js:1653:12)
+
+            </system-err>
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/lib/keyStore.test.ts" timestamp="2026-02-16T17:17:40.107Z" hostname="runsc" tests="12" failures="0" errors="0" skipped="0" time="0.117800977">
+        <testcase classname="src/__tests__/lib/keyStore.test.ts" name="KeyStore Module &gt; Identity Keys &gt; should store and retrieve identity keys" time="0.015309922">
+        </testcase>
+        <testcase classname="src/__tests__/lib/keyStore.test.ts" name="KeyStore Module &gt; Identity Keys &gt; should return true for hasIdentityKeys after storing" time="0.00054131">
+        </testcase>
+        <testcase classname="src/__tests__/lib/keyStore.test.ts" name="KeyStore Module &gt; Channel Keys &gt; should return false for hasChannelKey with non-existent channel" time="0.000526776">
+        </testcase>
+        <testcase classname="src/__tests__/lib/keyStore.test.ts" name="KeyStore Module &gt; Channel Keys &gt; should store and retrieve channel keys" time="0.001133946">
+        </testcase>
+        <testcase classname="src/__tests__/lib/keyStore.test.ts" name="KeyStore Module &gt; Channel Keys &gt; should return true for hasChannelKey after storing" time="0.001086189">
+        </testcase>
+        <testcase classname="src/__tests__/lib/keyStore.test.ts" name="KeyStore Module &gt; Channel Keys &gt; should return null for non-existent channel key" time="0.000347968">
+        </testcase>
+        <testcase classname="src/__tests__/lib/keyStore.test.ts" name="KeyStore Module &gt; User Keys &gt; should store and retrieve user keys" time="0.00091546">
+        </testcase>
+        <testcase classname="src/__tests__/lib/keyStore.test.ts" name="KeyStore Module &gt; User Keys &gt; should return null for non-existent user key" time="0.00032653">
+        </testcase>
+        <testcase classname="src/__tests__/lib/keyStore.test.ts" name="KeyStore Module &gt; User Keys &gt; should update existing user key" time="0.001094093">
+        </testcase>
+        <testcase classname="src/__tests__/lib/keyStore.test.ts" name="KeyStore Module &gt; clearAllKeys &gt; should clear identity keys" time="0.005347027">
+        </testcase>
+        <testcase classname="src/__tests__/lib/keyStore.test.ts" name="KeyStore Module &gt; clearAllKeys &gt; should clear channel keys" time="0.001683076">
+        </testcase>
+        <testcase classname="src/__tests__/lib/keyStore.test.ts" name="KeyStore Module &gt; clearAllKeys &gt; should clear user keys" time="0.001701964">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/lib/mentions.test.ts" timestamp="2026-02-16T17:17:40.109Z" hostname="runsc" tests="29" failures="0" errors="0" skipped="0" time="0.016699461">
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="parseMentions &gt; returns single text token for plain text" time="0.002146514">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="parseMentions &gt; parses a single mention" time="0.000320144">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="parseMentions &gt; parses multiple mentions" time="0.001000595">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="parseMentions &gt; handles mention at start of text" time="0.000363445">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="parseMentions &gt; handles mention at end of text" time="0.000156967">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="parseMentions &gt; returns empty array for empty string" time="0.000128675">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="parseMentions &gt; handles full UUID format" time="0.000202123">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="parseMentions &gt; does not parse malformed mentions" time="0.000119837">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="buildMentionText &gt; builds correct mention format" time="0.000123149">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="buildMentionText &gt; handles display names with spaces" time="0.00016944">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="getActiveMentionQuery &gt; returns null when no @ present" time="0.000220404">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="getActiveMentionQuery &gt; detects active mention at start of text" time="0.000188645">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="getActiveMentionQuery &gt; detects active mention after space" time="0.000179811">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="getActiveMentionQuery &gt; returns empty query right after @" time="0.000124249">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="getActiveMentionQuery &gt; returns null for @ in middle of word" time="0.000089309">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="getActiveMentionQuery &gt; returns null for completed mention" time="0.000080021">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="getActiveMentionQuery &gt; ignores completed mention and detects new one" time="0.00012969">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="getActiveMentionQuery &gt; returns null when query is too long" time="0.000104951">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="getActiveMentionQuery &gt; returns null when query contains newline" time="0.000081789">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="filterMembers &gt; returns all members (up to limit) for empty query" time="0.000216842">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="filterMembers &gt; filters by display name substring" time="0.006790652">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="filterMembers &gt; is case insensitive" time="0.000201225">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="filterMembers &gt; prefers prefix matches" time="0.000135702">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="filterMembers &gt; respects limit" time="0.000126226">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="filterMembers &gt; returns empty array when no match" time="0.000140431">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="hasMentionOf &gt; returns true when user is mentioned" time="0.000221632">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="hasMentionOf &gt; returns false when user is not mentioned" time="0.000126768">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="hasMentionOf &gt; returns false for plain text" time="0.000136666">
+        </testcase>
+        <testcase classname="src/__tests__/lib/mentions.test.ts" name="hasMentionOf &gt; handles multiple mentions" time="0.000190868">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/lib/websocket.test.ts" timestamp="2026-02-16T17:17:40.114Z" hostname="runsc" tests="30" failures="0" errors="0" skipped="0" time="0.351040695">
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; connect &gt; should create WebSocket connection with correct URL" time="0.059753444">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; connect &gt; should send auth message on connection" time="0.011624765">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; connect &gt; should handle auth:success and set authenticated" time="0.010792111">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; connect &gt; should rejoin channels after authentication" time="0.011487484">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; disconnect &gt; should close WebSocket and clear state" time="0.011785527">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; send &gt; should queue messages when not connected" time="0.000774548">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; send &gt; should queue messages when not authenticated" time="0.011945178">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; send &gt; should send messages when authenticated" time="0.011294057">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; send &gt; should send queued messages after authentication" time="0.011388839">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; message handlers &gt; should emit events to registered handlers" time="0.012000255">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; message handlers &gt; should remove handlers with off" time="0.010653423">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; message handlers &gt; should handle multiple handlers for same event" time="0.011524821">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; error handling &gt; should emit error events on server error messages" time="0.01118035">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; error handling &gt; should emit auth:failed on token-related errors" time="0.011650401">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; error handling &gt; should handle malformed JSON gracefully" time="0.010521135">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; channel operations &gt; should track joined channels" time="0.011361842">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; channel operations &gt; should send leave channel message" time="0.010392139">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; community operations &gt; should send join community message" time="0.01148481">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; community operations &gt; should send leave community message" time="0.011358495">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; message operations &gt; should send message with correct payload" time="0.011555826">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; message operations &gt; should send edit message" time="0.011439294">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; message operations &gt; should send delete message" time="0.011522129">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; typing indicators &gt; should send typing start" time="0.011319479">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; typing indicators &gt; should send typing stop" time="0.010055554">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; reactions &gt; should send add reaction" time="0.011379381">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; reactions &gt; should send remove reaction" time="0.01129736">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; key requests &gt; should send key request" time="0.010289799">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; reconnection &gt; should attempt reconnect on disconnect" time="0.003274772">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; reconnection &gt; should use exponential backoff for reconnection" time="0.001338291">
+        </testcase>
+        <testcase classname="src/__tests__/lib/websocket.test.ts" name="WebSocketClient &gt; reconnection &gt; should track reconnect attempts" time="0.001403424">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/__tests__/stores/chat.test.ts" timestamp="2026-02-16T17:17:40.119Z" hostname="runsc" tests="44" failures="0" errors="0" skipped="0" time="0.025189837">
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Communities &gt; should set communities" time="0.002023174">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Communities &gt; should add a community" time="0.00044382">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Communities &gt; should set active community" time="0.00042257">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Communities &gt; should clear active community" time="0.000262764">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Channels &gt; should set channels for a community" time="0.000289146">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Channels &gt; should add a channel" time="0.000246367">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Channels &gt; should append to existing channels" time="0.001040666">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Channels &gt; should set active channel" time="0.00042521">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Messages &gt; should set messages for a channel" time="0.000265731">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Messages &gt; should add a message" time="0.00033314">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Messages &gt; should deduplicate messages with same id" time="0.0003502">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Messages &gt; should update a message" time="0.000287566">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Messages &gt; should delete a message" time="0.000391024">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Messages &gt; should get message by id" time="0.000275003">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Messages &gt; should return undefined for non-existent message" time="0.000177489">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Members &gt; should set members for a community" time="0.000313147">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Members &gt; should add member if missing" time="0.000565996">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Members &gt; should not duplicate existing member" time="0.000390358">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Members &gt; should add member to specific community" time="0.000378535">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Members &gt; should not duplicate member in community" time="0.000275286">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Typing Users &gt; should set user as typing" time="0.001022045">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Typing Users &gt; should remove user from typing" time="0.000472118">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Typing Users &gt; should handle multiple users typing" time="0.000315115">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Typing Users &gt; should not duplicate typing user" time="0.000260308">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Typing Users &gt; should handle typing across channels independently" time="0.000355401">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Reply State &gt; should set replying to message" time="0.000268435">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Reply State &gt; should clear replying to message" time="0.000203981">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Online Users &gt; should set online users for community" time="0.000260859">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Online Users &gt; should set user online" time="0.000330398">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Online Users &gt; should set user offline" time="0.000254044">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Online Users &gt; should not duplicate online user" time="0.000245629">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Online Users &gt; should check if user is online" time="0.000225069">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Reactions &gt; should add reaction to message" time="0.000580096">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Reactions &gt; should increment count for existing reaction" time="0.000455147">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Reactions &gt; should remove reaction from message" time="0.000485413">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Reactions &gt; should decrement count when removing one of multiple reactions" time="0.000480007">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; Reactions &gt; should handle multiple emoji reactions" time="0.000299654">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; State Isolation &gt; should maintain separate messages per channel" time="0.000312062">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store &gt; State Isolation &gt; should maintain separate channels per community" time="0.000395115">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store - State Cleanup &gt; should clear messages for a specific channel" time="0.00039903">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store - State Cleanup &gt; should clear typing users for a specific channel" time="0.000598126">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store - State Cleanup &gt; should clear both messages and typing users with clearChannelState" time="0.000341032">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store - State Cleanup &gt; should not affect other channels when clearing state" time="0.000319984">
+        </testcase>
+        <testcase classname="src/__tests__/stores/chat.test.ts" name="Chat Store - State Cleanup &gt; should handle clearing non-existent channel gracefully" time="0.000171653">
         </testcase>
     </testsuite>
 </testsuites>
