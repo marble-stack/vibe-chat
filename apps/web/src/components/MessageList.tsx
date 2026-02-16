@@ -435,6 +435,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     activeCommunityId,
     typingUsers,
     setMessages,
+    updateMessage,
     getMessageById,
     setActiveChannel,
     setActiveThread,
@@ -443,6 +444,7 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
     setSearchOpen,
     scrollToMessageId,
     setScrollToMessage,
+    keySyncVersion,
   } = useChatStore();
   const user = useAuthStore((state) => state.user);
 
@@ -535,6 +537,47 @@ export function MessageList({ onOpenSidebar }: MessageListProps) {
 
     loadMessages();
   }, [activeChannelId, user, setMessages]);
+
+  // Re-decrypt failed messages when keySyncVersion bumps (key:available was received)
+  const currentKeySyncVersion = activeChannelId ? keySyncVersion[activeChannelId] || 0 : 0;
+  useEffect(() => {
+    if (!activeChannelId || !user || currentKeySyncVersion === 0) return;
+
+    const reDecryptFailed = async () => {
+      const channelMsgs = useChatStore.getState().messages[activeChannelId] || [];
+      const failedMsgs = channelMsgs.filter(
+        (m) => isDecryptionError(m.plaintext) || m.decryptionFailed
+      );
+
+      if (failedMsgs.length === 0) return;
+
+      logger.debug(`keySyncVersion bumped, re-decrypting ${failedMsgs.length} failed messages`);
+
+      const currentMembers = communityMembersRef.current;
+      const membersForDecryption = currentMembers.some((m) => m.id === user.id)
+        ? currentMembers
+        : [...currentMembers, { id: user.id, displayName: user.displayName || "Me" }];
+
+      for (const failedMsg of failedMsgs) {
+        try {
+          const plaintext = await decryptChannelMessage(
+            activeChannelId,
+            failedMsg.ciphertext,
+            membersForDecryption,
+            user.id,
+            failedMsg.senderId
+          );
+          if (!isDecryptionError(plaintext)) {
+            updateMessage(activeChannelId, failedMsg.id, { plaintext, decryptionFailed: false });
+          }
+        } catch {
+          // Still can't decrypt
+        }
+      }
+    };
+
+    reDecryptFailed();
+  }, [activeChannelId, user, currentKeySyncVersion, updateMessage]);
 
   // Smart auto-scroll: scroll to bottom on initial load, or when a new message
   // arrives and the user is already near the bottom

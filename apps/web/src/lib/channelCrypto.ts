@@ -135,14 +135,24 @@ export async function ensureChannelKey(
     const { senderKeyOwners } = await api.channels.getSenderKeyOwners(channelId);
 
     if (senderKeyOwners.length > 0) {
-      // Deadlock recovery: if sender keys exist but decryption failed (cryptographically
-      // broken keys) AND we're trying to send, fall through to create a new key.
-      // This breaks the deadlock where neither user can decrypt the stored key.
+      // If sender keys exist but decryption failed (cryptographically broken keys,
+      // e.g. identity key mismatch after cross-device login), request redistribution
+      // instead of creating a new key. Creating a new key would cause key fragmentation
+      // where old messages encrypted with the original key become permanently unreadable.
       if (senderKeyDecryptionFailed && createIfMissing) {
-        logger.warn(
-          `Deadlock recovery: sender keys exist but decryption failed for channel ${channelId}. Creating new channel key.`
-        );
-        // Fall through to key creation below
+        const keyOwner = senderKeyOwners[0];
+        const requestKey = `${channelId}:${keyOwner.userId}`;
+
+        if (!pendingKeyRequests.has(requestKey)) {
+          pendingKeyRequests.add(requestKey);
+          logger.debug(
+            `Requesting key redistribution from ${keyOwner.userId} for channel ${channelId} (sender key decryption failed)`
+          );
+          wsClient.requestKey(channelId, keyOwner.userId);
+          setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+        }
+
+        throw new Error("Encryption keys are syncing. Please wait a moment and try again.");
       } else {
         // Normal path: A key exists but we don't have it - request redistribution via WebSocket
         const keyOwner = senderKeyOwners[0];
@@ -471,4 +481,48 @@ export async function tryFetchChannelKey(
   }
 
   return false;
+}
+
+/**
+ * Proactively fetch channel keys for all of the user's communities/channels.
+ * Called on login to minimize "[Syncing keys...]" messages when navigating channels.
+ * Non-blocking — failures are logged but don't prevent the app from loading.
+ */
+export async function prefetchAllChannelKeys(currentUserId: string): Promise<void> {
+  try {
+    const { communities } = await api.communities.list(currentUserId);
+
+    for (const community of communities) {
+      try {
+        const { channels } = await api.communities.get(community.id);
+
+        // Fetch keys in parallel for all channels in this community
+        await Promise.allSettled(
+          channels.map(async (channel) => {
+            const fetched = await tryFetchChannelKey(channel.id, currentUserId);
+            if (!fetched) {
+              // Key not available — request redistribution via WebSocket
+              // (will be fulfilled when a key holder is online)
+              const { senderKeyOwners } = await api.channels.getSenderKeyOwners(channel.id);
+              if (senderKeyOwners.length > 0) {
+                const keyOwner = senderKeyOwners[0];
+                const requestKey = `${channel.id}:${keyOwner.userId}`;
+                if (!pendingKeyRequests.has(requestKey)) {
+                  pendingKeyRequests.add(requestKey);
+                  wsClient.requestKey(channel.id, keyOwner.userId);
+                  setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+                }
+              }
+            }
+          })
+        );
+      } catch (err) {
+        logger.debug(`Failed to prefetch keys for community ${community.id}:`, err);
+      }
+    }
+
+    logger.debug("Channel key prefetch complete");
+  } catch (err) {
+    logger.debug("Failed to prefetch channel keys:", err);
+  }
 }
