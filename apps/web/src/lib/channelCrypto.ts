@@ -155,8 +155,8 @@ export async function ensureChannelKey(
           );
           wsClient.requestKey(channelId, keyOwner.userId);
 
-          // Remove from pending after 30 seconds to allow retry
-          setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+          // Remove from pending after 5 seconds to allow faster retry
+          setTimeout(() => pendingKeyRequests.delete(requestKey), 5000);
         }
 
         if (!createIfMissing) {
@@ -366,8 +366,8 @@ export async function decryptChannelMessage(
       logger.debug(`Requesting key from sender ${senderId} for channel ${channelId}`);
       wsClient.requestKey(channelId, senderId);
 
-      // Remove from pending after 30 seconds to allow retry
-      setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+      // Remove from pending after 5 seconds to allow faster retry
+      setTimeout(() => pendingKeyRequests.delete(requestKey), 5000);
     }
     return "[Syncing keys...]";
   }
@@ -383,7 +383,7 @@ export async function decryptChannelMessage(
         logger.debug(`Requesting key redistribution from ${keyOwner.userId}`);
         wsClient.requestKey(channelId, keyOwner.userId);
 
-        setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+        setTimeout(() => pendingKeyRequests.delete(requestKey), 5000);
       }
       return "[Syncing keys...]";
     }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, pollVotes, messages } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
 import { canUserAccessChannel } from "../lib/authorization.js";
+import { sendToChannel } from "../websocket/connectionMaps.js";
 
 const voteSchema = z.object({
   messageId: z.string().uuid(),
@@ -45,11 +46,28 @@ export const pollRoutes: FastifyPluginAsync = async (fastify) => {
     if (existing) {
       // Toggle off - remove the vote
       await db.delete(pollVotes).where(eq(pollVotes.id, existing.id));
+      sendToChannel(message.channelId, {
+        type: "poll:voted",
+        payload: {
+          messageId: body.messageId,
+          channelId: message.channelId,
+          userId: request.user.userId,
+          optionIndex: body.optionIndex,
+          action: "remove",
+        },
+      });
       return { success: true, action: "removed" };
     }
 
     // If exclusive mode, remove all other votes by this user for this poll first
     if (body.exclusive) {
+      const previousVotes = await db.query.pollVotes.findMany({
+        where: and(
+          eq(pollVotes.messageId, body.messageId),
+          eq(pollVotes.userId, request.user.userId)
+        ),
+      });
+
       await db
         .delete(pollVotes)
         .where(
@@ -58,6 +76,20 @@ export const pollRoutes: FastifyPluginAsync = async (fastify) => {
             eq(pollVotes.userId, request.user.userId)
           )
         );
+
+      // Broadcast removal for each previous vote
+      for (const prev of previousVotes) {
+        sendToChannel(message.channelId, {
+          type: "poll:voted",
+          payload: {
+            messageId: body.messageId,
+            channelId: message.channelId,
+            userId: request.user.userId,
+            optionIndex: prev.optionIndex,
+            action: "remove",
+          },
+        });
+      }
     }
 
     // Add vote
@@ -65,6 +97,17 @@ export const pollRoutes: FastifyPluginAsync = async (fastify) => {
       messageId: body.messageId,
       userId: request.user.userId,
       optionIndex: body.optionIndex,
+    });
+
+    sendToChannel(message.channelId, {
+      type: "poll:voted",
+      payload: {
+        messageId: body.messageId,
+        channelId: message.channelId,
+        userId: request.user.userId,
+        optionIndex: body.optionIndex,
+        action: "add",
+      },
     });
 
     return { success: true, action: "added" };
@@ -100,6 +143,17 @@ export const pollRoutes: FastifyPluginAsync = async (fastify) => {
           eq(pollVotes.optionIndex, body.optionIndex)
         )
       );
+
+    sendToChannel(message.channelId, {
+      type: "poll:voted",
+      payload: {
+        messageId: body.messageId,
+        channelId: message.channelId,
+        userId: request.user.userId,
+        optionIndex: body.optionIndex,
+        action: "remove",
+      },
+    });
 
     return { success: true };
   });

@@ -12,6 +12,7 @@ import {
   communityOnlineUsers,
   communityConnections,
   cleanupEmptyMaps,
+  sendToChannel,
 } from "./connectionMaps.js";
 
 // In-memory cache for display names (populated during auth, avoids DB query per message)
@@ -442,7 +443,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       const user = socketUsers.get(socket);
 
       if (user) {
-        broadcastToChannel(
+        sendToChannel(
           typingStartPayload.channelId,
           {
             type: "typing:update",
@@ -468,7 +469,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       const user = socketUsers.get(socket);
 
       if (user) {
-        broadcastToChannel(
+        sendToChannel(
           typingStopPayload.channelId,
           {
             type: "typing:update",
@@ -525,7 +526,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
         .returning();
 
       // Broadcast to channel
-      broadcastToChannel(channelId, {
+      sendToChannel(channelId, {
         type: "reaction:added",
         payload: {
           reactionId: reaction.id,
@@ -555,7 +556,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       await db.delete(reactions).where(eq(reactions.id, reactionId));
 
       // Broadcast to channel
-      broadcastToChannel(channelId, {
+      sendToChannel(channelId, {
         type: "reaction:removed",
         payload: {
           reactionId,
@@ -686,7 +687,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       }
 
       // Broadcast to channel
-      broadcastToChannel(channelId, {
+      sendToChannel(channelId, {
         type: "poll:voted",
         payload: {
           messageId,
@@ -759,20 +760,6 @@ function handleUserLeaveCommunity(socket: WebSocket, userId: string, communityId
   const user = socketUsers.get(socket);
   if (user) {
     user.communityIds.delete(communityId);
-  }
-}
-
-function broadcastToChannel(channelId: string, message: WsMessage, excludeSocket?: WebSocket) {
-  const channelSockets = channelConnections.get(channelId);
-
-  if (channelSockets) {
-    const msgStr = JSON.stringify(message);
-
-    for (const clientSocket of channelSockets) {
-      if (clientSocket !== excludeSocket && clientSocket.readyState === WebSocket.OPEN) {
-        clientSocket.send(msgStr);
-      }
-    }
   }
 }
 

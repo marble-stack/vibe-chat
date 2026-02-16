@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
-import { generateIdentityKeys, encryptKeyBackup } from "../lib/crypto";
+import { generateIdentityKeys, uploadKeyBackupWithRetry } from "../lib/crypto";
 import { storeIdentityKeys } from "../lib/keyStore";
 
 export function Register() {
@@ -46,14 +46,19 @@ export function Register() {
       // Store private keys locally in IndexedDB
       await storeIdentityKeys(user.id, keys);
 
-      // Upload encrypted key backup for cross-device restore (fire-and-forget)
-      encryptKeyBackup(keys, password)
-        .then(({ ciphertext, salt }) =>
-          api.auth.uploadKeyBackup({ encryptedKeyBackup: ciphertext, salt }, token)
-        )
-        .catch((err) => console.warn("Failed to upload key backup:", err));
-
       setAuth(user, token);
+
+      // Upload encrypted key backup with retry (runs after auth is set)
+      const { setKeyBackupStatus, setLastBackupAt } = useAuthStore.getState();
+      setKeyBackupStatus("pending");
+      uploadKeyBackupWithRetry(keys, password, token).then((success) => {
+        if (success) {
+          setKeyBackupStatus("success");
+          setLastBackupAt(Date.now());
+        } else {
+          setKeyBackupStatus("failed");
+        }
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {

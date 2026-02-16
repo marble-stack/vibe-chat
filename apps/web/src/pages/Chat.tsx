@@ -10,7 +10,7 @@ import {
   tryFetchChannelKey,
   isDecryptionError,
 } from "../lib/channelCrypto";
-import { getChannelKey } from "../lib/keyStore";
+import { getChannelKey, getIdentityKeys } from "../lib/keyStore";
 import { logger } from "../lib/logger";
 import { Sidebar } from "../components/Sidebar";
 import { ChannelList } from "../components/ChannelList";
@@ -18,6 +18,7 @@ import { MessageList } from "../components/MessageList";
 import { MessageInput } from "../components/MessageInput";
 import { MemberList } from "../components/MemberList";
 import { KeyRecoveryBanner } from "../components/KeyRecoveryBanner";
+import { KeyBackupWarning } from "../components/KeyBackupWarning";
 import { ThreadPanel } from "../components/ThreadPanel";
 import { SearchPanel } from "../components/SearchPanel";
 import {
@@ -125,6 +126,38 @@ export function Chat() {
     }
   }, [user]);
 
+  // Re-attempt key backup on mount if previous backup failed
+  useEffect(() => {
+    if (!user || !token || !hasHydrated) return;
+
+    const { keyBackupStatus, setKeyBackupStatus, setLastBackupAt } = useAuthStore.getState();
+    if (keyBackupStatus === "success") return;
+
+    const attemptBackup = async () => {
+      const identityKeys = await getIdentityKeys();
+      if (!identityKeys) return;
+
+      // We need the full IdentityKeys object - reconstruct from stored data
+      // The password is needed but we don't store it. For re-attempts we can only
+      // succeed if the backup was never uploaded (no password needed for check).
+      // For now, check if a backup already exists on server.
+      try {
+        const backup = await api.auth.getKeyBackup(token);
+        if (backup.encryptedKeyBackup && backup.salt) {
+          // Backup exists on server — mark as success
+          setKeyBackupStatus("success");
+          setLastBackupAt(Date.now());
+        }
+        // If no backup exists, we can't re-upload without the password.
+        // The KeyBackupWarning banner will show with a "retry" option.
+      } catch {
+        // Network error — leave status as-is, will retry next mount
+      }
+    };
+
+    attemptBackup();
+  }, [user, token, hasHydrated]);
+
   // Process pending key requests on login (for offline key sync)
   // When a key holder comes online, they should redistribute keys to users who requested while offline
   useEffect(() => {
@@ -188,8 +221,10 @@ export function Chat() {
       }
     };
 
-    // Process after a short delay to let WebSocket connect first
-    const timeoutId = setTimeout(processPendingRequests, 2000);
+    // Run immediately (WebSocket may already be connected from a prior session)
+    processPendingRequests();
+    // Run again after 5 seconds to cover the case where WebSocket wasn't ready yet
+    const timeoutId = setTimeout(processPendingRequests, 5000);
     return () => clearTimeout(timeoutId);
   }, [user, hasHydrated]);
 
@@ -546,6 +581,24 @@ export function Chat() {
       updatePollVote(messageId, userId, optionIndex, action);
     };
 
+    // Handle key request sent acknowledgment - retry if no key holder was online
+    const handleKeyRequestSent = (msg: { payload: Record<string, unknown> }) => {
+      const { channelId, sentToOnlineKeyHolder } = msg.payload as {
+        channelId: string;
+        sentToOnlineKeyHolder: boolean;
+      };
+
+      if (!sentToOnlineKeyHolder) {
+        // No key holder was online — retry after 10 seconds in case someone comes online
+        logger.debug(`No online key holder for ${channelId}, retrying in 10s`);
+        setTimeout(() => {
+          if (user) {
+            wsClient.requestKey(channelId, user.id);
+          }
+        }, 10000);
+      }
+    };
+
     // Handle new member joining a community - update local member list
     const handleMemberJoined = (msg: { payload: Record<string, unknown> }) => {
       const { communityId, member } = msg.payload as {
@@ -567,6 +620,7 @@ export function Chat() {
     wsClient.on("reaction:removed", handleReactionRemoved);
     wsClient.on("key:requested", handleKeyRequested);
     wsClient.on("key:available", handleKeyAvailable);
+    wsClient.on("key:request:sent", handleKeyRequestSent);
     wsClient.on("member:joined", handleMemberJoined);
     wsClient.on("poll:voted", handlePollVoted);
 
@@ -582,6 +636,7 @@ export function Chat() {
       wsClient.off("reaction:removed", handleReactionRemoved);
       wsClient.off("key:requested", handleKeyRequested);
       wsClient.off("key:available", handleKeyAvailable);
+      wsClient.off("key:request:sent", handleKeyRequestSent);
       wsClient.off("member:joined", handleMemberJoined);
       wsClient.off("poll:voted", handlePollVoted);
       wsClient.disconnect();
@@ -620,44 +675,50 @@ export function Chat() {
     }
   }, [activeChannelId, markChannelRead]);
 
-  // Polling fallback for key sync when key owner might be offline
+  // Polling fallback for key sync with exponential backoff
   useEffect(() => {
     if (!user || !activeChannelId) return;
 
+    let pollDelay = 2000; // Start at 2s
+    const maxDelay = 30000; // Cap at 30s
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
     const pollForKeys = async () => {
+      if (cancelled) return;
+
       // Check if there are any messages stuck in syncing state for the active channel
       const channelMsgs = useChatStore.getState().messages[activeChannelId] || [];
       const hasSyncingMessages = channelMsgs.some(
         (m) => isDecryptionError(m.plaintext) || m.decryptionFailed
       );
 
-      if (!hasSyncingMessages) return;
+      if (!hasSyncingMessages) {
+        // No syncing messages — reset backoff and check again later
+        pollDelay = 2000;
+        if (!cancelled) timeoutId = setTimeout(pollForKeys, pollDelay);
+        return;
+      }
 
       // Try to fetch the key from server (in case key owner came online and distributed)
-      // Returns true if a NEW key was fetched, false if key already existed or not found
       const keyFound = await tryFetchChannelKey(activeChannelId, user.id);
       if (keyFound) {
         logger.debug("Polling found new key");
       }
 
-      // If no key found, re-request via WebSocket (server broadcasts to all online key holders)
+      // If no key found, re-request via WebSocket
       if (!keyFound) {
         const localKey = await getChannelKey(activeChannelId);
         if (!localKey) {
-          // We don't have a local key and couldn't fetch one - request it
-          // Server will broadcast to all online key holders
           wsClient.requestKey(activeChannelId, user.id);
           logger.debug("Re-requesting key via WebSocket");
         }
       }
 
       // Always try to re-decrypt if we have syncing messages
-      // The key might have been stored by key:available handler (tryFetchChannelKey returns false if key exists)
-      // Get current community members for decryption
       const currentCommunityId = activeCommunityRef.current;
       let currentMembers = currentCommunityId ? membersRef.current[currentCommunityId] || [] : [];
 
-      // Ensure current user is in members list
       if (!currentMembers.some((m) => m.id === user.id)) {
         currentMembers = [
           ...currentMembers,
@@ -665,7 +726,6 @@ export function Chat() {
         ];
       }
 
-      // Re-decrypt failed messages
       const failedMsgs =
         useChatStore
           .getState()
@@ -673,6 +733,7 @@ export function Chat() {
             (m) => isDecryptionError(m.plaintext) || m.decryptionFailed
           ) || [];
 
+      let allResolved = true;
       for (const failedMsg of failedMsgs) {
         try {
           const plaintext = await decryptChannelMessage(
@@ -684,20 +745,31 @@ export function Chat() {
           );
           if (!isDecryptionError(plaintext)) {
             updateMessage(activeChannelId, failedMsg.id, { plaintext, decryptionFailed: false });
+          } else {
+            allResolved = false;
           }
         } catch {
-          // Still can't decrypt
+          allResolved = false;
         }
       }
+
+      // If all resolved, reset backoff; otherwise increase delay
+      if (allResolved) {
+        pollDelay = 2000;
+      } else {
+        pollDelay = Math.min(pollDelay * 2, maxDelay);
+      }
+
+      if (!cancelled) timeoutId = setTimeout(pollForKeys, pollDelay);
     };
 
-    // Poll every 5 seconds
-    const intervalId = setInterval(pollForKeys, 5000);
-
-    // Also poll immediately on channel change
+    // Poll immediately on channel change
     pollForKeys();
 
-    return () => clearInterval(intervalId);
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [user, activeChannelId, updateMessage]);
 
   return (
@@ -720,6 +792,8 @@ export function Chat() {
       <div className={`flex-1 flex flex-col ${activeChannelId ? "flex" : "hidden md:flex"}`}>
         {/* Key recovery banner - shown when encryption keys are missing */}
         <KeyRecoveryBanner />
+        {/* Key backup warning - shown when backup to server failed */}
+        <KeyBackupWarning />
 
         {activeChannelId ? (
           <>
