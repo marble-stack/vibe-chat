@@ -9,6 +9,7 @@ import {
   distributeChannelKey,
   tryFetchChannelKey,
   isDecryptionError,
+  prefetchAllChannelKeys,
 } from "../lib/channelCrypto";
 import { getChannelKey, getIdentityKeys } from "../lib/keyStore";
 import { logger } from "../lib/logger";
@@ -55,6 +56,7 @@ export function Chat() {
     incrementUnread,
     markChannelRead,
     isSearchOpen,
+    bumpKeySyncVersion,
   } = useChatStore();
 
   // Mobile navigation state
@@ -157,6 +159,16 @@ export function Chat() {
 
     attemptBackup();
   }, [user, token, hasHydrated]);
+
+  // Proactively fetch channel keys on login to minimize "[Syncing keys...]"
+  useEffect(() => {
+    if (!user || !hasHydrated) return;
+
+    // Fire-and-forget: non-blocking prefetch of all channel keys
+    prefetchAllChannelKeys(user.id).catch((err) =>
+      logger.error("Channel key prefetch failed:", err)
+    );
+  }, [user, hasHydrated]);
 
   // Process pending key requests on login (for offline key sync)
   // When a key holder comes online, they should redistribute keys to users who requested while offline
@@ -520,53 +532,19 @@ export function Chat() {
       }
     };
 
-    // Handle key available notification - re-decrypt failed messages
+    // Handle key available notification - bump keySyncVersion to trigger re-decryption in MessageList
     const handleKeyAvailable = async (msg: { payload: Record<string, unknown> }) => {
       const { channelId } = msg.payload as { channelId: string; fromUserId: string };
 
       if (!user) return;
 
-      logger.debug(`Key available for channel ${channelId}`);
+      logger.debug(`Key available for channel ${channelId}, bumping keySyncVersion`);
 
-      // Get current messages for this channel
-      const channelMsgs = useChatStore.getState().messages[channelId] || [];
-      const failedMsgs = channelMsgs.filter(
-        (m) => isDecryptionError(m.plaintext) || m.decryptionFailed
-      );
+      // First, try to fetch and store the key so it's available for decryption
+      await tryFetchChannelKey(channelId, user.id);
 
-      if (failedMsgs.length === 0) return;
-
-      logger.debug(`Re-decrypting ${failedMsgs.length} failed messages`);
-
-      // Get current community members for decryption
-      const currentCommunityId = activeCommunityRef.current;
-      let currentMembers = currentCommunityId ? membersRef.current[currentCommunityId] || [] : [];
-
-      // Ensure current user is in members list
-      if (!currentMembers.some((m) => m.id === user.id)) {
-        currentMembers = [
-          ...currentMembers,
-          { id: user.id, displayName: user.displayName || "Me" },
-        ];
-      }
-
-      // Re-decrypt each failed message
-      for (const failedMsg of failedMsgs) {
-        try {
-          const plaintext = await decryptChannelMessage(
-            channelId,
-            failedMsg.ciphertext,
-            currentMembers,
-            user.id,
-            failedMsg.senderId
-          );
-          if (!isDecryptionError(plaintext)) {
-            updateMessage(channelId, failedMsg.id, { plaintext, decryptionFailed: false });
-          }
-        } catch {
-          // Still can't decrypt, leave as is
-        }
-      }
+      // Bump the version counter - MessageList watches this and re-decrypts failed messages
+      bumpKeySyncVersion(channelId);
     };
 
     // Handle poll voted
@@ -658,6 +636,7 @@ export function Chat() {
     addMemberToCommunity,
     updatePollVote,
     incrementUnread,
+    bumpKeySyncVersion,
   ]);
 
   // Join active community for presence updates

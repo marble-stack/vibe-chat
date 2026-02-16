@@ -139,7 +139,11 @@ export function MessageInput() {
       logger.error("Failed to encrypt message:", err);
       // Mark the optimistic message as failed
       updateMessage(activeChannelId, clientId, { sendFailed: true, pending: false });
-      setSendError("Encryption failed. Please try again or refresh the page.");
+      // Show a user-friendly error for key syncing vs generic encryption failure
+      const errorMsg = err instanceof Error && err.message.includes("syncing")
+        ? "Encryption keys are syncing. Please wait a moment and try again."
+        : "Encryption failed. Please try again or refresh the page.";
+      setSendError(errorMsg);
     } finally {
       setIsSending(false);
     }

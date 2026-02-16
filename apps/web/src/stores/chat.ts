@@ -74,6 +74,7 @@ interface ChatState {
   searchResults: Message[];
   isSearchOpen: boolean;
   scrollToMessageId: string | null;
+  keySyncVersion: Record<string, number>; // channelId -> version counter, bumped when key:available fires
 
   setCommunities: (communities: Community[]) => void;
   addCommunity: (community: Community) => void;
@@ -107,6 +108,7 @@ interface ChatState {
   setCustomEmojis: (communityId: string, emojis: CustomEmoji[]) => void;
   addCustomEmoji: (communityId: string, emoji: CustomEmoji) => void;
   removeCustomEmoji: (communityId: string, emojiId: string) => void;
+  bumpKeySyncVersion: (channelId: string) => void;
   // Cleanup methods to prevent memory leaks
   clearChannelMessages: (channelId: string) => void;
   clearTypingUsers: (channelId: string) => void;
@@ -157,6 +159,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   searchResults: [],
   isSearchOpen: false,
   scrollToMessageId: null,
+  keySyncVersion: {},
 
   setCommunities: (communities) => set({ communities }),
 
@@ -504,6 +507,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       customEmojis: {
         ...state.customEmojis,
         [communityId]: (state.customEmojis[communityId] || []).filter((e) => e.id !== emojiId),
+      },
+    })),
+
+  bumpKeySyncVersion: (channelId) =>
+    set((state) => ({
+      keySyncVersion: {
+        ...state.keySyncVersion,
+        [channelId]: (state.keySyncVersion[channelId] || 0) + 1,
       },
     })),
 
