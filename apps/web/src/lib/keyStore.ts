@@ -175,6 +175,55 @@ export async function clearAllKeys(): Promise<void> {
 }
 
 /**
+ * Export all channel keys as { channelId: base64Key } map (for backup)
+ */
+export async function getAllChannelKeys(): Promise<Record<string, string>> {
+  const all = await db.channelKeys.toArray();
+  const result: Record<string, string> = {};
+  for (const entry of all) {
+    result[entry.channelId] = entry.keyBase64;
+  }
+  return result;
+}
+
+/**
+ * Bulk-import channel keys (for backup restore)
+ */
+export async function importAllChannelKeys(keys: Record<string, string>): Promise<void> {
+  const entries = Object.entries(keys).map(([channelId, keyBase64]) => ({
+    channelId,
+    keyBase64,
+  }));
+  if (entries.length > 0) {
+    await db.channelKeys.bulkPut(entries);
+  }
+}
+
+/**
+ * Reconstruct full IdentityKeys from IndexedDB (for backup encryption)
+ */
+export async function getFullIdentityKeysForBackup(): Promise<IdentityKeys | null> {
+  const identity = await db.identity.get("local");
+  if (!identity) return null;
+  const preKeys = await db.preKeys.toArray();
+  return {
+    identityKeyPair: {
+      publicKey: identity.identityKeyPublic,
+      privateKey: identity.identityKeyPrivate,
+    },
+    signedPreKeyPair: {
+      publicKey: identity.signedPreKeyPublic,
+      privateKey: identity.signedPreKeyPrivate,
+    },
+    signedPreKeySignature: identity.signedPreKeySignature,
+    preKeyPairs: preKeys.map((pk) => ({
+      keyId: parseInt(pk.id, 10),
+      keyPair: { publicKey: pk.publicKey, privateKey: pk.privateKey },
+    })),
+  };
+}
+
+/**
  * Check if we have identity keys stored
  */
 export async function hasIdentityKeys(): Promise<boolean> {

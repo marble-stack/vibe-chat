@@ -289,12 +289,14 @@ export async function deriveBackupKey(
  */
 export async function encryptKeyBackup(
   keys: IdentityKeys,
-  password: string
+  password: string,
+  channelKeys?: Record<string, string>
 ): Promise<{ ciphertext: string; salt: string }> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const backupKey = await deriveBackupKey(password, salt);
 
-  const plaintext = new TextEncoder().encode(JSON.stringify(keys));
+  const payload = channelKeys ? { ...keys, channelKeys } : keys;
+  const plaintext = new TextEncoder().encode(JSON.stringify(payload));
   const iv = crypto.getRandomValues(new Uint8Array(12));
 
   const encrypted = await crypto.subtle.encrypt(
@@ -321,7 +323,7 @@ export async function decryptKeyBackup(
   ciphertextBase64: string,
   password: string,
   saltBase64: string
-): Promise<IdentityKeys> {
+): Promise<IdentityKeys & { channelKeys?: Record<string, string> }> {
   const salt = new Uint8Array(base64ToArrayBuffer(saltBase64));
   const backupKey = await deriveBackupKey(password, salt);
 
@@ -335,7 +337,7 @@ export async function decryptKeyBackup(
     ciphertext
   );
 
-  return JSON.parse(new TextDecoder().decode(decrypted)) as IdentityKeys;
+  return JSON.parse(new TextDecoder().decode(decrypted)) as IdentityKeys & { channelKeys?: Record<string, string> };
 }
 
 /**
@@ -346,14 +348,15 @@ export async function decryptKeyBackup(
 export async function uploadKeyBackupWithRetry(
   keys: IdentityKeys,
   password: string,
-  token: string
+  token: string,
+  channelKeys?: Record<string, string>
 ): Promise<boolean> {
   const { api } = await import("./api");
   const maxRetries = 5;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const { ciphertext, salt } = await encryptKeyBackup(keys, password);
+      const { ciphertext, salt } = await encryptKeyBackup(keys, password, channelKeys);
       await api.auth.uploadKeyBackup(
         { encryptedKeyBackup: ciphertext, salt },
         token

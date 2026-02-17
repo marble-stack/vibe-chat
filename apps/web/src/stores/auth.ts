@@ -15,6 +15,7 @@ interface AuthState {
   _hasHydrated: boolean;
   keyBackupStatus: KeyBackupStatus;
   lastBackupAt: number | null;
+  sessionPassword: string | null;
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
   setAuth: (user: User, token: string) => void;
@@ -22,6 +23,7 @@ interface AuthState {
   setHasHydrated: (state: boolean) => void;
   setKeyBackupStatus: (status: KeyBackupStatus) => void;
   setLastBackupAt: (timestamp: number) => void;
+  setSessionPassword: (pw: string | null) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -32,16 +34,23 @@ export const useAuthStore = create<AuthState>()(
       _hasHydrated: false,
       keyBackupStatus: "pending" as KeyBackupStatus,
       lastBackupAt: null,
+      sessionPassword: null,
       setUser: (user) => set({ user }),
       setToken: (token) => set({ token }),
       setAuth: (user, token) => set({ user, token }),
-      logout: () => set({ user: null, token: null, keyBackupStatus: "pending" as KeyBackupStatus, lastBackupAt: null }),
+      logout: () => set({ user: null, token: null, keyBackupStatus: "pending" as KeyBackupStatus, lastBackupAt: null, sessionPassword: null }),
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       setKeyBackupStatus: (status) => set({ keyBackupStatus: status }),
       setLastBackupAt: (timestamp) => set({ lastBackupAt: timestamp }),
+      setSessionPassword: (pw) => set({ sessionPassword: pw }),
     }),
     {
       name: "vibe-chat-auth",
+      partialize: (state) => {
+        // Exclude sessionPassword from persistence (in-memory only)
+        const { sessionPassword: _, ...rest } = state;
+        return rest;
+      },
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },

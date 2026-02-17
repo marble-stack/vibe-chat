@@ -11,7 +11,8 @@ import {
   isDecryptionError,
   prefetchAllChannelKeys,
 } from "../lib/channelCrypto";
-import { getChannelKey, getIdentityKeys } from "../lib/keyStore";
+import { uploadKeyBackupWithRetry } from "../lib/crypto";
+import { getChannelKey, getIdentityKeys, getAllChannelKeys, getFullIdentityKeysForBackup } from "../lib/keyStore";
 import { logger } from "../lib/logger";
 import { Sidebar } from "../components/Sidebar";
 import { ChannelList } from "../components/ChannelList";
@@ -167,9 +168,20 @@ export function Chat() {
     // Non-blocking prefetch of all channel keys, then bump keySyncVersion
     // so MessageList re-decrypts any messages that were showing "[Syncing keys...]"
     prefetchAllChannelKeys(user.id)
-      .then((fetchedChannelIds) => {
+      .then(async (fetchedChannelIds) => {
         for (const channelId of fetchedChannelIds) {
           bumpKeySyncVersion(channelId);
+        }
+
+        // Re-upload backup with channel keys included so future logins restore them
+        const sessionPassword = useAuthStore.getState().sessionPassword;
+        if (sessionPassword && token) {
+          const fullKeys = await getFullIdentityKeysForBackup();
+          const channelKeys = await getAllChannelKeys();
+          if (fullKeys && Object.keys(channelKeys).length > 0) {
+            uploadKeyBackupWithRetry(fullKeys, sessionPassword, token, channelKeys)
+              .then(() => useAuthStore.getState().setSessionPassword(null));
+          }
         }
       })
       .catch((err) => logger.error("Channel key prefetch failed:", err));

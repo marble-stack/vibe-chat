@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
 import { generateIdentityKeys, decryptKeyBackup, uploadKeyBackupWithRetry } from "../lib/crypto";
-import { storeIdentityKeys, clearAllKeys, getIdentityKeys } from "../lib/keyStore";
+import { storeIdentityKeys, clearAllKeys, getIdentityKeys, importAllChannelKeys } from "../lib/keyStore";
 
 export function Login() {
   const [email, setEmail] = useState("");
@@ -40,9 +40,14 @@ export function Login() {
         try {
           const { encryptedKeyBackup, salt } = await api.auth.getKeyBackup(token);
           if (encryptedKeyBackup && salt) {
-            const restoredKeys = await decryptKeyBackup(encryptedKeyBackup, password, salt);
+            const restored = await decryptKeyBackup(encryptedKeyBackup, password, salt);
+            const { channelKeys: restoredChannelKeys, ...identityKeys } = restored;
             await clearAllKeys();
-            await storeIdentityKeys(user.id, restoredKeys);
+            await storeIdentityKeys(user.id, identityKeys);
+            if (restoredChannelKeys && Object.keys(restoredChannelKeys).length > 0) {
+              await importAllChannelKeys(restoredChannelKeys);
+            }
+            useAuthStore.getState().setSessionPassword(password);
             setKeyBackupStatus("success");
           } else {
             throw new Error("Backup data missing");
@@ -66,6 +71,9 @@ export function Login() {
       }
 
       setAuth(user, token);
+
+      // Store password in memory for backup re-upload with channel keys later
+      useAuthStore.getState().setSessionPassword(password);
 
       // Upload backup with retry if needed (runs after auth is set)
       if (needsBackupUpload && keysForBackup) {
@@ -97,9 +105,14 @@ export function Login() {
     try {
       const { encryptedKeyBackup, salt } = await api.auth.getKeyBackup(token);
       if (encryptedKeyBackup && salt) {
-        const restoredKeys = await decryptKeyBackup(encryptedKeyBackup, password, salt);
+        const restored = await decryptKeyBackup(encryptedKeyBackup, password, salt);
+        const { channelKeys: restoredChannelKeys, ...identityKeys } = restored;
         await clearAllKeys();
-        await storeIdentityKeys(user.id, restoredKeys);
+        await storeIdentityKeys(user.id, identityKeys);
+        if (restoredChannelKeys && Object.keys(restoredChannelKeys).length > 0) {
+          await importAllChannelKeys(restoredChannelKeys);
+        }
+        useAuthStore.getState().setSessionPassword(password);
         setKeyBackupStatus("success");
         setBackupRestoreFailed(false);
         setPendingLoginData(null);
