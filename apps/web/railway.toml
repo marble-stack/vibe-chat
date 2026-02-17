@@ -1,0 +1,3 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm run build"
