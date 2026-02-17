@@ -164,11 +164,16 @@ export function Chat() {
   useEffect(() => {
     if (!user || !hasHydrated) return;
 
-    // Fire-and-forget: non-blocking prefetch of all channel keys
-    prefetchAllChannelKeys(user.id).catch((err) =>
-      logger.error("Channel key prefetch failed:", err)
-    );
-  }, [user, hasHydrated]);
+    // Non-blocking prefetch of all channel keys, then bump keySyncVersion
+    // so MessageList re-decrypts any messages that were showing "[Syncing keys...]"
+    prefetchAllChannelKeys(user.id)
+      .then((fetchedChannelIds) => {
+        for (const channelId of fetchedChannelIds) {
+          bumpKeySyncVersion(channelId);
+        }
+      })
+      .catch((err) => logger.error("Channel key prefetch failed:", err));
+  }, [user, hasHydrated, bumpKeySyncVersion]);
 
   // Process pending key requests on login (for offline key sync)
   // When a key holder comes online, they should redistribute keys to users who requested while offline

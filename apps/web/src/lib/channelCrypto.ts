@@ -488,7 +488,9 @@ export async function tryFetchChannelKey(
  * Called on login to minimize "[Syncing keys...]" messages when navigating channels.
  * Non-blocking — failures are logged but don't prevent the app from loading.
  */
-export async function prefetchAllChannelKeys(currentUserId: string): Promise<void> {
+export async function prefetchAllChannelKeys(currentUserId: string): Promise<string[]> {
+  const fetchedChannelIds: string[] = [];
+
   try {
     const { communities } = await api.communities.list(currentUserId);
 
@@ -497,25 +499,33 @@ export async function prefetchAllChannelKeys(currentUserId: string): Promise<voi
         const { channels } = await api.communities.get(community.id);
 
         // Fetch keys in parallel for all channels in this community
-        await Promise.allSettled(
+        const results = await Promise.allSettled(
           channels.map(async (channel) => {
             const fetched = await tryFetchChannelKey(channel.id, currentUserId);
-            if (!fetched) {
-              // Key not available — request redistribution via WebSocket
-              // (will be fulfilled when a key holder is online)
-              const { senderKeyOwners } = await api.channels.getSenderKeyOwners(channel.id);
-              if (senderKeyOwners.length > 0) {
-                const keyOwner = senderKeyOwners[0];
-                const requestKey = `${channel.id}:${keyOwner.userId}`;
-                if (!pendingKeyRequests.has(requestKey)) {
-                  pendingKeyRequests.add(requestKey);
-                  wsClient.requestKey(channel.id, keyOwner.userId);
-                  setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
-                }
+            if (fetched) {
+              return channel.id;
+            }
+            // Key not available — request redistribution via WebSocket
+            // (will be fulfilled when a key holder is online)
+            const { senderKeyOwners } = await api.channels.getSenderKeyOwners(channel.id);
+            if (senderKeyOwners.length > 0) {
+              const keyOwner = senderKeyOwners[0];
+              const requestKey = `${channel.id}:${keyOwner.userId}`;
+              if (!pendingKeyRequests.has(requestKey)) {
+                pendingKeyRequests.add(requestKey);
+                wsClient.requestKey(channel.id, keyOwner.userId);
+                setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
               }
             }
+            return null;
           })
         );
+
+        for (const result of results) {
+          if (result.status === "fulfilled" && result.value) {
+            fetchedChannelIds.push(result.value);
+          }
+        }
       } catch (err) {
         logger.debug(`Failed to prefetch keys for community ${community.id}:`, err);
       }
@@ -525,4 +535,6 @@ export async function prefetchAllChannelKeys(currentUserId: string): Promise<voi
   } catch (err) {
     logger.debug("Failed to prefetch channel keys:", err);
   }
+
+  return fetchedChannelIds;
 }
