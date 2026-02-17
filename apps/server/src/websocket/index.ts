@@ -604,7 +604,7 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
       for (const [targetSocket, targetUser] of socketUsers) {
         if (
           uniqueKeyOwnerIds.includes(targetUser.userId) &&
-          targetUser.userId !== user.userId && // Don't send to the requester
+          targetSocket !== socket && // Don't send back to the requesting socket (allow other devices of same user)
           targetSocket.readyState === WebSocket.OPEN
         ) {
           targetSocket.send(
