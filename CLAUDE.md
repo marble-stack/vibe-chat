@@ -267,6 +267,26 @@ Copy `apps/web/.env.example` to `apps/web/.env` if you need to override default 
 - Memory leak prevention in WebSocket connection management
 - Single canonical channel key enforcement to prevent key fragmentation
 
+### Active Bug: "[Syncing keys...]" still showing (Feb 2026)
+
+**Status**: Partially fixed. Channel keys are now included in the encrypted backup (`5d1ab6c`), but still not working in practice. Needs further debugging.
+
+**What was done (commit `5d1ab6c`)**:
+- `keyStore.ts`: Added `getAllChannelKeys()`, `importAllChannelKeys()`, `getFullIdentityKeysForBackup()`
+- `crypto.ts`: `encryptKeyBackup` / `decryptKeyBackup` / `uploadKeyBackupWithRetry` now support optional `channelKeys` field
+- `auth.ts`: Added in-memory `sessionPassword` (not persisted) for backup re-upload
+- `Login.tsx`: Restores channel keys from backup; stores password in `sessionPassword`
+- `Chat.tsx`: After `prefetchAllChannelKeys()`, re-uploads backup with channel keys included
+
+**Likely remaining issues to investigate**:
+1. **Chicken-and-egg on first deploy**: Existing backups on the server don't have `channelKeys` yet. The re-upload with channel keys only happens after `prefetchAllChannelKeys()` succeeds in `Chat.tsx`. For the original device (where keys exist in IndexedDB), this should work — but it must log in AFTER the fix is deployed to trigger the re-upload. Until then, new-device logins still get old-format backups without channel keys.
+2. **Solo user / offline key holder**: If the user is the only member and logs in on a new device, `prefetchAllChannelKeys()` may fail (no one to redistribute). The backup re-upload in `Chat.tsx` then has no channel keys to include. Check whether the original device's IndexedDB still has the keys and whether the re-upload ran.
+3. **`sessionPassword` timing**: The password is set during `Login.tsx` and consumed in `Chat.tsx`'s prefetch effect. If the effect runs before `sessionPassword` is set (race condition), the re-upload is skipped. Verify ordering.
+4. **Registration flow**: `Register.tsx` also uploads a backup — check if it includes channel keys (it probably doesn't need to since there are no channels yet at registration, but verify the flow).
+5. **Test manually**: Log in on original device → verify backup re-upload fires (check network tab for `/auth/key-backup` PUT) → log in on new device (incognito) → check if channel keys are restored from backup → check if messages decrypt.
+
+**Files involved**: `keyStore.ts`, `crypto.ts`, `auth.ts`, `Login.tsx`, `Chat.tsx`, `channelCrypto.ts`
+
 ### Workflow Note
 
 - Push to `staging` branch for QA testing, push to `main` for production deploys.
