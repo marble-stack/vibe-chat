@@ -107,7 +107,7 @@ export function Login() {
       } else {
         throw new Error("Backup data missing");
       }
-    } catch (err) {
+    } catch (_err) {
       setError("Retry failed. You can try again or start fresh with new keys.");
     } finally {
       setLoading(false);

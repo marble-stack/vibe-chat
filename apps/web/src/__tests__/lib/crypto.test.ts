@@ -443,7 +443,7 @@ describe("Crypto Module", () => {
 
     it("should retry and succeed after transient failures", async () => {
       // Skip retry delays
-      globalThis.setTimeout = ((fn: () => void) => origSetTimeout(fn, 0)) as any;
+      globalThis.setTimeout = ((fn: () => void) => origSetTimeout(fn, 0)) as typeof globalThis.setTimeout;
 
       const mockUpload = vi
         .fn()
@@ -473,7 +473,7 @@ describe("Crypto Module", () => {
 
     it("should return false after exhausting all retries", async () => {
       // Skip retry delays
-      globalThis.setTimeout = ((fn: () => void) => origSetTimeout(fn, 0)) as any;
+      globalThis.setTimeout = ((fn: () => void) => origSetTimeout(fn, 0)) as typeof globalThis.setTimeout;
 
       const mockUpload = vi.fn().mockRejectedValue(new Error("Permanent failure"));
 

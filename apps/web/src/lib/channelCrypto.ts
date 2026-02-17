@@ -179,7 +179,7 @@ export async function ensureChannelKey(
     }
   } catch (err) {
     // If this is our "syncing keys" error, re-throw it
-    if (err instanceof Error && err.message.includes("Syncing")) {
+    if (err instanceof Error && err.message.toLowerCase().includes("syncing")) {
       throw err;
     }
     // For any other error (e.g., network error), do NOT proceed to create a new key

@@ -639,15 +639,15 @@ describe("Channel Crypto Integration", () => {
   });
 
   describe("ensureChannelKey deadlock recovery", () => {
-    it("should create new key when sender keys exist but decryption fails (deadlock recovery)", async () => {
+    it("should request redistribution when sender keys exist but decryption fails (no key fragmentation)", async () => {
       const {
         getChannelKey,
         getIdentityKeys,
-        storeChannelKey,
-        storeUserKey,
         getUserKey,
+        storeUserKey,
       } = await import("../../lib/keyStore");
       const { api } = await import("../../lib/api");
+      const { wsClient } = await import("../../lib/websocket");
       const { ensureChannelKey } = await import("../../lib/channelCrypto");
 
       const userKeyPair = await generateKeyPair();
@@ -668,7 +668,6 @@ describe("Channel Crypto Integration", () => {
       });
       vi.mocked(getUserKey).mockResolvedValue(null);
       vi.mocked(storeUserKey).mockResolvedValue(undefined);
-      vi.mocked(storeChannelKey).mockResolvedValue(undefined);
 
       // Sender keys exist but are cryptographically broken (decryption will fail)
       vi.mocked(api.channels.getSenderKeys).mockResolvedValue({
@@ -687,31 +686,17 @@ describe("Channel Crypto Integration", () => {
         senderKeyOwners: [{ userId: "sender-1", senderPublicKey: userPublicKey }],
       });
 
-      // Mock key distribution
-      vi.mocked(api.channels.getMembers).mockResolvedValue({
-        members: [{ id: "user-1", displayName: "User 1" }],
-      });
-      vi.mocked(api.auth.getUserKeys).mockResolvedValue({
-        identityKey: userPublicKey,
-        signedPreKey: { publicKey: "signed-pub", signature: "sig" },
-        preKey: null,
-      });
-      vi.mocked(api.channels.distributeSenderKey).mockResolvedValue({
-        success: true,
-      });
+      // createIfMissing=true (sending mode) - should request redistribution, NOT create new key
+      await expect(
+        ensureChannelKey(
+          "channel-123",
+          [{ id: "user-1", displayName: "User 1" }],
+          "user-1",
+          true
+        )
+      ).rejects.toThrow("Encryption keys are syncing");
 
-      // createIfMissing=true (sending mode) - should create new key despite owners existing
-      const result = await ensureChannelKey(
-        "channel-123",
-        [{ id: "user-1", displayName: "User 1" }],
-        "user-1",
-        true
-      );
-
-      expect(result.key).toBeDefined();
-      expect(result.isNew).toBe(true);
-      expect(storeChannelKey).toHaveBeenCalled();
-      expect(api.channels.distributeSenderKey).toHaveBeenCalled();
+      expect(wsClient.requestKey).toHaveBeenCalledWith("channel-123", "sender-1");
     });
 
     it("should still throw syncing error when no sender keys exist for user but key owners exist", async () => {
