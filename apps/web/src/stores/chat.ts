@@ -80,6 +80,9 @@ interface ChatState {
   addCommunity: (community: Community) => void;
   setChannels: (communityId: string, channels: Channel[]) => void;
   addChannel: (channel: Channel) => void;
+  updateChannel: (channelId: string, updates: Partial<Channel>) => void;
+  removeChannel: (communityId: string, channelId: string) => void;
+  updateCommunity: (communityId: string, updates: Partial<Community>) => void;
   setMembers: (communityId: string, members: Member[]) => void;
   addMemberIfMissing: (userId: string, displayName: string) => void;
   addMemberToCommunity: (communityId: string, member: Member) => void;
@@ -176,6 +179,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ...state.channels,
         [channel.communityId]: [...(state.channels[channel.communityId] || []), channel],
       },
+    })),
+
+  updateChannel: (channelId, updates) =>
+    set((state) => {
+      const newChannels = { ...state.channels };
+      for (const communityId in newChannels) {
+        const idx = newChannels[communityId].findIndex((c) => c.id === channelId);
+        if (idx !== -1) {
+          newChannels[communityId] = [...newChannels[communityId]];
+          newChannels[communityId][idx] = { ...newChannels[communityId][idx], ...updates };
+          break;
+        }
+      }
+      return { channels: newChannels };
+    }),
+
+  removeChannel: (communityId, channelId) =>
+    set((state) => ({
+      channels: {
+        ...state.channels,
+        [communityId]: (state.channels[communityId] || []).filter((c) => c.id !== channelId),
+      },
+      activeChannelId: state.activeChannelId === channelId ? null : state.activeChannelId,
+    })),
+
+  updateCommunity: (communityId, updates) =>
+    set((state) => ({
+      communities: state.communities.map((c) =>
+        c.id === communityId ? { ...c, ...updates } : c
+      ),
     })),
 
   setMembers: (communityId, members) =>
