@@ -9,6 +9,12 @@ import { sendToCommunity } from "../websocket/connectionMaps.js";
 const createCommunitySchema = z.object({
   name: z.string().min(1).max(100),
   userId: z.string().uuid(),
+  iconUrl: z.string().optional(),
+});
+
+const updateCommunitySchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  iconUrl: z.string().nullable().optional(),
 });
 
 const joinCommunitySchema = z.object({
@@ -27,6 +33,7 @@ export const communityRoutes: FastifyPluginAsync = async (fastify) => {
       .insert(communities)
       .values({
         name: body.name,
+        iconUrl: body.iconUrl || null,
         inviteCode,
         createdBy: body.userId,
       })
@@ -176,5 +183,36 @@ export const communityRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     return { community };
+  });
+
+  // Update community
+  fastify.patch("/:communityId", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
+    const { communityId } = request.params as { communityId: string };
+    const body = updateCommunitySchema.parse(request.body);
+
+    const isMember = await isUserInCommunity(request.user.userId, communityId);
+    if (!isMember) {
+      return reply.status(403).send({ error: "Not a member of this community" });
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.iconUrl !== undefined) updates.iconUrl = body.iconUrl;
+
+    if (Object.keys(updates).length === 0) {
+      return reply.status(400).send({ error: "No updates provided" });
+    }
+
+    const [updated] = await db
+      .update(communities)
+      .set(updates)
+      .where(eq(communities.id, communityId))
+      .returning();
+
+    return { community: updated };
   });
 };

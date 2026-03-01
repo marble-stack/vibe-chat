@@ -1,12 +1,20 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { db, channels, senderKeys, pendingKeyRequests, communityMembers, users } from "../db/index.js";
+import { db, channels, senderKeys, pendingKeyRequests, communityMembers, users, messages, fileAttachments } from "../db/index.js";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { canUserAccessChannel } from "../lib/authorization.js";
 import { sendToUser } from "../websocket/connectionMaps.js";
 
 const createChannelSchema = z.object({
   communityId: z.string().uuid(),
+  name: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-z0-9-]+$/, "Channel name must be lowercase alphanumeric with dashes"),
+});
+
+const updateChannelSchema = z.object({
   name: z
     .string()
     .min(1)
@@ -58,6 +66,69 @@ export const channelRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     return { channel };
+  });
+
+  // Update channel name
+  fastify.patch("/:channelId", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
+    const { channelId } = request.params as { channelId: string };
+    const body = updateChannelSchema.parse(request.body);
+
+    const channel = await db.query.channels.findFirst({
+      where: eq(channels.id, channelId),
+    });
+
+    if (!channel) {
+      return reply.status(404).send({ error: "Channel not found" });
+    }
+
+    const canAccess = await canUserAccessChannel(request.user.userId, channelId);
+    if (!canAccess) {
+      return reply.status(403).send({ error: "Not a member of this channel's community" });
+    }
+
+    const [updated] = await db
+      .update(channels)
+      .set({ name: body.name })
+      .where(eq(channels.id, channelId))
+      .returning();
+
+    return { channel: updated };
+  });
+
+  // Delete channel
+  fastify.delete("/:channelId", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
+    const { channelId } = request.params as { channelId: string };
+
+    const channel = await db.query.channels.findFirst({
+      where: eq(channels.id, channelId),
+    });
+
+    if (!channel) {
+      return reply.status(404).send({ error: "Channel not found" });
+    }
+
+    const canAccess = await canUserAccessChannel(request.user.userId, channelId);
+    if (!canAccess) {
+      return reply.status(403).send({ error: "Not a member of this channel's community" });
+    }
+
+    // Delete related data first
+    await db.delete(senderKeys).where(eq(senderKeys.channelId, channelId));
+    await db.delete(pendingKeyRequests).where(eq(pendingKeyRequests.channelId, channelId));
+    await db.delete(fileAttachments).where(eq(fileAttachments.channelId, channelId));
+    await db.delete(messages).where(eq(messages.channelId, channelId));
+
+    await db.delete(channels).where(eq(channels.id, channelId));
+
+    return { success: true };
   });
 
   // Distribute sender key to channel members

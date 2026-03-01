@@ -69,6 +69,30 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
     return { fileId: attachment.id };
   });
 
+  // Upload a community icon image (not encrypted)
+  fastify.post("/community-icon", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
+    const data = await request.file();
+    if (!data) {
+      return reply.status(400).send({ error: "No file uploaded" });
+    }
+
+    if (!ALLOWED_EMOJI_MIMES.has(data.mimetype) && data.mimetype !== "image/jpeg") {
+      return reply.status(400).send({ error: "Only PNG, GIF, WebP, and JPEG images are allowed" });
+    }
+
+    const buffer = await data.toBuffer();
+    if (buffer.length > 2 * 1024 * 1024) {
+      return reply.status(413).send({ error: "Image too large. Maximum size is 2MB." });
+    }
+
+    const base64 = buffer.toString("base64");
+    return { iconUrl: `data:${data.mimetype};base64,${base64}` };
+  });
+
   // Upload a custom emoji image (not encrypted)
   fastify.post("/emoji-upload", async (request, reply) => {
     if (!request.user) {

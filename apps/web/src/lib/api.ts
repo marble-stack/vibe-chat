@@ -126,32 +126,59 @@ export const api = {
   },
 
   communities: {
-    create: (data: { name: string; userId: string }) =>
-      request<{ community: { id: string; name: string; inviteCode: string } }>("/communities", {
+    create: (data: { name: string; userId: string; iconUrl?: string }) =>
+      request<{ community: { id: string; name: string; iconUrl?: string; inviteCode: string } }>("/communities", {
         method: "POST",
         body: JSON.stringify(data),
       }),
 
+    update: (communityId: string, data: { name?: string; iconUrl?: string | null }) =>
+      request<{ community: { id: string; name: string; iconUrl?: string; inviteCode: string } }>(
+        `/communities/${communityId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }
+      ),
+
     list: (userId: string) =>
-      request<{ communities: { id: string; name: string; inviteCode: string }[] }>(
+      request<{ communities: { id: string; name: string; iconUrl?: string; inviteCode: string }[] }>(
         `/communities/user/${userId}`
       ),
 
     get: (communityId: string) =>
       request<{
-        community: { id: string; name: string; inviteCode: string };
+        community: { id: string; name: string; iconUrl?: string; inviteCode: string };
         channels: { id: string; communityId: string; name: string }[];
         members: { id: string; displayName: string; avatarUrl?: string }[];
       }>(`/communities/${communityId}`),
 
     join: (inviteCode: string, userId: string) =>
-      request<{ community: { id: string; name: string; inviteCode: string } }>(
+      request<{ community: { id: string; name: string; iconUrl?: string; inviteCode: string } }>(
         "/communities/join",
         {
           method: "POST",
           body: JSON.stringify({ inviteCode, userId }),
         }
       ),
+
+    uploadIcon: (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const token = useAuthStore.getState().token;
+      return fetch(`${API_BASE}/files/community-icon`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      }).then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: "Upload failed" }));
+          throw new Error(err.error || "Upload failed");
+        }
+        return res.json() as Promise<{ iconUrl: string }>;
+      });
+    },
   },
 
   channels: {
@@ -159,6 +186,20 @@ export const api = {
       request<{ channel: { id: string; communityId: string; name: string } }>("/channels", {
         method: "POST",
         body: JSON.stringify(data),
+      }),
+
+    update: (channelId: string, data: { name: string }) =>
+      request<{ channel: { id: string; communityId: string; name: string } }>(
+        `/channels/${channelId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }
+      ),
+
+    delete: (channelId: string) =>
+      request<{ success: boolean }>(`/channels/${channelId}`, {
+        method: "DELETE",
       }),
 
     getSenderKeys: (channelId: string, userId: string) =>
