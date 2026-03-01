@@ -12,6 +12,7 @@ export function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState("");
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,8 +35,10 @@ export function Register() {
 
     try {
       // Generate real cryptographic keys using Web Crypto API
+      setLoadingStatus("Generating encryption keys...");
       const { keys, publicBundle } = await generateIdentityKeys();
 
+      setLoadingStatus("Creating account...");
       const { user, token } = await api.auth.register({
         email,
         password,
@@ -44,6 +47,7 @@ export function Register() {
       });
 
       // Store private keys locally in IndexedDB
+      setLoadingStatus("Storing keys...");
       await storeIdentityKeys(user.id, keys);
 
       setAuth(user, token);
@@ -63,6 +67,7 @@ export function Register() {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
       setLoading(false);
+      setLoadingStatus("");
     }
   };
 
@@ -139,7 +144,7 @@ export function Register() {
             disabled={loading}
             className="w-full bg-accent-primary hover:bg-accent-hover text-white font-medium py-2 rounded transition-colors disabled:opacity-50"
           >
-            {loading ? "Creating account..." : "Continue"}
+            {loading ? (loadingStatus || "Creating account...") : "Continue"}
           </button>
         </form>
 

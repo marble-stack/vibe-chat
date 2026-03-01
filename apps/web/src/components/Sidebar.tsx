@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
@@ -195,153 +196,157 @@ export function Sidebar({ showMobile, onClose }: SidebarProps) {
         />
       ))}
 
-      {/* Create modal */}
-      {showCreate && (
-        <div
-          className="fixed left-0 top-0 w-screen h-screen bg-black/50 flex items-center justify-center z-[100]"
-          onClick={resetCreateModal}
-        >
+      {/* Create modal - portaled to body to escape transform containing block */}
+      {showCreate &&
+        createPortal(
           <div
-            className="bg-background-secondary rounded-lg p-8 w-[90vw] max-w-lg"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]"
+            onClick={resetCreateModal}
           >
-            <h2 className="text-2xl font-bold text-text-primary mb-6">Create a Community</h2>
+            <div
+              className="bg-background-secondary rounded-lg p-8 w-[90vw] max-w-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-bold text-text-primary mb-6">Create a Community</h2>
 
-            {/* Icon selection */}
-            <div className="flex flex-col items-center mb-6">
-              <div
-                className="w-20 h-20 rounded-full bg-background-primary flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity overflow-hidden border-2 border-dashed border-text-muted/30 hover:border-accent-primary"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {iconPreview ? (
-                  <img src={iconPreview} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="flex flex-col items-center text-text-muted">
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp"
-                className="hidden"
-                onChange={handleIconFileChange}
-              />
-              <div className="flex gap-2 mt-2">
-                <button
-                  type="button"
+              {/* Icon selection */}
+              <div className="flex flex-col items-center mb-6">
+                <div
+                  className="w-20 h-20 rounded-full bg-background-primary flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity overflow-hidden border-2 border-dashed border-text-muted/30 hover:border-accent-primary"
                   onClick={() => fileInputRef.current?.click()}
-                  className="text-xs text-accent-primary hover:underline"
                 >
-                  Upload
-                </button>
-                <span className="text-xs text-text-muted">or</span>
-                <button
-                  type="button"
-                  onClick={() => setShowStockPicker(!showStockPicker)}
-                  className="text-xs text-accent-primary hover:underline"
-                >
-                  Pick a stock image
-                </button>
-                {iconPreview && (
-                  <>
-                    <span className="text-xs text-text-muted">or</span>
-                    <button
-                      type="button"
-                      onClick={() => { setIconPreview(null); setIconFile(null); }}
-                      className="text-xs text-red-400 hover:underline"
-                    >
-                      Remove
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Stock image picker */}
-            {showStockPicker && (
-              <div className="grid grid-cols-4 gap-2 mb-6">
-                {STOCK_IMAGES.map((url, i) => (
+                  {iconPreview ? (
+                    <img src={iconPreview} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="flex flex-col items-center text-text-muted">
+                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  className="hidden"
+                  onChange={handleIconFileChange}
+                />
+                <div className="flex gap-2 mt-2">
                   <button
-                    key={i}
-                    onClick={() => handleSelectStock(url)}
-                    className={`w-full aspect-square rounded-lg overflow-hidden border-2 transition-colors ${
-                      iconPreview === url ? "border-accent-primary" : "border-transparent hover:border-text-muted/50"
-                    }`}
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs text-accent-primary hover:underline"
                   >
-                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    Upload
                   </button>
-                ))}
+                  <span className="text-xs text-text-muted">or</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowStockPicker(!showStockPicker)}
+                    className="text-xs text-accent-primary hover:underline"
+                  >
+                    Pick a stock image
+                  </button>
+                  {iconPreview && (
+                    <>
+                      <span className="text-xs text-text-muted">or</span>
+                      <button
+                        type="button"
+                        onClick={() => { setIconPreview(null); setIconFile(null); }}
+                        className="text-xs text-red-400 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            )}
 
-            <input
-              type="text"
-              placeholder="Community name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="w-full bg-background-primary border border-text-muted/30 text-text-primary placeholder:text-text-muted rounded px-4 py-3 mb-6 text-lg outline-none focus:ring-2 focus:ring-accent-primary"
-              autoFocus
-            />
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={resetCreateModal}
-                className="px-5 py-2.5 text-text-secondary hover:text-text-primary transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={uploading}
-                className="px-5 py-2.5 bg-accent-primary hover:bg-accent-hover text-white rounded font-medium disabled:opacity-50"
-              >
-                {uploading ? "Creating..." : "Create"}
-              </button>
+              {/* Stock image picker */}
+              {showStockPicker && (
+                <div className="grid grid-cols-4 gap-2 mb-6">
+                  {STOCK_IMAGES.map((url, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleSelectStock(url)}
+                      className={`w-full aspect-square rounded-lg overflow-hidden border-2 transition-colors ${
+                        iconPreview === url ? "border-accent-primary" : "border-transparent hover:border-text-muted/50"
+                      }`}
+                    >
+                      <img src={url} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <input
+                type="text"
+                placeholder="Community name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="w-full bg-background-primary border border-text-muted/30 text-text-primary placeholder:text-text-muted rounded px-4 py-3 mb-6 text-lg outline-none focus:ring-2 focus:ring-accent-primary"
+                autoFocus
+              />
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={resetCreateModal}
+                  className="px-5 py-2.5 text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreate}
+                  disabled={uploading}
+                  className="px-5 py-2.5 bg-accent-primary hover:bg-accent-hover text-white rounded font-medium disabled:opacity-50"
+                >
+                  {uploading ? "Creating..." : "Create"}
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
-      {/* Join modal */}
-      {showJoin && (
-        <div
-          className="fixed left-0 top-0 w-screen h-screen bg-black/50 flex items-center justify-center z-[100]"
-          onClick={() => setShowJoin(false)}
-        >
+      {/* Join modal - portaled to body to escape transform containing block */}
+      {showJoin &&
+        createPortal(
           <div
-            className="bg-background-secondary rounded-lg p-8 w-[90vw] max-w-lg"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]"
+            onClick={() => setShowJoin(false)}
           >
-            <h2 className="text-2xl font-bold text-text-primary mb-6">Join a Community</h2>
-            <input
-              type="text"
-              placeholder="Invite code"
-              value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value)}
-              className="w-full bg-background-primary border border-text-muted/30 text-text-primary placeholder:text-text-muted rounded px-4 py-3 mb-6 text-lg outline-none focus:ring-2 focus:ring-accent-primary"
-              autoFocus
-            />
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowJoin(false)}
-                className="px-5 py-2.5 text-text-secondary hover:text-text-primary transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleJoin}
-                className="px-5 py-2.5 bg-accent-primary hover:bg-accent-hover text-white rounded font-medium"
-              >
-                Join
-              </button>
+            <div
+              className="bg-background-secondary rounded-lg p-8 w-[90vw] max-w-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-bold text-text-primary mb-6">Join a Community</h2>
+              <input
+                type="text"
+                placeholder="Invite code"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                className="w-full bg-background-primary border border-text-muted/30 text-text-primary placeholder:text-text-muted rounded px-4 py-3 mb-6 text-lg outline-none focus:ring-2 focus:ring-accent-primary"
+                autoFocus
+              />
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowJoin(false)}
+                  className="px-5 py-2.5 text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleJoin}
+                  className="px-5 py-2.5 bg-accent-primary hover:bg-accent-hover text-white rounded font-medium"
+                >
+                  Join
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

@@ -2,6 +2,8 @@ import { useAuthStore } from "../stores/auth";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
+const REQUEST_TIMEOUT_MS = 30_000; // 30 second timeout
+
 async function request<T>(path: string, options: RequestInit = {}, retries = 3): Promise<T> {
   // Get token from auth store
   const token = useAuthStore.getState().token;
@@ -16,10 +18,25 @@ async function request<T>(path: string, options: RequestInit = {}, retries = 3):
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Request timed out. The server may be starting up — please try again.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   // Retry on 429 Too Many Requests with exponential backoff
   if (response.status === 429 && retries > 0) {
@@ -82,47 +99,59 @@ export const api = {
         preKeys: { keyId: string; publicKey: string }[];
       },
       token: string
-    ) =>
-      fetch(`${API_BASE}/auth/keys`, {
+    ) => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      return fetch(`${API_BASE}/auth/keys`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(data),
+        signal: controller.signal,
       }).then((res) => {
         if (!res.ok) throw new Error("Failed to update keys");
         return res.json();
-      }),
+      });
+    },
 
-    getKeyBackup: (token: string) =>
-      fetch(`${API_BASE}/auth/key-backup`, {
+    getKeyBackup: (token: string) => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      return fetch(`${API_BASE}/auth/key-backup`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal: controller.signal,
       }).then(async (res) => {
         if (!res.ok) throw new Error("Failed to get key backup");
         return res.json() as Promise<{
           encryptedKeyBackup: string | null;
           salt: string | null;
         }>;
-      }),
+      });
+    },
 
     uploadKeyBackup: (
       data: { encryptedKeyBackup: string; salt: string },
       token: string
-    ) =>
-      fetch(`${API_BASE}/auth/key-backup`, {
+    ) => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      return fetch(`${API_BASE}/auth/key-backup`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(data),
+        signal: controller.signal,
       }).then((res) => {
         if (!res.ok) throw new Error("Failed to upload key backup");
         return res.json();
-      }),
+      });
+    },
   },
 
   communities: {
