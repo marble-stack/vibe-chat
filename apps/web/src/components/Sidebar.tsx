@@ -22,10 +22,25 @@ interface SidebarProps {
 
 export function Sidebar({ showMobile, onClose }: SidebarProps) {
   const user = useAuthStore((state) => state.user);
-  const { communities, activeCommunityId, setActiveCommunity, setActiveChannel, addCommunity, updateCommunity } =
-    useChatStore();
+  const {
+    communities, activeCommunityId, setActiveCommunity, setActiveChannel, addCommunity, updateCommunity,
+    showCreateCommunityModal, showJoinCommunityModal, setShowCreateCommunityModal, setShowJoinCommunityModal,
+  } = useChatStore();
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
+
+  // Sync external modal triggers from store (e.g. WelcomeSplash buttons)
+  const showCreateModal = showCreate || showCreateCommunityModal;
+  const showJoinModal = showJoin || showJoinCommunityModal;
+
+  const closeCreateModal = () => {
+    setShowCreate(false);
+    setShowCreateCommunityModal(false);
+  };
+  const closeJoinModal = () => {
+    setShowJoin(false);
+    setShowJoinCommunityModal(false);
+  };
   const [newName, setNewName] = useState("");
   const [iconPreview, setIconPreview] = useState<string | null>(null);
   const [iconFile, setIconFile] = useState<File | null>(null);
@@ -39,7 +54,7 @@ export function Sidebar({ showMobile, onClose }: SidebarProps) {
     setIconPreview(null);
     setIconFile(null);
     setShowStockPicker(false);
-    setShowCreate(false);
+    closeCreateModal();
   };
 
   const handleIconFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,7 +120,7 @@ export function Sidebar({ showMobile, onClose }: SidebarProps) {
       const { community } = await api.communities.join(inviteCode.trim(), user.id);
       addCommunity(community);
       setInviteCode("");
-      setShowJoin(false);
+      closeJoinModal();
       setActiveCommunity(community.id);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to join");
@@ -197,7 +212,7 @@ export function Sidebar({ showMobile, onClose }: SidebarProps) {
       ))}
 
       {/* Create modal - portaled to body to escape transform containing block */}
-      {showCreate &&
+      {showCreateModal &&
         createPortal(
           <div
             className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]"
@@ -310,11 +325,11 @@ export function Sidebar({ showMobile, onClose }: SidebarProps) {
         )}
 
       {/* Join modal - portaled to body to escape transform containing block */}
-      {showJoin &&
+      {showJoinModal &&
         createPortal(
           <div
             className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]"
-            onClick={() => setShowJoin(false)}
+            onClick={closeJoinModal}
           >
             <div
               className="bg-background-secondary rounded-lg p-8 w-[90vw] max-w-lg shadow-2xl"
@@ -331,7 +346,7 @@ export function Sidebar({ showMobile, onClose }: SidebarProps) {
               />
               <div className="flex gap-3 justify-end">
                 <button
-                  onClick={() => setShowJoin(false)}
+                  onClick={closeJoinModal}
                   className="px-5 py-2.5 text-text-secondary hover:text-text-primary transition-colors"
                 >
                   Cancel

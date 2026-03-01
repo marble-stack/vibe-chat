@@ -9,7 +9,7 @@ import {
   distributeChannelKey,
   tryFetchChannelKey,
   isDecryptionError,
-  prefetchAllChannelKeys,
+  prefetchChannelKeysByIds,
 } from "../lib/channelCrypto";
 import { uploadKeyBackupWithRetry } from "../lib/crypto";
 import { getChannelKey, getIdentityKeys, getAllChannelKeys, getFullIdentityKeysForBackup } from "../lib/keyStore";
@@ -23,6 +23,8 @@ import { KeyRecoveryBanner } from "../components/KeyRecoveryBanner";
 import { KeyBackupWarning } from "../components/KeyBackupWarning";
 import { ThreadPanel } from "../components/ThreadPanel";
 import { SearchPanel } from "../components/SearchPanel";
+import { WelcomeSplash } from "../components/WelcomeSplash";
+import { ActivitySplash } from "../components/ActivitySplash";
 import {
   requestNotificationPermission,
   showMessageNotification,
@@ -63,6 +65,11 @@ export function Chat() {
   // Mobile navigation state
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
+  // Splash page state
+  const [showActivitySplash, setShowActivitySplash] = useState(false);
+  const [splashDismissed, setSplashDismissed] = useState(false);
+  const [communitiesLoaded, setCommunitiesLoaded] = useState(false);
+
   // Close mobile sidebar when clicking outside
   const handleBackdropClick = () => {
     setShowMobileSidebar(false);
@@ -88,29 +95,36 @@ export function Chat() {
       try {
         const { communities } = await api.communities.list(user.id);
         setCommunities(communities);
+        setCommunitiesLoaded(true);
 
-        // Restore last-visited community from localStorage
+        if (communities.length === 0) {
+          // New user with no communities — WelcomeSplash will show
+          return;
+        }
+
+        // Show activity splash for returning users (don't auto-select community)
+        if (!splashDismissed) {
+          setShowActivitySplash(true);
+          return;
+        }
+
+        // If splash was already dismissed, restore last-visited community
         const { activeCommunityId: savedCommunityId } = useChatStore.getState();
         if (savedCommunityId && communities.some((c) => c.id === savedCommunityId)) {
-          // Community exists — select it (triggers channel load via the community effect)
           useChatStore.getState().setActiveCommunity(savedCommunityId);
         } else if (communities.length > 0) {
-          // No saved community (or it was deleted) — auto-select the first one
           useChatStore.getState().setActiveCommunity(communities[0].id);
         }
       } catch (err) {
         logger.error("Failed to load communities:", err);
-        // Retry once after a short delay (helps with mobile auth timing)
         setTimeout(async () => {
           try {
             const { communities } = await api.communities.list(user.id);
             setCommunities(communities);
+            setCommunitiesLoaded(true);
 
-            const { activeCommunityId: savedCommunityId } = useChatStore.getState();
-            if (savedCommunityId && communities.some((c) => c.id === savedCommunityId)) {
-              useChatStore.getState().setActiveCommunity(savedCommunityId);
-            } else if (communities.length > 0) {
-              useChatStore.getState().setActiveCommunity(communities[0].id);
+            if (communities.length > 0 && !splashDismissed) {
+              setShowActivitySplash(true);
             }
           } catch (retryErr) {
             logger.error("Failed to load communities on retry:", retryErr);
@@ -162,13 +176,25 @@ export function Chat() {
   }, [user, token, hasHydrated]);
 
   // Proactively fetch channel keys on login to minimize "[Syncing keys...]"
+  // Uses channel IDs already loaded into the store to avoid duplicate API calls.
   useEffect(() => {
     if (!user || !hasHydrated) return;
 
-    // Non-blocking prefetch of all channel keys, then bump keySyncVersion
-    // so MessageList re-decrypts any messages that were showing "[Syncing keys...]"
-    prefetchAllChannelKeys(user.id)
-      .then(async (fetchedChannelIds) => {
+    // Wait briefly for community/channel data to load into the store
+    const timer = setTimeout(async () => {
+      try {
+        // Collect all channel IDs from the store (already fetched by loadCommunities effect)
+        const storeChannels = useChatStore.getState().channels;
+        const allChannelIds: string[] = [];
+        for (const communityChannels of Object.values(storeChannels)) {
+          for (const ch of communityChannels) {
+            allChannelIds.push(ch.id);
+          }
+        }
+
+        if (allChannelIds.length === 0) return;
+
+        const fetchedChannelIds = await prefetchChannelKeysByIds(allChannelIds, user.id);
         for (const channelId of fetchedChannelIds) {
           bumpKeySyncVersion(channelId);
         }
@@ -183,8 +209,12 @@ export function Chat() {
               .then(() => useAuthStore.getState().setSessionPassword(null));
           }
         }
-      })
-      .catch((err) => logger.error("Channel key prefetch failed:", err));
+      } catch (err) {
+        logger.error("Channel key prefetch failed:", err);
+      }
+    }, 2000); // Wait 2s for store to populate from community loading effects
+
+    return () => clearTimeout(timer);
   }, [user, hasHydrated, bumpKeySyncVersion]);
 
   // Process pending key requests on login (for offline key sync)
@@ -675,8 +705,8 @@ export function Chat() {
   useEffect(() => {
     if (!user || !activeChannelId) return;
 
-    let pollDelay = 2000; // Start at 2s
-    const maxDelay = 30000; // Cap at 30s
+    let pollDelay = 5000; // Start at 5s
+    const maxDelay = 60000; // Cap at 60s
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
 
@@ -691,7 +721,7 @@ export function Chat() {
 
       if (!hasSyncingMessages) {
         // No syncing messages — reset backoff and check again later
-        pollDelay = 2000;
+        pollDelay = 5000;
         if (!cancelled) timeoutId = setTimeout(pollForKeys, pollDelay);
         return;
       }
@@ -751,7 +781,7 @@ export function Chat() {
 
       // If all resolved, reset backoff; otherwise increase delay
       if (allResolved) {
-        pollDelay = 2000;
+        pollDelay = 5000;
       } else {
         pollDelay = Math.min(pollDelay * 2, maxDelay);
       }
@@ -791,7 +821,24 @@ export function Chat() {
         {/* Key backup warning - shown when backup to server failed */}
         <KeyBackupWarning />
 
-        {activeChannelId ? (
+        {communitiesLoaded && useChatStore.getState().communities.length === 0 ? (
+          <WelcomeSplash />
+        ) : showActivitySplash && !splashDismissed ? (
+          <ActivitySplash onDismiss={() => {
+            setSplashDismissed(true);
+            setShowActivitySplash(false);
+            // Auto-select the last-visited or first community
+            const { communities, activeCommunityId: current } = useChatStore.getState();
+            if (!current && communities.length > 0) {
+              const savedCommunityId = useChatStore.getState().activeCommunityId;
+              if (savedCommunityId && communities.some((c) => c.id === savedCommunityId)) {
+                useChatStore.getState().setActiveCommunity(savedCommunityId);
+              } else {
+                useChatStore.getState().setActiveCommunity(communities[0].id);
+              }
+            }
+          }} />
+        ) : activeChannelId ? (
           <>
             <MessageList onOpenSidebar={() => setShowMobileSidebar(true)} />
             <MessageInput />

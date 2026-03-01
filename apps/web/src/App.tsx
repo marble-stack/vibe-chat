@@ -4,6 +4,7 @@ import { useAuthStore } from "./stores/auth";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Chat } from "./pages/Chat";
+import { InviteRedirect } from "./pages/InviteRedirect";
 import { hasIdentityKeys, storeIdentityKeys } from "./lib/keyStore";
 import { generateIdentityKeys } from "./lib/crypto";
 import { api } from "./lib/api";
@@ -71,7 +72,7 @@ function App() {
       <Route path="/chat/*" element={user ? <Chat /> : <Navigate to="/login" replace />} />
       <Route
         path="/invite/:inviteCode"
-        element={user ? <Chat /> : <Navigate to="/login" replace />}
+        element={user ? <InviteRedirect /> : <Navigate to={`/login?redirect=${window.location.pathname}`} replace />}
       />
     </Routes>
   );

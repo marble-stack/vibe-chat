@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
@@ -51,10 +52,46 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListP
     setShowCreate(false);
   };
 
-  const copyInviteCode = () => {
-    if (activeCommunity) {
-      navigator.clipboard.writeText(activeCommunity.inviteCode);
-      alert("Invite code copied!");
+  const [inviteCopied, setInviteCopied] = useState(false);
+
+  const getInviteLink = () => {
+    if (!activeCommunity) return "";
+    return `${window.location.origin}/invite/${activeCommunity.inviteCode}`;
+  };
+
+  const getInviteMessage = () => {
+    if (!activeCommunity) return "";
+    return `Join me on Vibe Chat! ${getInviteLink()}\n\nOr use invite code: ${activeCommunity.inviteCode}`;
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(getInviteLink());
+    setInviteCopied(true);
+    setTimeout(() => setInviteCopied(false), 2000);
+  };
+
+  const handleShareText = () => {
+    const body = encodeURIComponent(getInviteMessage());
+    window.open(`sms:?&body=${body}`, "_self");
+  };
+
+  const handleShareEmail = () => {
+    const subject = encodeURIComponent(`Join ${activeCommunity?.name} on Vibe Chat`);
+    const body = encodeURIComponent(getInviteMessage());
+    window.open(`mailto:?subject=${subject}&body=${body}`, "_self");
+  };
+
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Join ${activeCommunity?.name} on Vibe Chat`,
+          text: getInviteMessage(),
+          url: getInviteLink(),
+        });
+      } catch {
+        // User cancelled share
+      }
     }
   };
 
@@ -434,10 +471,10 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListP
         </div>
       )}
 
-      {/* Invite modal */}
-      {showInvite && (
+      {/* Invite modal - portaled to body */}
+      {showInvite && createPortal(
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]"
           onClick={() => setShowInvite(false)}
         >
           <div
@@ -445,28 +482,85 @@ export function ChannelList({ showOnMobile = true, onOpenSidebar }: ChannelListP
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-xl font-bold text-text-primary mb-4">Invite Friends</h2>
-            <p className="text-text-secondary mb-4">Share this invite code:</p>
-            <div className="flex items-center gap-2 bg-background-tertiary rounded px-3 py-2 mb-4">
-              <code className="flex-1 text-text-primary font-mono">
-                {activeCommunity?.inviteCode}
-              </code>
-              <button
-                onClick={copyInviteCode}
-                className="px-3 py-1 bg-accent-primary hover:bg-accent-hover text-white rounded text-sm"
-              >
-                Copy
-              </button>
+            <p className="text-text-secondary mb-2">Share this invite link:</p>
+
+            {/* Invite link */}
+            <div className="bg-background-tertiary rounded-lg px-3 py-2.5 mb-3 break-all">
+              <span className="text-accent-primary text-sm font-medium">{getInviteLink()}</span>
             </div>
+
+            {/* Raw code as secondary */}
+            <p className="text-text-muted text-xs mb-4">
+              Or share the invite code: <code className="text-text-secondary font-mono">{activeCommunity?.inviteCode}</code>
+            </p>
+
+            {/* Share buttons */}
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <button
+                onClick={handleCopyLink}
+                className="flex items-center justify-center gap-2 px-3 py-2.5 bg-accent-primary hover:bg-accent-hover text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                {inviteCopied ? (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Copy Link
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleShareEmail}
+                className="flex items-center justify-center gap-2 px-3 py-2.5 bg-background-tertiary hover:bg-background-tertiary/80 text-text-primary rounded-lg text-sm font-medium transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Email
+              </button>
+
+              <button
+                onClick={handleShareText}
+                className="flex items-center justify-center gap-2 px-3 py-2.5 bg-background-tertiary hover:bg-background-tertiary/80 text-text-primary rounded-lg text-sm font-medium transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                Text
+              </button>
+
+              {typeof navigator.share === "function" && (
+                <button
+                  onClick={handleNativeShare}
+                  className="flex items-center justify-center gap-2 px-3 py-2.5 bg-background-tertiary hover:bg-background-tertiary/80 text-text-primary rounded-lg text-sm font-medium transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  More
+                </button>
+              )}
+            </div>
+
             <div className="flex justify-end">
               <button
                 onClick={() => setShowInvite(false)}
-                className="px-4 py-2 text-text-secondary hover:underline"
+                className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
               >
                 Done
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

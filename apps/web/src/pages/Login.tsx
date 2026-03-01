@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
 import { generateIdentityKeys, decryptKeyBackup, uploadKeyBackupWithRetry } from "../lib/crypto";
@@ -10,6 +10,8 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [backupRestoreFailed, setBackupRestoreFailed] = useState(false);
   const [pendingLoginData, setPendingLoginData] = useState<{
     user: { id: string; email: string; displayName: string };
@@ -75,6 +77,12 @@ export function Login() {
       // Store password in memory for backup re-upload with channel keys later
       useAuthStore.getState().setSessionPassword(password);
 
+      // Navigate to redirect URL if present (e.g., invite link)
+      const redirect = searchParams.get("redirect");
+      if (redirect) {
+        navigate(redirect, { replace: true });
+      }
+
       // Upload backup with retry if needed (runs after auth is set)
       if (needsBackupUpload && keysForBackup) {
         setKeyBackupStatus("pending");
@@ -117,6 +125,8 @@ export function Login() {
         setBackupRestoreFailed(false);
         setPendingLoginData(null);
         setAuth(user, token);
+        const redirect = searchParams.get("redirect");
+        if (redirect) navigate(redirect, { replace: true });
       } else {
         throw new Error("Backup data missing");
       }
@@ -145,6 +155,8 @@ export function Login() {
       setBackupRestoreFailed(false);
       setPendingLoginData(null);
       setAuth(user, token);
+      const redirect = searchParams.get("redirect");
+      if (redirect) navigate(redirect, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate new keys");
     } finally {

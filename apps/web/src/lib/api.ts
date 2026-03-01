@@ -79,6 +79,7 @@ export const api = {
         user: { id: string; email: string; displayName: string };
         token: string;
         hasKeyBackup: boolean;
+        lastLoginAt: string | null;
       }>("/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
@@ -190,6 +191,18 @@ export const api = {
           body: JSON.stringify({ inviteCode, userId }),
         }
       ),
+
+    getActivitySummary: () =>
+      request<{
+        summary: {
+          communityId: string;
+          communityName: string;
+          communityIconUrl: string | null;
+          memberCount: number;
+          newMessageCount: number;
+        }[];
+        since: string | null;
+      }>("/communities/activity-summary"),
 
     uploadIcon: (file: File) => {
       const formData = new FormData();

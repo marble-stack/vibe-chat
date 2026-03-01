@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { db, communities, communityMembers, channels, users } from "../db/index.js";
-import { eq, and } from "drizzle-orm";
+import { db, communities, communityMembers, channels, users, messages } from "../db/index.js";
+import { eq, and, gte, sql, count } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { isUserInCommunity } from "../lib/authorization.js";
 import { sendToCommunity } from "../websocket/connectionMaps.js";
@@ -23,6 +23,81 @@ const joinCommunitySchema = z.object({
 });
 
 export const communityRoutes: FastifyPluginAsync = async (fastify) => {
+  // Activity summary - must be before /:communityId to avoid route conflict
+  fastify.get("/activity-summary", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
+    const userId = request.user.userId;
+
+    // Get user's lastLoginAt
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { lastLoginAt: true },
+    });
+
+    const since = user?.lastLoginAt ?? null;
+
+    // Get user's communities
+    const memberships = await db.query.communityMembers.findMany({
+      where: eq(communityMembers.userId, userId),
+    });
+
+    if (memberships.length === 0) {
+      return { summary: [], since: since?.toISOString() ?? null };
+    }
+
+    const communityIds = memberships.map((m) => m.communityId);
+
+    const userCommunities = await db.query.communities.findMany({
+      where: (communities, { inArray }) => inArray(communities.id, communityIds),
+    });
+
+    const summary = await Promise.all(
+      userCommunities.map(async (community) => {
+        // Count members
+        const [memberResult] = await db
+          .select({ count: count() })
+          .from(communityMembers)
+          .where(eq(communityMembers.communityId, community.id));
+
+        // Count new messages since lastLoginAt
+        let newMessageCount = 0;
+        if (since) {
+          const communityChannels = await db.query.channels.findMany({
+            where: eq(channels.communityId, community.id),
+            columns: { id: true },
+          });
+
+          if (communityChannels.length > 0) {
+            const channelIds = communityChannels.map((c) => c.id);
+            const [msgResult] = await db
+              .select({ count: count() })
+              .from(messages)
+              .where(
+                and(
+                  sql`${messages.channelId} IN ${channelIds}`,
+                  gte(messages.createdAt, since)
+                )
+              );
+            newMessageCount = msgResult?.count ?? 0;
+          }
+        }
+
+        return {
+          communityId: community.id,
+          communityName: community.name,
+          communityIconUrl: community.iconUrl,
+          memberCount: memberResult?.count ?? 0,
+          newMessageCount,
+        };
+      })
+    );
+
+    return { summary, since: since?.toISOString() ?? null };
+  });
+
   // Create community
   fastify.post("/", async (request, _reply) => {
     const body = createCommunitySchema.parse(request.body);

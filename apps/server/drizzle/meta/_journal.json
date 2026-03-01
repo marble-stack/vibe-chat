@@ -71,6 +71,13 @@
       "when": 1770696788705,
       "tag": "0009_rainy_vision",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772401588601,
+      "tag": "0010_adorable_randall_flagg",
+      "breakpoints": true
     }
   ]
 }

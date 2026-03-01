@@ -31,6 +31,10 @@ import {
 // Track pending key requests to avoid duplicate requests
 const pendingKeyRequests = new Set<string>();
 
+// Throttle redistribution to avoid excessive API calls on every message send
+const lastRedistributionTime = new Map<string, number>();
+const REDISTRIBUTION_COOLDOWN_MS = 60_000; // 60 seconds
+
 /** Error strings returned by decryption when it can't produce plaintext */
 const DECRYPTION_ERROR_STRINGS = [
   "[Syncing keys...]",
@@ -65,13 +69,17 @@ export async function ensureChannelKey(
   if (existingKey) {
     // When sending (createIfMissing=true), redistribute key to all current members
     // in case new members joined. This ensures new members can decrypt messages.
+    // Throttled to once per 60s per channel to avoid excessive API calls.
     if (createIfMissing && members.length > 0) {
-      // Fire-and-forget: don't block sends on key redistribution.
-      // The local key is already available for encryption — redistribution
-      // only ensures new members receive the key, which isn't urgent for this send.
-      distributeChannelKey(channelId, existingKey, members, currentUserId).catch(
-        (err) => logger.error("Failed to redistribute channel key:", err)
-      );
+      const now = Date.now();
+      const lastTime = lastRedistributionTime.get(channelId) || 0;
+      if (now - lastTime > REDISTRIBUTION_COOLDOWN_MS) {
+        lastRedistributionTime.set(channelId, now);
+        // Fire-and-forget: don't block sends on key redistribution.
+        distributeChannelKey(channelId, existingKey, members, currentUserId).catch(
+          (err) => logger.error("Failed to redistribute channel key:", err)
+        );
+      }
     }
     return { key: existingKey, isNew: false };
   }
@@ -481,6 +489,46 @@ export async function tryFetchChannelKey(
   }
 
   return false;
+}
+
+/**
+ * Fetch channel keys for an already-known list of channel IDs.
+ * Use this when the caller already has channel IDs (e.g. from the chat store)
+ * to avoid redundant communities.list + communities.get API calls.
+ */
+export async function prefetchChannelKeysByIds(
+  channelIds: string[],
+  currentUserId: string
+): Promise<string[]> {
+  const fetchedChannelIds: string[] = [];
+
+  const results = await Promise.allSettled(
+    channelIds.map(async (channelId) => {
+      const fetched = await tryFetchChannelKey(channelId, currentUserId);
+      if (fetched) return channelId;
+
+      // Key not available — request redistribution via WebSocket
+      const { senderKeyOwners } = await api.channels.getSenderKeyOwners(channelId);
+      if (senderKeyOwners.length > 0) {
+        const keyOwner = senderKeyOwners[0];
+        const requestKey = `${channelId}:${keyOwner.userId}`;
+        if (!pendingKeyRequests.has(requestKey)) {
+          pendingKeyRequests.add(requestKey);
+          wsClient.requestKey(channelId, keyOwner.userId);
+          setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+        }
+      }
+      return null;
+    })
+  );
+
+  for (const result of results) {
+    if (result.status === "fulfilled" && result.value) {
+      fetchedChannelIds.push(result.value);
+    }
+  }
+
+  return fetchedChannelIds;
 }
 
 /**

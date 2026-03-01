@@ -75,6 +75,8 @@ interface ChatState {
   isSearchOpen: boolean;
   scrollToMessageId: string | null;
   keySyncVersion: Record<string, number>; // channelId -> version counter, bumped when key:available fires
+  showCreateCommunityModal: boolean;
+  showJoinCommunityModal: boolean;
 
   setCommunities: (communities: Community[]) => void;
   addCommunity: (community: Community) => void;
@@ -112,6 +114,8 @@ interface ChatState {
   addCustomEmoji: (communityId: string, emoji: CustomEmoji) => void;
   removeCustomEmoji: (communityId: string, emojiId: string) => void;
   bumpKeySyncVersion: (channelId: string) => void;
+  setShowCreateCommunityModal: (show: boolean) => void;
+  setShowJoinCommunityModal: (show: boolean) => void;
   // Cleanup methods to prevent memory leaks
   clearChannelMessages: (channelId: string) => void;
   clearTypingUsers: (channelId: string) => void;
@@ -165,6 +169,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isSearchOpen: false,
   scrollToMessageId: null,
   keySyncVersion: {},
+  showCreateCommunityModal: false,
+  showJoinCommunityModal: false,
 
   setCommunities: (communities) => set({ communities }),
 
@@ -553,6 +559,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     })),
 
+  setShowCreateCommunityModal: (show) => set({ showCreateCommunityModal: show }),
+  setShowJoinCommunityModal: (show) => set({ showJoinCommunityModal: show }),
+
   // Cleanup methods to prevent memory leaks
 
   clearChannelMessages: (channelId) =>
@@ -597,5 +606,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       isSearchOpen: false,
       scrollToMessageId: null,
       keySyncVersion: {},
+      showCreateCommunityModal: false,
+      showJoinCommunityModal: false,
     }),
 }));

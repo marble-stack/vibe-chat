@@ -110,6 +110,15 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(401).send({ error: "Invalid email or password" });
     }
 
+    // Capture previous lastLoginAt before updating
+    const previousLoginAt = user.lastLoginAt;
+
+    // Update lastLoginAt
+    await db
+      .update(users)
+      .set({ lastLoginAt: new Date() })
+      .where(eq(users.id, user.id));
+
     // Generate JWT token
     const token = generateToken({ userId: user.id, email: user.email });
 
@@ -117,6 +126,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       user: { id: user.id, email: user.email, displayName: user.displayName },
       token,
       hasKeyBackup: !!user.encryptedKeyBackup,
+      lastLoginAt: previousLoginAt?.toISOString() ?? null,
     };
   });
 
