@@ -2,7 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { db, channels, senderKeys, pendingKeyRequests, communityMembers, users, messages, fileAttachments } from "../db/index.js";
 import { eq, and, sql, inArray } from "drizzle-orm";
-import { canUserAccessChannel } from "../lib/authorization.js";
+import { canUserAccessChannel, isUserInCommunity } from "../lib/authorization.js";
 import { sendToUser } from "../websocket/connectionMaps.js";
 
 const createChannelSchema = z.object({
@@ -39,8 +39,18 @@ const distributeSenderKeySchema = z.object({
 
 export const channelRoutes: FastifyPluginAsync = async (fastify) => {
   // Create channel
-  fastify.post("/", async (request) => {
+  fastify.post("/", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
     const body = createChannelSchema.parse(request.body);
+
+    // Authorization: must be a member of the community
+    const isMember = await isUserInCommunity(request.user.userId, body.communityId);
+    if (!isMember) {
+      return reply.status(403).send({ error: "Not a member of this community" });
+    }
 
     const [channel] = await db
       .insert(channels)
@@ -55,7 +65,16 @@ export const channelRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Get channel details
   fastify.get("/:channelId", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
     const { channelId } = request.params as { channelId: string };
+
+    const canAccess = await canUserAccessChannel(request.user.userId, channelId);
+    if (!canAccess) {
+      return reply.status(403).send({ error: "Not a member of this channel's community" });
+    }
 
     const channel = await db.query.channels.findFirst({
       where: eq(channels.id, channelId),

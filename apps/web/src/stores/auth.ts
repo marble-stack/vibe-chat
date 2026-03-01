@@ -38,7 +38,13 @@ export const useAuthStore = create<AuthState>()(
       setUser: (user) => set({ user }),
       setToken: (token) => set({ token }),
       setAuth: (user, token) => set({ user, token }),
-      logout: () => set({ user: null, token: null, keyBackupStatus: "pending" as KeyBackupStatus, lastBackupAt: null, sessionPassword: null }),
+      logout: () => {
+        set({ user: null, token: null, keyBackupStatus: "pending" as KeyBackupStatus, lastBackupAt: null, sessionPassword: null });
+        // Clear saved last-channel so the next user doesn't inherit it
+        try { localStorage.removeItem("vibe-chat-last-channel"); } catch { /* ignore */ }
+        // Clear chat store so next user doesn't see previous user's communities/messages
+        import("./chat").then(({ useChatStore }) => useChatStore.getState().resetStore());
+      },
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       setKeyBackupStatus: (status) => set({ keyBackupStatus: status }),
       setLastBackupAt: (timestamp) => set({ lastBackupAt: timestamp }),

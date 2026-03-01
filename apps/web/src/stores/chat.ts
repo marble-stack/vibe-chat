@@ -116,6 +116,8 @@ interface ChatState {
   clearChannelMessages: (channelId: string) => void;
   clearTypingUsers: (channelId: string) => void;
   clearChannelState: (channelId: string) => void;
+  // Full store reset (for logout)
+  resetStore: () => void;
 }
 
 // Lightweight localStorage persist for last-visited channel (not the entire store)
@@ -573,5 +575,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
         messages: restMessages,
         typingUsers: restTyping,
       };
+    }),
+
+  resetStore: () =>
+    set({
+      communities: [],
+      channels: {},
+      messages: {},
+      members: {},
+      customEmojis: {},
+      activeCommunityId: null,
+      activeChannelId: null,
+      typingUsers: {},
+      replyingTo: null,
+      onlineUsers: {},
+      activeThreadId: null,
+      pollVotes: {},
+      unreadCounts: {},
+      searchQuery: "",
+      searchResults: [],
+      isSearchOpen: false,
+      scrollToMessageId: null,
+      keySyncVersion: {},
     }),
 }));
