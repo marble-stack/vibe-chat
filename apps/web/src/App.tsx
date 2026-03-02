@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./stores/auth";
+import { useThemeStore, applyTheme } from "./stores/theme";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { ForgotPassword } from "./pages/ForgotPassword";
@@ -17,6 +18,12 @@ function App() {
   const token = useAuthStore((state) => state.token);
   const hasHydrated = useAuthStore((state) => state._hasHydrated);
   const [keysInitialized, setKeysInitialized] = useState(false);
+  const theme = useThemeStore((state) => state.theme);
+
+  // Apply theme on mount and when theme changes
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   // Ensure identity keys exist when auth is restored from localStorage
   // IndexedDB might be cleared separately from localStorage, causing decryption failures

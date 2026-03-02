@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
+import { isSupportedImageType, processEmojiImage } from "../lib/imageUtils";
 
 interface EmojiUploadModalProps {
   onClose: () => void;
@@ -20,28 +21,35 @@ export function EmojiUploadModal({ onClose }: EmojiUploadModalProps) {
 
   const nameValid = /^[a-z0-9_]+$/.test(name) && name.length >= 1 && name.length <= 32;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
 
-    if (!["image/png", "image/gif", "image/webp"].includes(selected.type)) {
-      setError("Only PNG, GIF, and WebP images are allowed");
+    if (!isSupportedImageType(selected.type) && !selected.name.toLowerCase().match(/\.(heic|heif)$/)) {
+      setError("Only PNG, GIF, WebP, JPEG, and HEIC images are allowed");
       return;
     }
 
-    if (selected.size > 256 * 1024) {
-      setError("Image must be under 256KB");
-      return;
-    }
+    try {
+      // Process (resize + convert) the image
+      const processed = await processEmojiImage(selected);
 
-    setError(null);
-    setFile(selected);
-    setPreview(URL.createObjectURL(selected));
+      if (processed.size > 256 * 1024) {
+        setError("Image is still over 256KB after resizing. Please use a smaller image.");
+        return;
+      }
 
-    // Auto-fill name from filename if empty
-    if (!name) {
-      const baseName = selected.name.replace(/\.[^.]+$/, "").toLowerCase().replace(/[^a-z0-9_]/g, "_");
-      setName(baseName.slice(0, 32));
+      setError(null);
+      setFile(processed);
+      setPreview(URL.createObjectURL(processed));
+
+      // Auto-fill name from filename if empty
+      if (!name) {
+        const baseName = selected.name.replace(/\.[^.]+$/, "").toLowerCase().replace(/[^a-z0-9_]/g, "_");
+        setName(baseName.slice(0, 32));
+      }
+    } catch {
+      setError("Failed to process image. HEIC files may not be supported in this browser.");
     }
   };
 
@@ -91,13 +99,13 @@ export function EmojiUploadModal({ onClose }: EmojiUploadModalProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               <span className="text-sm text-text-muted">Click to select image</span>
-              <span className="text-xs text-text-muted mt-1">PNG, GIF, or WebP (max 256KB)</span>
+              <span className="text-xs text-text-muted mt-1">PNG, GIF, WebP, JPEG, or HEIC (max 256KB)</span>
             </>
           )}
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/png,image/gif,image/webp"
+            accept="image/png,image/gif,image/webp,image/jpeg,image/heic,image/heif,.heic,.heif,.jpg,.jpeg"
             onChange={handleFileChange}
             className="hidden"
           />

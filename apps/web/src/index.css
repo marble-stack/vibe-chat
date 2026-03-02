@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Default theme (dark) - RGB values for Tailwind opacity support, overridden by JS on mount */
+  --bg-primary: 26 26 26;
+  --bg-secondary: 17 17 17;
+  --bg-tertiary: 10 10 10;
+  --text-primary: 240 240 240;
+  --text-secondary: 176 176 176;
+  --text-muted: 119 119 119;
+  --accent-primary: 76 175 80;
+  --accent-hover: 56 142 60;
+  --channel-default: 136 136 136;
+  --channel-hover: 208 208 208;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -18,8 +32,8 @@ body {
     Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #1a2e1a;
-  color: #e8f5e8;
+  background-color: rgb(var(--bg-primary));
+  color: rgb(var(--text-primary));
 }
 
 /* Custom scrollbar */
@@ -33,10 +47,46 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #0f1a0f;
+  background: rgb(var(--bg-tertiary));
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #2a4a2a;
+  background: rgb(var(--accent-primary));
+}
+
+/* Fun theme confetti background */
+.theme-fun body,
+.theme-fun .h-screen-safe {
+  background-image:
+    radial-gradient(circle at 10% 20%, rgba(255, 107, 107, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 90% 80%, rgba(78, 205, 196, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(255, 209, 102, 0.1) 0%, transparent 50%);
+}
+
+/* Confetti dots for fun theme */
+.theme-fun::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(2px 2px at 20px 30px, #ff6b6b, transparent),
+    radial-gradient(2px 2px at 40px 70px, #4ecdc4, transparent),
+    radial-gradient(2px 2px at 50px 160px, #ffd166, transparent),
+    radial-gradient(2px 2px at 90px 40px, #a78bfa, transparent),
+    radial-gradient(2px 2px at 130px 80px, #ff6b6b, transparent),
+    radial-gradient(2px 2px at 160px 30px, #4ecdc4, transparent),
+    radial-gradient(2px 2px at 200px 120px, #ffd166, transparent),
+    radial-gradient(2px 2px at 250px 60px, #a78bfa, transparent),
+    radial-gradient(2px 2px at 300px 140px, #ff6b6b, transparent),
+    radial-gradient(2px 2px at 350px 90px, #4ecdc4, transparent),
+    radial-gradient(2px 2px at 400px 40px, #ffd166, transparent),
+    radial-gradient(2px 2px at 450px 170px, #a78bfa, transparent);
+  background-size: 470px 200px;
+  opacity: 0.5;
 }
