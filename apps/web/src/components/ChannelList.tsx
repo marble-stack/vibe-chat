@@ -12,6 +12,7 @@ interface ChannelListProps {
 
 export function ChannelList({ showOnMobile = true }: ChannelListProps) {
   const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
   const {
     communities,
     channels,
@@ -212,6 +213,15 @@ export function ChannelList({ showOnMobile = true }: ChannelListProps) {
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+            </svg>
+          </button>
+          <button
+            onClick={logout}
+            className="p-1.5 text-text-muted hover:text-text-primary hover:bg-background-primary/50 rounded transition-colors flex-shrink-0"
+            title="Logout"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
             </svg>
           </button>
           <div className="w-8 h-8 rounded-full bg-accent-primary flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
@@ -471,6 +481,15 @@ export function ChannelList({ showOnMobile = true }: ChannelListProps) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
           </svg>
         </button>
+        <button
+          onClick={logout}
+          className="p-1.5 text-text-muted hover:text-text-primary hover:bg-background-primary/50 rounded transition-colors flex-shrink-0"
+          title="Logout"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
+          </svg>
+        </button>
         <div className="w-8 h-8 rounded-full bg-accent-primary flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
           {user?.displayName.charAt(0).toUpperCase()}
         </div>
@@ -496,8 +515,9 @@ export function ChannelList({ showOnMobile = true }: ChannelListProps) {
                 type="text"
                 placeholder="new-channel"
                 value={newChannelName}
-                onChange={(e) => setNewChannelName(e.target.value)}
+                onChange={(e) => setNewChannelName(e.target.value.toLowerCase())}
                 className="flex-1 bg-transparent text-text-primary outline-none"
+                autoCapitalize="none"
                 autoFocus
               />
             </div>
