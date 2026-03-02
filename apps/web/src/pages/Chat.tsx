@@ -67,10 +67,34 @@ export function Chat() {
   const [splashDismissed, setSplashDismissed] = useState(false);
   const [communitiesLoaded, setCommunitiesLoaded] = useState(false);
 
+  // Snapshot of selection state when splash was shown (to detect user clicks)
+  const splashSelectionRef = useRef<{ communityId: string | null; channelId: string | null } | null>(null);
+
   // Ref to track current members for the WebSocket handler
   const membersRef = useRef(members);
   const activeCommunityRef = useRef(activeCommunityId);
   const activeChannelRef = useRef(activeChannelId);
+
+  // Capture selection snapshot when activity splash first appears
+  useEffect(() => {
+    if (showActivitySplash && !splashDismissed && !splashSelectionRef.current) {
+      splashSelectionRef.current = { communityId: activeCommunityId, channelId: activeChannelId };
+    }
+    if (splashDismissed) {
+      splashSelectionRef.current = null;
+    }
+  }, [showActivitySplash, splashDismissed, activeCommunityId, activeChannelId]);
+
+  // Dismiss activity splash when user selects a community or channel from the sidebar
+  useEffect(() => {
+    if (!showActivitySplash || splashDismissed) return;
+    const snapshot = splashSelectionRef.current;
+    if (!snapshot) return;
+    if (activeCommunityId !== snapshot.communityId || activeChannelId !== snapshot.channelId) {
+      setSplashDismissed(true);
+      setShowActivitySplash(false);
+    }
+  }, [activeCommunityId, activeChannelId, showActivitySplash, splashDismissed]);
 
   useEffect(() => {
     membersRef.current = members;
