@@ -35,6 +35,12 @@ const pendingKeyRequests = new Set<string>();
 const lastRedistributionTime = new Map<string, number>();
 const REDISTRIBUTION_COOLDOWN_MS = 10_000; // 10 seconds
 
+// Track when we first requested redistribution for each channel (deadlock breaker)
+// If we've been waiting > REDISTRIBUTION_TIMEOUT_MS and still no key, the other owner
+// likely also has a broken key. Break the deadlock by creating a new key.
+const redistributionRequestStart = new Map<string, number>();
+const REDISTRIBUTION_TIMEOUT_MS = 30_000; // 30 seconds
+
 /** Error strings returned by decryption when it can't produce plaintext */
 const DECRYPTION_ERROR_STRINGS = [
   "[Syncing keys...]",
@@ -139,6 +145,9 @@ export async function ensureChannelKey(
       const keyBase64 = await exportAesKey(channelKey);
       await storeChannelKey(channelId, keyBase64);
 
+      // Clear deadlock timeout tracker since we got the key
+      redistributionRequestStart.delete(channelId);
+
       return { key: channelKey, isNew: false };
     }
   } catch (err) {
@@ -159,22 +168,41 @@ export async function ensureChannelKey(
         // Check if there's another user who can redistribute.
         // If the only key owner is the current user, the old key is irrecoverable
         // (e.g. re-registration wiped local keys) — fall through to create a new key.
-        const otherOwner = senderKeyOwners.find((o) => o.userId !== currentUserId);
+        const otherOwner = senderKeyOwners.find(
+          (o) => o.userId !== currentUserId && members.some((m) => m.id === o.userId)
+        );
         if (otherOwner) {
           const requestKey = `${channelId}:${otherOwner.userId}`;
+          const now = Date.now();
+          const startTime = redistributionRequestStart.get(channelId);
 
-          if (!pendingKeyRequests.has(requestKey)) {
-            pendingKeyRequests.add(requestKey);
-            logger.debug(
-              `Requesting key redistribution from ${otherOwner.userId} for channel ${channelId} (sender key decryption failed)`
+          // If we've been waiting > 30s, the other owner can't help (likely also has broken key)
+          // Break the deadlock by creating a new key
+          if (startTime && now - startTime > REDISTRIBUTION_TIMEOUT_MS) {
+            logger.warn(
+              `Key redistribution timeout for channel ${channelId} — other owner likely also has broken key. Creating new channel key.`
             );
-            wsClient.requestKey(channelId, otherOwner.userId);
-            setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
-          }
+            redistributionRequestStart.delete(channelId);
+            // Fall through to create new key
+          } else {
+            // Start/continue waiting for redistribution
+            if (!startTime) {
+              redistributionRequestStart.set(channelId, now);
+            }
 
-          throw new Error("Encryption keys are syncing. Please wait a moment and try again.");
+            if (!pendingKeyRequests.has(requestKey)) {
+              pendingKeyRequests.add(requestKey);
+              logger.debug(
+                `Requesting key redistribution from ${otherOwner.userId} for channel ${channelId} (sender key decryption failed)`
+              );
+              wsClient.requestKey(channelId, otherOwner.userId);
+              setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+            }
+
+            throw new Error("Encryption keys are syncing. Please wait a moment and try again.");
+          }
         }
-        // No other owner — old key is irrecoverable, create a new one below
+        // No other owner OR timeout — old key is irrecoverable, create a new one below
         logger.warn(
           `Only key owner for channel ${channelId} is current user with broken key — creating new channel key`
         );
@@ -496,8 +524,9 @@ export async function tryFetchChannelKey(
       const keyBase64 = await exportAesKey(channelKey);
       await storeChannelKey(channelId, keyBase64);
 
-      // Clear pending request since we got the key
+      // Clear pending request and deadlock timeout since we got the key
       clearPendingKeyRequest(channelId, senderKey.userId);
+      redistributionRequestStart.delete(channelId);
 
       logger.debug(`Successfully fetched channel key for ${channelId}`);
       return true;
