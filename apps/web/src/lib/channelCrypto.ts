@@ -447,7 +447,7 @@ export async function tryFetchChannelKey(
 ): Promise<boolean> {
   // Check if we already have the key — skip when force=true (e.g. key:available just fired)
   if (!force && await hasChannelKey(channelId)) {
-    return true; // Key exists locally = success for callers checking "is a key available?"
+    return false; // Key exists but wasn't newly fetched — callers use false to trigger redistribution
   }
 
   const identityKeys = await getIdentityKeys();
