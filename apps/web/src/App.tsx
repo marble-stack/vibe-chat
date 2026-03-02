@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./stores/auth";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
+import { ForgotPassword } from "./pages/ForgotPassword";
+import { ResetPassword } from "./pages/ResetPassword";
 import { Chat } from "./pages/Chat";
 import { InviteRedirect } from "./pages/InviteRedirect";
 import { hasIdentityKeys, storeIdentityKeys } from "./lib/keyStore";
@@ -69,6 +71,8 @@ function App() {
       />
       <Route path="/login" element={user ? <Navigate to="/chat" replace /> : <Login />} />
       <Route path="/register" element={user ? <Navigate to="/chat" replace /> : <Register />} />
+      <Route path="/forgot-password" element={user ? <Navigate to="/chat" replace /> : <ForgotPassword />} />
+      <Route path="/reset-password" element={user ? <Navigate to="/chat" replace /> : <ResetPassword />} />
       <Route path="/chat/*" element={user ? <Chat /> : <Navigate to="/login" replace />} />
       <Route
         path="/invite/:inviteCode"
