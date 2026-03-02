@@ -395,6 +395,30 @@ export function Chat() {
         createdAt: payload.createdAt,
       });
 
+      // Auto-retry decryption after 1.5s — covers the timing gap where
+      // key redistribution completes just after the message arrives
+      if (decryptionFailed && user) {
+        setTimeout(async () => {
+          try {
+            const retryPlaintext = await decryptChannelMessage(
+              payload.channelId,
+              payload.ciphertext,
+              currentMembers,
+              user.id,
+              payload.senderId
+            );
+            if (!isDecryptionError(retryPlaintext)) {
+              updateMessage(payload.channelId, payload.id, {
+                plaintext: retryPlaintext,
+                decryptionFailed: false,
+              });
+            }
+          } catch {
+            // Still can't decrypt — polling will pick it up later
+          }
+        }, 1500);
+      }
+
       // Increment unread count if message is for a non-active channel
       if (payload.channelId !== activeChannelRef.current) {
         incrementUnread(payload.channelId);
@@ -616,6 +640,50 @@ export function Chat() {
       }
     };
 
+    // Handle auth:success (WebSocket reconnect) — re-process pending key requests
+    // so that when a key holder's phone wakes from background, they redistribute keys
+    const handleAuthSuccess = async () => {
+      if (!user) return;
+      logger.debug("WebSocket reconnected (auth:success), re-processing pending key requests");
+      try {
+        const { pendingRequests } = await api.channels.getPendingKeyRequests();
+        if (pendingRequests.length === 0) return;
+
+        const requestsByChannel = new Map<string, typeof pendingRequests>();
+        for (const req of pendingRequests) {
+          const existing = requestsByChannel.get(req.channelId) || [];
+          existing.push(req);
+          requestsByChannel.set(req.channelId, existing);
+        }
+
+        for (const [channelId, requests] of requestsByChannel) {
+          const channelKey = await getChannelKey(channelId);
+          if (!channelKey) continue;
+
+          const requestingUserIds = requests.map((r) => r.requestingUserId);
+          const membersForDistribution = [
+            { id: user.id, displayName: user.displayName || "Me" },
+            ...requestingUserIds.map((id) => ({ id, displayName: "Unknown" })),
+          ];
+
+          try {
+            await distributeChannelKey(channelId, channelKey, membersForDistribution, user.id);
+            for (const req of requests) {
+              try {
+                await api.channels.deletePendingKeyRequest(req.id);
+              } catch {
+                // Ignore — may already be deleted
+              }
+            }
+          } catch (err) {
+            logger.error(`Failed to redistribute key for channel ${channelId} on reconnect:`, err);
+          }
+        }
+      } catch (err) {
+        logger.error("Failed to process pending key requests on reconnect:", err);
+      }
+    };
+
     // Handle new member joining a community - update local member list
     const handleMemberJoined = (msg: { payload: Record<string, unknown> }) => {
       const { communityId, member } = msg.payload as {
@@ -638,6 +706,7 @@ export function Chat() {
     wsClient.on("key:requested", handleKeyRequested);
     wsClient.on("key:available", handleKeyAvailable);
     wsClient.on("key:request:sent", handleKeyRequestSent);
+    wsClient.on("auth:success", handleAuthSuccess);
     wsClient.on("member:joined", handleMemberJoined);
     wsClient.on("poll:voted", handlePollVoted);
 
@@ -654,6 +723,7 @@ export function Chat() {
       wsClient.off("key:requested", handleKeyRequested);
       wsClient.off("key:available", handleKeyAvailable);
       wsClient.off("key:request:sent", handleKeyRequestSent);
+      wsClient.off("auth:success", handleAuthSuccess);
       wsClient.off("member:joined", handleMemberJoined);
       wsClient.off("poll:voted", handlePollVoted);
       wsClient.disconnect();
@@ -697,8 +767,8 @@ export function Chat() {
   useEffect(() => {
     if (!user || !activeChannelId) return;
 
-    let pollDelay = 5000; // Start at 5s
-    const maxDelay = 60000; // Cap at 60s
+    let pollDelay = 2000; // Start at 2s
+    const maxDelay = 15000; // Cap at 15s
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
 
@@ -713,7 +783,7 @@ export function Chat() {
 
       if (!hasSyncingMessages) {
         // No syncing messages — reset backoff and check again later
-        pollDelay = 5000;
+        pollDelay = 2000;
         if (!cancelled) timeoutId = setTimeout(pollForKeys, pollDelay);
         return;
       }
@@ -771,11 +841,11 @@ export function Chat() {
         }
       }
 
-      // If all resolved, reset backoff; otherwise increase delay
+      // If all resolved, reset backoff; otherwise increase delay linearly
       if (allResolved) {
-        pollDelay = 5000;
+        pollDelay = 2000;
       } else {
-        pollDelay = Math.min(pollDelay * 2, maxDelay);
+        pollDelay = Math.min(pollDelay + 3000, maxDelay);
       }
 
       if (!cancelled) timeoutId = setTimeout(pollForKeys, pollDelay);

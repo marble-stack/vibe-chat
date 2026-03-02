@@ -33,7 +33,7 @@ const pendingKeyRequests = new Set<string>();
 
 // Throttle redistribution to avoid excessive API calls on every message send
 const lastRedistributionTime = new Map<string, number>();
-const REDISTRIBUTION_COOLDOWN_MS = 60_000; // 60 seconds
+const REDISTRIBUTION_COOLDOWN_MS = 10_000; // 10 seconds
 
 /** Error strings returned by decryption when it can't produce plaintext */
 const DECRYPTION_ERROR_STRINGS = [
@@ -75,10 +75,18 @@ export async function ensureChannelKey(
       const lastTime = lastRedistributionTime.get(channelId) || 0;
       if (now - lastTime > REDISTRIBUTION_COOLDOWN_MS) {
         lastRedistributionTime.set(channelId, now);
-        // Fire-and-forget: don't block sends on key redistribution.
-        distributeChannelKey(channelId, existingKey, members, currentUserId).catch(
-          (err) => logger.error("Failed to redistribute channel key:", err)
-        );
+        // Await redistribution with a 5s timeout so keys are on the server
+        // before the message is broadcast. Falls back to fire-and-forget on timeout.
+        try {
+          await Promise.race([
+            distributeChannelKey(channelId, existingKey, members, currentUserId),
+            new Promise<void>((_, reject) =>
+              setTimeout(() => reject(new Error("Key redistribution timeout")), 5000)
+            ),
+          ]);
+        } catch (err) {
+          logger.error("Failed to redistribute channel key (continuing send):", err);
+        }
       }
     }
     return { key: existingKey, isNew: false };

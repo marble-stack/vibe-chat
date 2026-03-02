@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState, memo } from "react";
 import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
-import { decryptChannelMessage, encryptChannelMessage, isDecryptionError } from "../lib/channelCrypto";
+import { decryptChannelMessage, encryptChannelMessage, isDecryptionError, tryFetchChannelKey } from "../lib/channelCrypto";
 import { wsClient } from "../lib/websocket";
 import { logger } from "../lib/logger";
 import { DecryptionErrorMessage } from "./DecryptionErrorMessage";
@@ -528,6 +528,10 @@ export function MessageList() {
       const membersForDecryption = currentMembers.some((m) => m.id === user.id)
         ? currentMembers
         : [...currentMembers, { id: user.id, displayName: user.displayName || "Me" }];
+
+      // Pre-fetch channel key once before bulk decryption to avoid N parallel
+      // getSenderKeys API calls (one per failed message) if the key isn't cached yet
+      await tryFetchChannelKey(activeChannelId, user.id);
 
       // Decrypt each message
       const decrypted = await Promise.all(
