@@ -10,7 +10,7 @@ import { join, extname } from "path";
 const UPLOADS_DIR = join(process.cwd(), "uploads");
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 const MAX_EMOJI_SIZE = 256 * 1024; // 256KB
-const ALLOWED_EMOJI_MIMES = new Set(["image/png", "image/gif", "image/webp"]);
+const ALLOWED_EMOJI_MIMES = new Set(["image/png", "image/gif", "image/webp", "image/jpeg"]);
 
 export const fileRoutes: FastifyPluginAsync = async (fastify) => {
   // Upload an encrypted file
@@ -115,7 +115,7 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     if (!ALLOWED_EMOJI_MIMES.has(data.mimetype)) {
-      return reply.status(400).send({ error: "Only PNG, GIF, and WebP images are allowed" });
+      return reply.status(400).send({ error: "Only PNG, GIF, WebP, and JPEG images are allowed" });
     }
 
     const buffer = await data.toBuffer();
@@ -132,7 +132,7 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
     const { filename } = request.params as { filename: string };
 
     // Sanitize filename (only allow uuid.ext pattern)
-    if (!/^[a-f0-9-]+\.(png|gif|webp)$/.test(filename)) {
+    if (!/^[a-f0-9-]+\.(png|gif|webp|jpe?g)$/.test(filename)) {
       return reply.status(400).send({ error: "Invalid filename" });
     }
 
@@ -146,6 +146,8 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
       ".png": "image/png",
       ".gif": "image/gif",
       ".webp": "image/webp",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
     };
 
     reply.header("Content-Type", mimeMap[ext] || "application/octet-stream");

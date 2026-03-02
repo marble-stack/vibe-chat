@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
+import { isSupportedImageType, processIconImage } from "../lib/imageUtils";
+import { useThemeStore, type ThemeName } from "../stores/theme";
 
 interface ChannelListProps {
   showOnMobile?: boolean;
@@ -24,6 +26,7 @@ export function ChannelList({ showOnMobile = true }: ChannelListProps) {
     markChannelRead,
   } = useChatStore();
 
+  const { updateCommunity } = useChatStore();
   const [showCreate, setShowCreate] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const [showInvite, setShowInvite] = useState(false);
@@ -32,10 +35,60 @@ export function ChannelList({ showOnMobile = true }: ChannelListProps) {
   const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
   const [editChannelName, setEditChannelName] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [showCommunitySettings, setShowCommunitySettings] = useState(false);
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const communitySettingsRef = useRef<HTMLDivElement>(null);
+  const communityIconInputRef = useRef<HTMLInputElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const currentTheme = useThemeStore((state) => state.theme);
+  const setTheme = useThemeStore((state) => state.setTheme);
 
   const activeCommunity = communities.find((c) => c.id === activeCommunityId);
   const communityChannels = activeCommunityId ? channels[activeCommunityId] || [] : [];
+
+  // Close community settings on outside click
+  useEffect(() => {
+    if (!showCommunitySettings) return;
+    const handleClick = (e: MouseEvent) => {
+      if (communitySettingsRef.current && !communitySettingsRef.current.contains(e.target as Node)) {
+        setShowCommunitySettings(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showCommunitySettings]);
+
+  const handleCommunityIconChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeCommunityId) return;
+    e.target.value = "";
+
+    if (!isSupportedImageType(file.type) && !file.name.toLowerCase().match(/\.(heic|heif)$/)) {
+      alert("Please select a PNG, JPEG, GIF, WebP, or HEIC image.");
+      return;
+    }
+
+    try {
+      const processed = await processIconImage(file);
+      const result = await api.communities.uploadIcon(processed);
+      await api.communities.update(activeCommunityId, { iconUrl: result.iconUrl });
+      updateCommunity(activeCommunityId, { iconUrl: result.iconUrl });
+      setShowCommunitySettings(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update community photo");
+    }
+  };
+
+  const handleRemoveCommunityIcon = async () => {
+    if (!activeCommunityId) return;
+    try {
+      await api.communities.update(activeCommunityId, { iconUrl: null });
+      updateCommunity(activeCommunityId, { iconUrl: undefined });
+      setShowCommunitySettings(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to remove community photo");
+    }
+  };
 
   const handleCreateChannel = async () => {
     if (!activeCommunityId || !newChannelName.trim()) return;
@@ -186,23 +239,83 @@ export function ChannelList({ showOnMobile = true }: ChannelListProps) {
     >
       {/* Community header */}
       <div className="h-12 px-4 flex items-center justify-between border-b border-background-tertiary shadow-sm">
-        <div className="flex items-center min-w-0 flex-1">
+        <div className="flex items-center min-w-0 flex-1 gap-2">
+          {activeCommunity?.iconUrl && (
+            <img src={activeCommunity.iconUrl} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+          )}
           <span className="font-semibold text-text-primary truncate">{activeCommunity?.name}</span>
         </div>
-        <button
-          onClick={() => setShowInvite(true)}
-          className="text-text-muted hover:text-text-primary"
-          title="Invite people"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+        <div className="flex items-center gap-1">
+          {/* Community settings */}
+          <div className="relative" ref={communitySettingsRef}>
+            <button
+              onClick={() => setShowCommunitySettings(!showCommunitySettings)}
+              className="text-text-muted hover:text-text-primary p-1 rounded transition-colors"
+              title="Community settings"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+            {showCommunitySettings && (
+              <div className="absolute right-0 top-full mt-1 bg-background-primary border border-background-tertiary rounded-lg shadow-lg py-1 z-[60] min-w-[180px]">
+                <button
+                  className="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-background-secondary flex items-center gap-2"
+                  onClick={() => communityIconInputRef.current?.click()}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  {activeCommunity?.iconUrl ? "Change Photo" : "Add Photo"}
+                </button>
+                {activeCommunity?.iconUrl && (
+                  <button
+                    className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-background-secondary flex items-center gap-2"
+                    onClick={handleRemoveCommunityIcon}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Remove Photo
+                  </button>
+                )}
+                <div className="border-t border-background-tertiary my-1" />
+                <button
+                  className="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-background-secondary flex items-center gap-2"
+                  onClick={() => { setShowThemePicker(true); setShowCommunitySettings(false); }}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                  </svg>
+                  Change Theme
+                </button>
+              </div>
+            )}
+            <input
+              ref={communityIconInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp,image/heic,image/heif,.heic,.heif,.jpg,.jpeg"
+              className="hidden"
+              onChange={handleCommunityIconChange}
             />
-          </svg>
-        </button>
+          </div>
+          <button
+            onClick={() => setShowInvite(true)}
+            className="text-text-muted hover:text-text-primary p-1"
+            title="Invite people"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Channel list */}
@@ -521,6 +634,64 @@ export function ChannelList({ showOnMobile = true }: ChannelListProps) {
             <div className="flex justify-end">
               <button
                 onClick={() => setShowInvite(false)}
+                className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Theme picker modal */}
+      {showThemePicker && createPortal(
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]"
+          onClick={() => setShowThemePicker(false)}
+        >
+          <div
+            className="bg-background-secondary rounded-lg p-6 w-full max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold text-text-primary mb-4">Choose Theme</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                { name: "dark" as ThemeName, label: "Dark", desc: "Black with white text", colors: ["#1a1a1a", "#f0f0f0", "#4caf50"] },
+                { name: "light" as ThemeName, label: "Light", desc: "Grey with dark text", colors: ["#e8e8e8", "#2a2a2a", "#4caf50"] },
+                { name: "fun" as ThemeName, label: "Fun", desc: "Confetti with colors", colors: ["#fff8f0", "#1a1a1a", "#ff6b6b"] },
+                { name: "navy" as ThemeName, label: "Navy", desc: "Deep blue tones", colors: ["#1b2838", "#e0e8f0", "#5b9bd5"] },
+              ]).map((t) => (
+                <button
+                  key={t.name}
+                  onClick={() => { setTheme(t.name); setShowThemePicker(false); }}
+                  className={`relative rounded-lg p-4 border-2 transition-all text-left ${
+                    currentTheme === t.name
+                      ? "border-accent-primary shadow-lg"
+                      : "border-background-tertiary hover:border-text-muted/50"
+                  }`}
+                  style={{ backgroundColor: t.colors[0] }}
+                >
+                  <div className="font-semibold text-sm mb-1" style={{ color: t.colors[1] }}>{t.label}</div>
+                  <div className="text-xs mb-2" style={{ color: t.colors[1], opacity: 0.7 }}>{t.desc}</div>
+                  <div className="flex gap-1">
+                    {t.colors.map((c, i) => (
+                      <div key={i} className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: c }} />
+                    ))}
+                  </div>
+                  {currentTheme === t.name && (
+                    <div className="absolute top-2 right-2">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke={t.colors[2]} strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => setShowThemePicker(false)}
                 className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
               >
                 Done

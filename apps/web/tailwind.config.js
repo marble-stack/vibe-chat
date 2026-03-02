@@ -4,24 +4,23 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Green dark theme
         background: {
-          primary: "#1a2e1a",
-          secondary: "#152415",
-          tertiary: "#0f1a0f",
+          primary: "rgb(var(--bg-primary) / <alpha-value>)",
+          secondary: "rgb(var(--bg-secondary) / <alpha-value>)",
+          tertiary: "rgb(var(--bg-tertiary) / <alpha-value>)",
         },
         text: {
-          primary: "#e8f5e8",
-          secondary: "#a8c5a8",
-          muted: "#7a9a7a",
+          primary: "rgb(var(--text-primary) / <alpha-value>)",
+          secondary: "rgb(var(--text-secondary) / <alpha-value>)",
+          muted: "rgb(var(--text-muted) / <alpha-value>)",
         },
         accent: {
-          primary: "#4caf50",
-          hover: "#388e3c",
+          primary: "rgb(var(--accent-primary) / <alpha-value>)",
+          hover: "rgb(var(--accent-hover) / <alpha-value>)",
         },
         channel: {
-          default: "#6b8f6b",
-          hover: "#c8e6c9",
+          default: "rgb(var(--channel-default) / <alpha-value>)",
+          hover: "rgb(var(--channel-hover) / <alpha-value>)",
         },
       },
     },

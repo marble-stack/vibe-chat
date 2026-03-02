@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
+import { isSupportedImageType, processIconImage } from "../lib/imageUtils";
 
 const STOCK_IMAGES = [
   "https://images.unsplash.com/photo-1557683316-973673baf926?w=128&h=128&fit=crop",
@@ -52,24 +53,26 @@ export function Sidebar() {
     closeCreateModal();
   };
 
-  const handleIconFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleIconFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.type)) {
-      alert("Please select a PNG, JPEG, GIF, or WebP image.");
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      alert("Image must be under 2MB.");
+    if (!isSupportedImageType(file.type) && !file.name.toLowerCase().match(/\.(heic|heif)$/)) {
+      alert("Please select a PNG, JPEG, JPG, GIF, WebP, or HEIC image.");
       return;
     }
 
-    setIconFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setIconPreview(reader.result as string);
-    reader.readAsDataURL(file);
-    setShowStockPicker(false);
+    try {
+      // Process (resize + convert) the image
+      const processed = await processIconImage(file);
+      setIconFile(processed);
+      const reader = new FileReader();
+      reader.onload = () => setIconPreview(reader.result as string);
+      reader.readAsDataURL(processed);
+      setShowStockPicker(false);
+    } catch {
+      alert("Failed to process image. HEIC files may not be supported in this browser.");
+    }
   };
 
   const handleSelectStock = (url: string) => {
@@ -125,7 +128,8 @@ export function Sidebar() {
   // Change icon for an existing community
   const handleChangeCommunityIcon = async (communityId: string, file: File) => {
     try {
-      const result = await api.communities.uploadIcon(file);
+      const processed = await processIconImage(file);
+      const result = await api.communities.uploadIcon(processed);
       await api.communities.update(communityId, { iconUrl: result.iconUrl });
       updateCommunity(communityId, { iconUrl: result.iconUrl });
     } catch (err) {
@@ -145,7 +149,7 @@ export function Sidebar() {
           }}
           className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold transition-all overflow-hidden ${
             activeCommunityId === community.id
-              ? "bg-accent-primary rounded-2xl"
+              ? "bg-accent-primary rounded-2xl ring-2 ring-accent-primary ring-offset-2 ring-offset-[rgb(var(--bg-tertiary))]"
               : "bg-background-primary hover:bg-accent-primary hover:rounded-2xl"
           }`}
           title={community.name}
@@ -168,7 +172,7 @@ export function Sidebar() {
       {/* Add community */}
       <button
         onClick={() => setShowCreate(true)}
-        className="w-12 h-12 rounded-full bg-background-primary hover:bg-green-600 hover:rounded-2xl flex items-center justify-center text-green-500 hover:text-white transition-all text-2xl"
+        className="w-12 h-12 rounded-full bg-background-primary hover:bg-accent-hover hover:rounded-2xl flex items-center justify-center text-accent-primary hover:text-white transition-all text-2xl"
         title="Create Community"
       >
         +
@@ -177,7 +181,7 @@ export function Sidebar() {
       {/* Join community */}
       <button
         onClick={() => setShowJoin(true)}
-        className="w-12 h-12 rounded-full bg-background-primary hover:bg-accent-primary hover:rounded-2xl flex items-center justify-center text-green-500 hover:text-white transition-all text-xl"
+        className="w-12 h-12 rounded-full bg-background-primary hover:bg-accent-primary hover:rounded-2xl flex items-center justify-center text-accent-primary hover:text-white transition-all text-xl"
         title="Join Community"
       >
         ↗
@@ -210,7 +214,7 @@ export function Sidebar() {
         <input
           key={`icon-input-${community.id}`}
           type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp"
+          accept="image/png,image/jpeg,image/gif,image/webp,image/heic,image/heif,.heic,.heif,.jpg,.jpeg"
           className="hidden"
           id={`community-icon-${community.id}`}
           onChange={(e) => {
@@ -254,7 +258,7 @@ export function Sidebar() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  accept="image/png,image/jpeg,image/gif,image/webp,image/heic,image/heif,.heic,.heif,.jpg,.jpeg"
                   className="hidden"
                   onChange={handleIconFileChange}
                 />
