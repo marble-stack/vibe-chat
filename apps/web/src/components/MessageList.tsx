@@ -562,6 +562,14 @@ export function MessageList() {
       // messages from being hidden when cached messages already bumped the count
       prevMessageCountRef.current = 0;
       setMessages(activeChannelId, decrypted);
+
+      // If any messages failed to decrypt, schedule a re-decryption attempt
+      // (the key may arrive via key:available shortly after load)
+      if (decrypted.some((m) => m.decryptionFailed)) {
+        setTimeout(() => {
+          useChatStore.getState().bumpKeySyncVersion(activeChannelId);
+        }, 500);
+      }
     };
 
     loadMessages();

@@ -442,11 +442,12 @@ export function clearPendingKeyRequest(channelId: string, userId: string): void 
  */
 export async function tryFetchChannelKey(
   channelId: string,
-  currentUserId: string
+  currentUserId: string,
+  force?: boolean
 ): Promise<boolean> {
-  // Check if we already have the key
-  if (await hasChannelKey(channelId)) {
-    return false;
+  // Check if we already have the key — skip when force=true (e.g. key:available just fired)
+  if (!force && await hasChannelKey(channelId)) {
+    return true; // Key exists locally = success for callers checking "is a key available?"
   }
 
   const identityKeys = await getIdentityKeys();
@@ -493,7 +494,20 @@ export async function tryFetchChannelKey(
       return true;
     }
   } catch (err) {
-    logger.debug("Failed to fetch channel key:", err);
+    logger.warn("Failed to fetch/decrypt channel key, requesting redistribution:", err);
+    // Request redistribution so the key owner re-encrypts for our current identity key
+    try {
+      const { senderKeyOwners } = await api.channels.getSenderKeyOwners(channelId);
+      if (senderKeyOwners.length > 0) {
+        const keyOwner = senderKeyOwners[0];
+        const requestKey = `${channelId}:${keyOwner.userId}`;
+        if (!pendingKeyRequests.has(requestKey)) {
+          pendingKeyRequests.add(requestKey);
+          wsClient.requestKey(channelId, keyOwner.userId);
+          setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+        }
+      }
+    } catch { /* ignore */ }
   }
 
   return false;

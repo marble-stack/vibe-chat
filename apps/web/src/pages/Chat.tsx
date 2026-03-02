@@ -168,25 +168,15 @@ export function Chat() {
   }, [user, token, hasHydrated]);
 
   // Proactively fetch channel keys on login to minimize "[Syncing keys...]"
-  // Uses channel IDs already loaded into the store to avoid duplicate API calls.
+  // Subscribes to the store and triggers when channels are first populated per community.
   useEffect(() => {
     if (!user || !hasHydrated) return;
 
-    // Wait briefly for community/channel data to load into the store
-    const timer = setTimeout(async () => {
+    const prefetchedCommunities = new Set<string>();
+
+    const runPrefetch = async (channelIds: string[]) => {
       try {
-        // Collect all channel IDs from the store (already fetched by loadCommunities effect)
-        const storeChannels = useChatStore.getState().channels;
-        const allChannelIds: string[] = [];
-        for (const communityChannels of Object.values(storeChannels)) {
-          for (const ch of communityChannels) {
-            allChannelIds.push(ch.id);
-          }
-        }
-
-        if (allChannelIds.length === 0) return;
-
-        const fetchedChannelIds = await prefetchChannelKeysByIds(allChannelIds, user.id);
+        const fetchedChannelIds = await prefetchChannelKeysByIds(channelIds, user.id);
         for (const channelId of fetchedChannelIds) {
           bumpKeySyncVersion(channelId);
         }
@@ -204,10 +194,32 @@ export function Chat() {
       } catch (err) {
         logger.error("Channel key prefetch failed:", err);
       }
-    }, 2000); // Wait 2s for store to populate from community loading effects
+    };
 
-    return () => clearTimeout(timer);
-  }, [user, hasHydrated, bumpKeySyncVersion]);
+    // Check if channels are already loaded (e.g. fast network or cached)
+    const checkAndPrefetch = () => {
+      const storeChannels = useChatStore.getState().channels;
+      const newChannelIds: string[] = [];
+      for (const [communityId, communityChannels] of Object.entries(storeChannels)) {
+        if (prefetchedCommunities.has(communityId) || communityChannels.length === 0) continue;
+        prefetchedCommunities.add(communityId);
+        for (const ch of communityChannels) {
+          newChannelIds.push(ch.id);
+        }
+      }
+      if (newChannelIds.length > 0) {
+        runPrefetch(newChannelIds);
+      }
+    };
+
+    // Run once immediately in case channels are already in the store
+    checkAndPrefetch();
+
+    // Subscribe to store changes so we trigger as soon as channels load
+    const unsubscribe = useChatStore.subscribe(checkAndPrefetch);
+
+    return () => unsubscribe();
+  }, [user, hasHydrated, token, bumpKeySyncVersion]);
 
   // Process pending key requests on login (for offline key sync)
   // When a key holder comes online, they should redistribute keys to users who requested while offline
@@ -603,8 +615,8 @@ export function Chat() {
 
       logger.debug(`Key available for channel ${channelId}, bumping keySyncVersion`);
 
-      // First, try to fetch and store the key so it's available for decryption
-      await tryFetchChannelKey(channelId, user.id);
+      // Force fetch from server — we KNOW a new key was just distributed
+      await tryFetchChannelKey(channelId, user.id, true);
 
       // Bump the version counter - MessageList watches this and re-decrypts failed messages
       bumpKeySyncVersion(channelId);
@@ -764,8 +776,9 @@ export function Chat() {
   }, [activeChannelId, markChannelRead]);
 
   // Polling fallback for key sync with exponential backoff
+  // Scans ALL loaded channels for syncing messages (not just activeChannelId)
   useEffect(() => {
-    if (!user || !activeChannelId) return;
+    if (!user) return;
 
     let pollDelay = 2000; // Start at 2s
     const maxDelay = 15000; // Cap at 15s
@@ -775,69 +788,87 @@ export function Chat() {
     const pollForKeys = async () => {
       if (cancelled) return;
 
-      // Check if there are any messages stuck in syncing state for the active channel
-      const channelMsgs = useChatStore.getState().messages[activeChannelId] || [];
-      const hasSyncingMessages = channelMsgs.some(
-        (m) => isDecryptionError(m.plaintext) || m.decryptionFailed
-      );
+      const storeMessages = useChatStore.getState().messages;
 
-      if (!hasSyncingMessages) {
-        // No syncing messages — reset backoff and check again later
+      // Collect all channels that have syncing messages, prioritising the active channel
+      const channelsWithSyncing: string[] = [];
+      const currentActiveChannelId = activeChannelRef.current;
+
+      if (currentActiveChannelId) {
+        const msgs = storeMessages[currentActiveChannelId] || [];
+        if (msgs.some((m) => isDecryptionError(m.plaintext) || m.decryptionFailed)) {
+          channelsWithSyncing.push(currentActiveChannelId);
+        }
+      }
+
+      for (const [chId, msgs] of Object.entries(storeMessages)) {
+        if (chId === currentActiveChannelId) continue; // already added
+        if (msgs.some((m) => isDecryptionError(m.plaintext) || m.decryptionFailed)) {
+          channelsWithSyncing.push(chId);
+        }
+        if (channelsWithSyncing.length >= 3) break; // cap per poll cycle
+      }
+
+      if (channelsWithSyncing.length === 0) {
+        // No syncing messages anywhere — reset backoff and check again later
         pollDelay = 2000;
         if (!cancelled) timeoutId = setTimeout(pollForKeys, pollDelay);
         return;
       }
 
-      // Try to fetch the key from server (in case key owner came online and distributed)
-      const keyFound = await tryFetchChannelKey(activeChannelId, user.id);
-      if (keyFound) {
-        logger.debug("Polling found new key");
-      }
-
-      // If no key found, re-request via WebSocket
-      if (!keyFound) {
-        const localKey = await getChannelKey(activeChannelId);
-        if (!localKey) {
-          wsClient.requestKey(activeChannelId, user.id);
-          logger.debug("Re-requesting key via WebSocket");
-        }
-      }
-
-      // Always try to re-decrypt if we have syncing messages
-      const currentCommunityId = activeCommunityRef.current;
-      let currentMembers = currentCommunityId ? membersRef.current[currentCommunityId] || [] : [];
-
-      if (!currentMembers.some((m) => m.id === user.id)) {
-        currentMembers = [
-          ...currentMembers,
-          { id: user.id, displayName: user.displayName || "Me" },
-        ];
-      }
-
-      const failedMsgs =
-        useChatStore
-          .getState()
-          .messages[activeChannelId]?.filter(
-            (m) => isDecryptionError(m.plaintext) || m.decryptionFailed
-          ) || [];
-
       let allResolved = true;
-      for (const failedMsg of failedMsgs) {
-        try {
-          const plaintext = await decryptChannelMessage(
-            activeChannelId,
-            failedMsg.ciphertext,
-            currentMembers,
-            user.id,
-            failedMsg.senderId
-          );
-          if (!isDecryptionError(plaintext)) {
-            updateMessage(activeChannelId, failedMsg.id, { plaintext, decryptionFailed: false });
-          } else {
+
+      for (const channelId of channelsWithSyncing) {
+        // Try to fetch the key from server (in case key owner came online and distributed)
+        const keyFound = await tryFetchChannelKey(channelId, user.id);
+        if (keyFound) {
+          logger.debug(`Polling found new key for ${channelId}`);
+        }
+
+        // If no key found, re-request via WebSocket
+        if (!keyFound) {
+          const localKey = await getChannelKey(channelId);
+          if (!localKey) {
+            wsClient.requestKey(channelId, user.id);
+            logger.debug(`Re-requesting key via WebSocket for ${channelId}`);
+          }
+        }
+
+        // Try to re-decrypt failed messages in this channel
+        const currentCommunityId = activeCommunityRef.current;
+        let currentMembers = currentCommunityId ? membersRef.current[currentCommunityId] || [] : [];
+
+        if (!currentMembers.some((m) => m.id === user.id)) {
+          currentMembers = [
+            ...currentMembers,
+            { id: user.id, displayName: user.displayName || "Me" },
+          ];
+        }
+
+        const failedMsgs =
+          useChatStore
+            .getState()
+            .messages[channelId]?.filter(
+              (m) => isDecryptionError(m.plaintext) || m.decryptionFailed
+            ) || [];
+
+        for (const failedMsg of failedMsgs) {
+          try {
+            const plaintext = await decryptChannelMessage(
+              channelId,
+              failedMsg.ciphertext,
+              currentMembers,
+              user.id,
+              failedMsg.senderId
+            );
+            if (!isDecryptionError(plaintext)) {
+              updateMessage(channelId, failedMsg.id, { plaintext, decryptionFailed: false });
+            } else {
+              allResolved = false;
+            }
+          } catch {
             allResolved = false;
           }
-        } catch {
-          allResolved = false;
         }
       }
 
@@ -851,14 +882,14 @@ export function Chat() {
       if (!cancelled) timeoutId = setTimeout(pollForKeys, pollDelay);
     };
 
-    // Poll immediately on channel change
+    // Poll immediately
     pollForKeys();
 
     return () => {
       cancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [user, activeChannelId, updateMessage]);
+  }, [user, updateMessage]);
 
   return (
     <div className="h-screen-safe flex bg-background-primary overflow-hidden">

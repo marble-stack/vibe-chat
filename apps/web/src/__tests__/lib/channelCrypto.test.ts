@@ -527,7 +527,7 @@ describe("Channel Crypto Integration", () => {
   });
 
   describe("tryFetchChannelKey", () => {
-    it("should return false if key already exists locally", async () => {
+    it("should return true if key already exists locally", async () => {
       const { hasChannelKey } = await import("../../lib/keyStore");
       const { tryFetchChannelKey } = await import("../../lib/channelCrypto");
 
@@ -535,7 +535,7 @@ describe("Channel Crypto Integration", () => {
 
       const result = await tryFetchChannelKey("channel-123", "user-1");
 
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     });
 
     it("should return false if no identity keys", async () => {
