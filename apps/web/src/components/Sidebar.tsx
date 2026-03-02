@@ -187,27 +187,6 @@ export function Sidebar() {
         ↗
       </button>
 
-      {/* Spacer to push logout to bottom */}
-      <div className="flex-1" />
-
-      {/* Logout button */}
-      <button
-        onClick={() => {
-          const { logout } = useAuthStore.getState();
-          logout();
-        }}
-        className="w-12 h-12 rounded-full bg-background-primary hover:bg-red-500/20 flex items-center justify-center text-text-muted hover:text-red-400 transition-all mb-2"
-        title="Log out"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-          />
-        </svg>
-      </button>
 
       {/* Hidden file input for community icon change */}
       {communities.map((community) => (
