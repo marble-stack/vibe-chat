@@ -147,10 +147,10 @@ export function Sidebar() {
             setActiveCommunity(community.id);
             setActiveChannel(null);
           }}
-          className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold transition-all overflow-hidden ${
+          className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold transition-all overflow-hidden ${
             activeCommunityId === community.id
-              ? "bg-accent-primary rounded-2xl ring-2 ring-accent-primary ring-offset-2 ring-offset-[rgb(var(--bg-tertiary))]"
-              : "bg-background-primary hover:bg-accent-primary hover:rounded-2xl"
+              ? "bg-accent-primary rounded-2xl ring-2 ring-accent-primary ring-offset-2 ring-offset-[rgb(var(--bg-tertiary))] text-white"
+              : "bg-background-primary hover:bg-accent-primary hover:rounded-2xl text-text-primary hover:text-white"
           }`}
           title={community.name}
         >
@@ -181,10 +181,12 @@ export function Sidebar() {
       {/* Join community */}
       <button
         onClick={() => setShowJoin(true)}
-        className="w-12 h-12 rounded-full bg-background-primary hover:bg-accent-primary hover:rounded-2xl flex items-center justify-center text-accent-primary hover:text-white transition-all text-xl"
+        className="w-12 h-12 rounded-full bg-background-primary hover:bg-accent-primary hover:rounded-2xl flex items-center justify-center text-accent-primary hover:text-white transition-all"
         title="Join Community"
       >
-        ↗
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+        </svg>
       </button>
 
 
