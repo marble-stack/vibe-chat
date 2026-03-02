@@ -62,18 +62,10 @@ export function Chat() {
     bumpKeySyncVersion,
   } = useChatStore();
 
-  // Mobile navigation state
-  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-
   // Splash page state
   const [showActivitySplash, setShowActivitySplash] = useState(false);
   const [splashDismissed, setSplashDismissed] = useState(false);
   const [communitiesLoaded, setCommunitiesLoaded] = useState(false);
-
-  // Close mobile sidebar when clicking outside
-  const handleBackdropClick = () => {
-    setShowMobileSidebar(false);
-  };
 
   // Ref to track current members for the WebSocket handler
   const membersRef = useRef(members);
@@ -800,19 +792,11 @@ export function Chat() {
 
   return (
     <div className="h-screen-safe flex bg-background-primary overflow-hidden">
-      {/* Mobile backdrop overlay */}
-      {showMobileSidebar && (
-        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={handleBackdropClick} />
-      )}
-
       {/* Community sidebar */}
-      <Sidebar showMobile={showMobileSidebar} onClose={() => setShowMobileSidebar(false)} />
+      <Sidebar />
 
       {/* Channel list - hidden on mobile when chat is active */}
-      <ChannelList
-        showOnMobile={!activeChannelId}
-        onOpenSidebar={() => setShowMobileSidebar(true)}
-      />
+      <ChannelList showOnMobile={!activeChannelId} />
 
       {/* Main chat area - only show on mobile when channel is selected */}
       <div className={`flex-1 flex flex-col ${activeChannelId ? "flex" : "hidden md:flex"}`}>
@@ -840,7 +824,7 @@ export function Chat() {
           }} />
         ) : activeChannelId ? (
           <>
-            <MessageList onOpenSidebar={() => setShowMobileSidebar(true)} />
+            <MessageList />
             <MessageInput />
           </>
         ) : (
