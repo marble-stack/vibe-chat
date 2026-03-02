@@ -41,6 +41,18 @@ const formatTime = (dateStr: string) => {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 };
 
+const formatFullDateTime = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return date.toLocaleString(undefined, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 const isSameDay = (d1: Date, d2: Date) =>
   d1.getFullYear() === d2.getFullYear() &&
   d1.getMonth() === d2.getMonth() &&
@@ -141,6 +153,7 @@ interface MessageItemProps {
   onOpenThread: (messageId: string) => void;
   onReply: (message: Message) => void;
   onUsernameClick: (userId: string, e: React.MouseEvent) => void;
+  onRetry: (message: Message) => void;
   getMember: (userId: string) => Member | undefined;
   replyCount: number;
   channelMessages: Message[];
@@ -172,6 +185,7 @@ const MessageItem = memo(function MessageItem({
   onOpenThread,
   onReply,
   onUsernameClick,
+  onRetry,
   getMember,
   replyCount,
 }: MessageItemProps) {
@@ -271,7 +285,11 @@ const MessageItem = memo(function MessageItem({
           {sender?.displayName?.charAt(0).toUpperCase() || "?"}
         </div>
       ) : (
-        <div className="w-10 flex-shrink-0" />
+        <div className="w-10 flex-shrink-0 flex items-center justify-center">
+          <span className="text-[10px] text-text-muted opacity-0 group-hover:opacity-100 transition-opacity select-none cursor-default" title={formatFullDateTime(message.createdAt)}>
+            {formatTime(message.createdAt)}
+          </span>
+        </div>
       )}
       <div className="flex-1 min-w-0">
         {/* Reply context */}
@@ -312,7 +330,7 @@ const MessageItem = memo(function MessageItem({
             >
               {sender?.displayName || "Unknown"}
             </span>
-            <span className="text-xs text-text-muted">
+            <span className="text-xs text-text-muted cursor-default" title={formatFullDateTime(message.createdAt)}>
               {formatTime(message.createdAt)}
             </span>
           </div>
@@ -347,7 +365,15 @@ const MessageItem = memo(function MessageItem({
             <p className="text-text-primary break-words whitespace-pre-wrap">
               {message.plaintext || message.ciphertext}
             </p>
-            <span className="text-xs text-red-400">Failed to send</span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-red-400">Failed to send</span>
+              <button
+                onClick={() => onRetry(message)}
+                className="text-xs text-red-400 hover:text-red-300 underline"
+              >
+                Retry
+              </button>
+            </div>
           </div>
         ) : message.decryptionFailed ? (
           <DecryptionErrorMessage errorType={message.plaintext} />
@@ -465,6 +491,9 @@ export function MessageList() {
     userId: string;
     position: { x: number; y: number };
   } | null>(null);
+
+  // Scroll-to-bottom button state
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
   const allChannelMessages = activeChannelId ? messages[activeChannelId] || [] : [];
   // Filter out thread replies from main view — inline replies (isThreadReply=false) stay visible
@@ -714,6 +743,25 @@ export function MessageList() {
     setActiveChannel(null);
   };
 
+  // Track scroll position for scroll-to-bottom button
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const distanceFromBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      setShowScrollButton(distanceFromBottom > 200);
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
   // Handle scroll-to-message from search
   useEffect(() => {
     if (scrollToMessageId) {
@@ -743,6 +791,35 @@ export function MessageList() {
     [setReplyingTo]
   );
 
+  // Retry sending a failed message
+  const handleRetry = useCallback(
+    async (message: Message) => {
+      if (!activeChannelId || !user) return;
+
+      const plaintext = message.plaintext || message.ciphertext;
+      if (!plaintext) return;
+
+      // Mark as pending again
+      updateMessage(activeChannelId, message.id, { sendFailed: false, pending: true });
+
+      try {
+        const ciphertext = await encryptChannelMessage(
+          activeChannelId,
+          plaintext,
+          communityMembers,
+          user.id
+        );
+        const sent = wsClient.sendMessage(activeChannelId, ciphertext, message.replyToId || undefined, message.clientId || undefined);
+        if (!sent) {
+          updateMessage(activeChannelId, message.id, { sendFailed: true, pending: false });
+        }
+      } catch {
+        updateMessage(activeChannelId, message.id, { sendFailed: true, pending: false });
+      }
+    },
+    [activeChannelId, user, communityMembers, updateMessage]
+  );
+
   const onlineUserIds = activeCommunityId ? onlineUsers[activeCommunityId] || [] : [];
 
   const handleUsernameClick = useCallback(
@@ -758,7 +835,7 @@ export function MessageList() {
   const profileMember = profileCard ? getMember(profileCard.userId) : null;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden relative">
       {/* Profile card popover */}
       {profileCard && profileMember && (
         <ProfileCard
@@ -818,12 +895,20 @@ export function MessageList() {
         }}
       >
         {channelMessages.length === 0 ? (
-          <div className="text-center text-text-muted py-8">
-            <div className="text-4xl mb-4">#</div>
+          <div className="text-center text-text-muted py-12 px-4">
+            <div className="w-16 h-16 rounded-full bg-accent-primary/20 flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl text-accent-primary font-bold">#</span>
+            </div>
             <h3 className="text-xl font-bold text-text-primary mb-2">
               Welcome to #{activeChannel?.name}!
             </h3>
-            <p>This is the start of the channel.</p>
+            <p className="mb-4 max-w-md mx-auto">This is the very beginning of the <span className="font-semibold text-text-primary">#{activeChannel?.name}</span> channel. Send a message to get the conversation started.</p>
+            <div className="inline-flex items-center gap-1.5 bg-accent-primary/10 text-accent-primary text-xs font-medium px-3 py-1.5 rounded-full">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              End-to-end encrypted
+            </div>
           </div>
         ) : (
           channelMessages.map((message, index) => {
@@ -883,6 +968,7 @@ export function MessageList() {
                 onOpenThread={setActiveThread}
                 onReply={handleReply}
                 onUsernameClick={handleUsernameClick}
+                onRetry={handleRetry}
                 getMember={getMember}
                 replyCount={replyCount}
                 channelMessages={channelMessages}
@@ -915,6 +1001,21 @@ export function MessageList() {
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Scroll-to-bottom button */}
+      {showScrollButton && (
+        <div className="absolute bottom-20 right-6 z-10">
+          <button
+            onClick={scrollToBottom}
+            className="w-10 h-10 rounded-full bg-background-tertiary border border-background-secondary shadow-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-background-secondary transition-colors"
+            title="Scroll to bottom"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Delete confirmation modal */}
       {deletingMessageId && (
