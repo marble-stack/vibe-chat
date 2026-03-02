@@ -14,6 +14,9 @@ export const users = pgTable("users", {
   // Encrypted identity key backup (for cross-device restore)
   encryptedKeyBackup: text("encrypted_key_backup"),
   keyBackupSalt: text("key_backup_salt"),
+  // Password reset
+  passwordResetToken: text("password_reset_token"),
+  passwordResetExpires: timestamp("password_reset_expires"),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

@@ -1,8 +1,10 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import crypto from "crypto";
 import { db, users, preKeys } from "../db/index.js";
 import { eq } from "drizzle-orm";
 import { hashPassword, verifyPassword, generateToken } from "../lib/auth.js";
+import { sendPasswordResetEmail } from "../lib/email.js";
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -22,6 +24,16 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string(),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+const resetPasswordSchema = z.object({
+  email: z.string().email(),
+  temporaryPassword: z.string(),
+  newPassword: z.string().min(8).max(100),
 });
 
 const keyBackupSchema = z.object({
@@ -128,6 +140,82 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       hasKeyBackup: !!user.encryptedKeyBackup,
       lastLoginAt: previousLoginAt?.toISOString() ?? null,
     };
+  });
+
+  // Forgot password - sends temporary password via email
+  fastify.post("/forgot-password", async (request, reply) => {
+    const body = forgotPasswordSchema.parse(request.body);
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, body.email),
+    });
+
+    // Always return success to prevent email enumeration
+    if (!user) {
+      return { success: true };
+    }
+
+    // Generate a random 8-character temporary password
+    const temporaryPassword = crypto.randomBytes(4).toString("hex");
+
+    // Hash it and store with 15-minute expiry
+    const hashedToken = await hashPassword(temporaryPassword);
+    const expires = new Date(Date.now() + 15 * 60 * 1000);
+
+    await db
+      .update(users)
+      .set({
+        passwordResetToken: hashedToken,
+        passwordResetExpires: expires,
+      })
+      .where(eq(users.id, user.id));
+
+    // Send email with temporary password
+    await sendPasswordResetEmail(user.email, temporaryPassword);
+
+    return { success: true };
+  });
+
+  // Reset password - validates temporary password and sets new password
+  fastify.post("/reset-password", async (request, reply) => {
+    const body = resetPasswordSchema.parse(request.body);
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, body.email),
+    });
+
+    if (!user || !user.passwordResetToken || !user.passwordResetExpires) {
+      return reply.status(400).send({ error: "Invalid or expired reset request" });
+    }
+
+    // Check if token has expired
+    if (new Date() > user.passwordResetExpires) {
+      // Clear expired token
+      await db
+        .update(users)
+        .set({ passwordResetToken: null, passwordResetExpires: null })
+        .where(eq(users.id, user.id));
+      return reply.status(400).send({ error: "Reset code has expired. Please request a new one." });
+    }
+
+    // Verify the temporary password
+    const isValid = await verifyPassword(body.temporaryPassword, user.passwordResetToken);
+    if (!isValid) {
+      return reply.status(400).send({ error: "Invalid temporary password" });
+    }
+
+    // Hash and set new password, clear reset token
+    const newHash = await hashPassword(body.newPassword);
+    await db
+      .update(users)
+      .set({
+        passwordHash: newHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      })
+      .where(eq(users.id, user.id));
+
+    return { success: true };
   });
 
   // Get current user (requires authentication)
