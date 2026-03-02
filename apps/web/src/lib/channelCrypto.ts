@@ -156,19 +156,28 @@ export async function ensureChannelKey(
       // instead of creating a new key. Creating a new key would cause key fragmentation
       // where old messages encrypted with the original key become permanently unreadable.
       if (senderKeyDecryptionFailed && createIfMissing) {
-        const keyOwner = senderKeyOwners[0];
-        const requestKey = `${channelId}:${keyOwner.userId}`;
+        // Check if there's another user who can redistribute.
+        // If the only key owner is the current user, the old key is irrecoverable
+        // (e.g. re-registration wiped local keys) — fall through to create a new key.
+        const otherOwner = senderKeyOwners.find((o) => o.userId !== currentUserId);
+        if (otherOwner) {
+          const requestKey = `${channelId}:${otherOwner.userId}`;
 
-        if (!pendingKeyRequests.has(requestKey)) {
-          pendingKeyRequests.add(requestKey);
-          logger.debug(
-            `Requesting key redistribution from ${keyOwner.userId} for channel ${channelId} (sender key decryption failed)`
-          );
-          wsClient.requestKey(channelId, keyOwner.userId);
-          setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+          if (!pendingKeyRequests.has(requestKey)) {
+            pendingKeyRequests.add(requestKey);
+            logger.debug(
+              `Requesting key redistribution from ${otherOwner.userId} for channel ${channelId} (sender key decryption failed)`
+            );
+            wsClient.requestKey(channelId, otherOwner.userId);
+            setTimeout(() => pendingKeyRequests.delete(requestKey), 30000);
+          }
+
+          throw new Error("Encryption keys are syncing. Please wait a moment and try again.");
         }
-
-        throw new Error("Encryption keys are syncing. Please wait a moment and try again.");
+        // No other owner — old key is irrecoverable, create a new one below
+        logger.warn(
+          `Only key owner for channel ${channelId} is current user with broken key — creating new channel key`
+        );
       } else {
         // Normal path: A key exists but we don't have it - request redistribution via WebSocket
         const keyOwner = senderKeyOwners[0];
