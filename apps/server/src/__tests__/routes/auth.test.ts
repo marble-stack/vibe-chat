@@ -445,6 +445,11 @@ describe("Auth Routes - Login", () => {
     it("should login successfully with valid credentials", async () => {
       mockDb.query.users.findFirst.mockResolvedValue(mockUser);
       vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
+      mockDb.update.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(undefined),
+        }),
+      });
 
       const response = await app.inject({
         method: "POST",

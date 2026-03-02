@@ -43,7 +43,7 @@ vi.mock("../../websocket/connectionMaps.js", () => ({
 }));
 
 import { db } from "../../db/index.js";
-import { canUserAccessChannel } from "../../lib/authorization.js";
+import { canUserAccessChannel, isUserInCommunity } from "../../lib/authorization.js";
 import { sendToUser } from "../../websocket/connectionMaps.js";
 
 describe("Channel Routes - Sender Key Security", () => {
@@ -306,6 +306,7 @@ describe('Channel Routes - Create and Get Channels', () => {
   describe('POST /api/channels', () => {
     it('should create a channel successfully', async () => {
       const token = createTestToken(testUserId);
+      vi.mocked(isUserInCommunity).mockResolvedValue(true);
 
       vi.mocked(db.insert).mockReturnValue({
         values: vi.fn().mockReturnValue({
@@ -370,6 +371,7 @@ describe('Channel Routes - Create and Get Channels', () => {
 
     it('should allow channel name with dashes', async () => {
       const token = createTestToken(testUserId);
+      vi.mocked(isUserInCommunity).mockResolvedValue(true);
 
       vi.mocked(db.insert).mockReturnValue({
         values: vi.fn().mockReturnValue({
