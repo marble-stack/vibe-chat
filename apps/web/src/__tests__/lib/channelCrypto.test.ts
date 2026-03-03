@@ -687,10 +687,12 @@ describe("Channel Crypto Integration", () => {
       });
 
       // createIfMissing=true (sending mode) - should request redistribution, NOT create new key
+      // Note: sender-1 must be in the members list so the implementation considers them
+      // a reachable "other owner" and requests redistribution instead of creating a new key
       await expect(
         ensureChannelKey(
           "channel-123",
-          [{ id: "user-1", displayName: "User 1" }],
+          [{ id: "user-1", displayName: "User 1" }, { id: "sender-1", displayName: "Sender 1" }],
           "user-1",
           true
         )
