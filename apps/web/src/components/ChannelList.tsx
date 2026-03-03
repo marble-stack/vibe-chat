@@ -4,15 +4,12 @@ import { useChatStore } from "../stores/chat";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
 import { isSupportedImageType, processIconImage } from "../lib/imageUtils";
-import { useThemeStore, type ThemeName } from "../stores/theme";
-
 interface ChannelListProps {
   showOnMobile?: boolean;
 }
 
 export function ChannelList({ showOnMobile = true }: ChannelListProps) {
   const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
   const {
     communities,
     channels,
@@ -36,12 +33,9 @@ export function ChannelList({ showOnMobile = true }: ChannelListProps) {
   const [editChannelName, setEditChannelName] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showCommunitySettings, setShowCommunitySettings] = useState(false);
-  const [showThemePicker, setShowThemePicker] = useState(false);
   const communitySettingsRef = useRef<HTMLDivElement>(null);
   const communityIconInputRef = useRef<HTMLInputElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-  const currentTheme = useThemeStore((state) => state.theme);
-  const setTheme = useThemeStore((state) => state.setTheme);
 
   const activeCommunity = communities.find((c) => c.id === activeCommunityId);
   const communityChannels = activeCommunityId ? channels[activeCommunityId] || [] : [];
@@ -206,24 +200,6 @@ export function ChannelList({ showOnMobile = true }: ChannelListProps) {
         </div>
         {/* User info */}
         <div className="h-14 px-2 flex items-center gap-2 bg-background-tertiary/50">
-          <button
-            onClick={() => setShowThemePicker(true)}
-            className="p-1.5 text-text-muted hover:text-text-primary hover:bg-background-primary/50 rounded transition-colors flex-shrink-0"
-            title="Change Theme"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-            </svg>
-          </button>
-          <button
-            onClick={logout}
-            className="p-1.5 text-text-muted hover:text-text-primary hover:bg-background-primary/50 rounded transition-colors flex-shrink-0"
-            title="Logout"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
-            </svg>
-          </button>
           <div className="w-8 h-8 rounded-full bg-accent-primary flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
             {user?.displayName.charAt(0).toUpperCase()}
           </div>
@@ -233,64 +209,6 @@ export function ChannelList({ showOnMobile = true }: ChannelListProps) {
             </div>
           </div>
         </div>
-
-        {/* Theme picker modal */}
-        {showThemePicker && createPortal(
-          <div
-            className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]"
-            onClick={() => setShowThemePicker(false)}
-          >
-            <div
-              className="bg-background-secondary rounded-lg p-6 w-full max-w-md mx-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-xl font-bold text-text-primary mb-4">Choose Theme</h2>
-              <div className="grid grid-cols-2 gap-3">
-                {([
-                  { name: "dark" as ThemeName, label: "Dark", desc: "Black with white text", colors: ["#1a1a1a", "#f0f0f0", "#4caf50"] },
-                  { name: "light" as ThemeName, label: "Light", desc: "Grey with dark text", colors: ["#e8e8e8", "#2a2a2a", "#4caf50"] },
-                  { name: "fun" as ThemeName, label: "Fun", desc: "Confetti with colors", colors: ["#fff8f0", "#1a1a1a", "#ff6b6b"] },
-                  { name: "navy" as ThemeName, label: "Navy", desc: "Deep blue tones", colors: ["#1b2838", "#e0e8f0", "#5b9bd5"] },
-                ]).map((t) => (
-                  <button
-                    key={t.name}
-                    onClick={() => { setTheme(t.name); setShowThemePicker(false); }}
-                    className={`relative rounded-lg p-4 border-2 transition-all text-left ${
-                      currentTheme === t.name
-                        ? "border-accent-primary shadow-lg"
-                        : "border-background-tertiary hover:border-text-muted/50"
-                    }`}
-                    style={{ backgroundColor: t.colors[0] }}
-                  >
-                    <div className="font-semibold text-sm mb-1" style={{ color: t.colors[1] }}>{t.label}</div>
-                    <div className="text-xs mb-2" style={{ color: t.colors[1], opacity: 0.7 }}>{t.desc}</div>
-                    <div className="flex gap-1">
-                      {t.colors.map((c, i) => (
-                        <div key={i} className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: c }} />
-                      ))}
-                    </div>
-                    {currentTheme === t.name && (
-                      <div className="absolute top-2 right-2">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke={t.colors[2]} strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <div className="flex justify-end mt-4">
-                <button
-                  onClick={() => setShowThemePicker(false)}
-                  className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
-                >
-                  Done
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
       </div>
     );
   }
@@ -472,24 +390,6 @@ export function ChannelList({ showOnMobile = true }: ChannelListProps) {
 
       {/* User info */}
       <div className="h-14 px-2 flex items-center gap-2 bg-background-tertiary/50">
-        <button
-          onClick={() => setShowThemePicker(true)}
-          className="p-1.5 text-text-muted hover:text-text-primary hover:bg-background-primary/50 rounded transition-colors flex-shrink-0"
-          title="Change Theme"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-          </svg>
-        </button>
-        <button
-          onClick={logout}
-          className="p-1.5 text-text-muted hover:text-text-primary hover:bg-background-primary/50 rounded transition-colors flex-shrink-0"
-          title="Logout"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
-          </svg>
-        </button>
         <div className="w-8 h-8 rounded-full bg-accent-primary flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
           {user?.displayName.charAt(0).toUpperCase()}
         </div>
@@ -701,63 +601,6 @@ export function ChannelList({ showOnMobile = true }: ChannelListProps) {
         document.body
       )}
 
-      {/* Theme picker modal */}
-      {showThemePicker && createPortal(
-        <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]"
-          onClick={() => setShowThemePicker(false)}
-        >
-          <div
-            className="bg-background-secondary rounded-lg p-6 w-full max-w-md mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-bold text-text-primary mb-4">Choose Theme</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {([
-                { name: "dark" as ThemeName, label: "Dark", desc: "Black with white text", colors: ["#1a1a1a", "#f0f0f0", "#4caf50"] },
-                { name: "light" as ThemeName, label: "Light", desc: "Grey with dark text", colors: ["#e8e8e8", "#2a2a2a", "#4caf50"] },
-                { name: "fun" as ThemeName, label: "Fun", desc: "Confetti with colors", colors: ["#fff8f0", "#1a1a1a", "#ff6b6b"] },
-                { name: "navy" as ThemeName, label: "Navy", desc: "Deep blue tones", colors: ["#1b2838", "#e0e8f0", "#5b9bd5"] },
-              ]).map((t) => (
-                <button
-                  key={t.name}
-                  onClick={() => { setTheme(t.name); setShowThemePicker(false); }}
-                  className={`relative rounded-lg p-4 border-2 transition-all text-left ${
-                    currentTheme === t.name
-                      ? "border-accent-primary shadow-lg"
-                      : "border-background-tertiary hover:border-text-muted/50"
-                  }`}
-                  style={{ backgroundColor: t.colors[0] }}
-                >
-                  <div className="font-semibold text-sm mb-1" style={{ color: t.colors[1] }}>{t.label}</div>
-                  <div className="text-xs mb-2" style={{ color: t.colors[1], opacity: 0.7 }}>{t.desc}</div>
-                  <div className="flex gap-1">
-                    {t.colors.map((c, i) => (
-                      <div key={i} className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: c }} />
-                    ))}
-                  </div>
-                  {currentTheme === t.name && (
-                    <div className="absolute top-2 right-2">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke={t.colors[2]} strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-            <div className="flex justify-end mt-4">
-              <button
-                onClick={() => setShowThemePicker(false)}
-                className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
     </div>
   );
 }
