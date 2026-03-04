@@ -36,6 +36,11 @@ const resetPasswordSchema = z.object({
   newPassword: z.string().min(8).max(100),
 });
 
+const updateProfileSchema = z.object({
+  displayName: z.string().min(1).max(50).optional(),
+  avatarUrl: z.string().max(500000).nullable().optional(), // base64 data URLs can be large
+});
+
 const keyBackupSchema = z.object({
   encryptedKeyBackup: z.string(),
   salt: z.string(),
@@ -98,7 +103,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     const token = generateToken({ userId: user.id, email: user.email });
 
     return {
-      user: { id: user.id, email: user.email, displayName: user.displayName },
+      user: { id: user.id, email: user.email, displayName: user.displayName, avatarUrl: user.avatarUrl },
       token,
     };
   });
@@ -135,7 +140,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     const token = generateToken({ userId: user.id, email: user.email });
 
     return {
-      user: { id: user.id, email: user.email, displayName: user.displayName },
+      user: { id: user.id, email: user.email, displayName: user.displayName, avatarUrl: user.avatarUrl },
       token,
       hasKeyBackup: !!user.encryptedKeyBackup,
       lastLoginAt: previousLoginAt?.toISOString() ?? null,
@@ -233,7 +238,39 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     return {
-      user: { id: user.id, email: user.email, displayName: user.displayName },
+      user: { id: user.id, email: user.email, displayName: user.displayName, avatarUrl: user.avatarUrl },
+    };
+  });
+
+  // Update user profile (display name, avatar)
+  fastify.patch("/profile", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Not authenticated" });
+    }
+
+    const body = updateProfileSchema.parse(request.body);
+
+    const updates: Record<string, unknown> = {};
+    if (body.displayName !== undefined) updates.displayName = body.displayName;
+    if (body.avatarUrl !== undefined) updates.avatarUrl = body.avatarUrl;
+
+    if (Object.keys(updates).length === 0) {
+      return reply.status(400).send({ error: "No fields to update" });
+    }
+
+    const [updated] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, request.user.userId))
+      .returning();
+
+    return {
+      user: {
+        id: updated.id,
+        email: updated.email,
+        displayName: updated.displayName,
+        avatarUrl: updated.avatarUrl,
+      },
     };
   });
 

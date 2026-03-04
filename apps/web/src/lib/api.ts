@@ -66,7 +66,7 @@ export const api = {
       signedPreKeySignature: string;
       preKeys: { keyId: string; publicKey: string }[];
     }) =>
-      request<{ user: { id: string; email: string; displayName: string }; token: string }>(
+      request<{ user: { id: string; email: string; displayName: string; avatarUrl?: string | null }; token: string }>(
         "/auth/register",
         {
           method: "POST",
@@ -76,7 +76,7 @@ export const api = {
 
     login: (email: string, password: string) =>
       request<{
-        user: { id: string; email: string; displayName: string };
+        user: { id: string; email: string; displayName: string; avatarUrl?: string | null };
         token: string;
         hasKeyBackup: boolean;
         lastLoginAt: string | null;
@@ -96,6 +96,33 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ email, temporaryPassword, newPassword }),
       }),
+
+    updateProfile: (data: { displayName?: string; avatarUrl?: string | null }) =>
+      request<{ user: { id: string; email: string; displayName: string; avatarUrl?: string | null } }>(
+        "/auth/profile",
+        {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }
+      ),
+
+    uploadAvatar: (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const token = useAuthStore.getState().token;
+      return fetch(`${API_BASE}/files/avatar`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      }).then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: "Upload failed" }));
+          throw new Error(err.error || "Upload failed");
+        }
+        return res.json() as Promise<{ avatarUrl: string }>;
+      });
+    },
 
     getUserKeys: (userId: string) =>
       request<{

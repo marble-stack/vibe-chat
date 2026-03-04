@@ -469,6 +469,7 @@ export function Chat() {
         try {
           const parsed = JSON.parse(preview);
           if (parsed.type === "file") displayPreview = `Sent a file: ${parsed.filename}`;
+          else if (parsed.type === "voice") displayPreview = "Sent a voice note";
           else if (parsed.type === "poll") displayPreview = `Created a poll: ${parsed.question}`;
         } catch {
           // Not JSON, use as-is

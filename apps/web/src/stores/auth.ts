@@ -5,6 +5,7 @@ interface User {
   id: string;
   email: string;
   displayName: string;
+  avatarUrl?: string | null;
 }
 
 export type KeyBackupStatus = "pending" | "success" | "failed";
