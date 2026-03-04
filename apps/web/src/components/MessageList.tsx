@@ -7,6 +7,7 @@ import { wsClient } from "../lib/websocket";
 import { logger } from "../lib/logger";
 import { DecryptionErrorMessage } from "./DecryptionErrorMessage";
 import { FileMessage } from "./FileMessage";
+import { VoiceMessage } from "./VoiceMessage";
 import { PollMessage } from "./PollMessage";
 import { ProfileCard } from "./ProfileCard";
 import { CustomEmojiText, EmojiDisplay } from "./CustomEmojiText";
@@ -281,8 +282,12 @@ const MessageItem = memo(function MessageItem({
       )}
 
       {showHeader ? (
-        <div className="w-10 h-10 rounded-full bg-accent-primary flex-shrink-0 flex items-center justify-center text-white font-medium">
-          {sender?.displayName?.charAt(0).toUpperCase() || "?"}
+        <div className="w-10 h-10 rounded-full bg-accent-primary flex-shrink-0 flex items-center justify-center text-white font-medium overflow-hidden">
+          {sender?.avatarUrl ? (
+            <img src={sender.avatarUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            sender?.displayName?.charAt(0).toUpperCase() || "?"
+          )}
         </div>
       ) : (
         <div className="w-10 flex-shrink-0 flex items-center justify-center">
@@ -384,6 +389,9 @@ const MessageItem = memo(function MessageItem({
             const parsed = JSON.parse(plaintext);
             if (parsed.type === "file") {
               return <FileMessage metadata={parsed} channelId={message.channelId} />;
+            }
+            if (parsed.type === "voice") {
+              return <VoiceMessage metadata={parsed} channelId={message.channelId} />;
             }
             if (parsed.type === "poll") {
               return <PollMessage metadata={parsed} messageId={message.id} />;

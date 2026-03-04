@@ -25,11 +25,16 @@ export function MessageInput() {
   const [plusMenuPos, setPlusMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [mentionQuery, setMentionQuery] = useState<{ query: string; startIndex: number } | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
   const typingTimeoutRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const plusBtnRef = useRef<HTMLButtonElement>(null);
   const emojiBtnRef = useRef<HTMLButtonElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<number | null>(null);
   const { activeChannelId, channels, activeCommunityId, members, replyingTo, setReplyingTo, addMessage, updateMessage } =
     useChatStore();
   const user = useAuthStore((state) => state.user);
@@ -288,11 +293,139 @@ export function MessageInput() {
     }
   };
 
+  const startRecording = async () => {
+    if (!activeChannelId || !user || isSending) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : "audio/webm",
+      });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        // Stop all tracks to release mic
+        stream.getTracks().forEach((t) => t.stop());
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        if (audioBlob.size === 0) return;
+
+        await sendVoiceNote(audioBlob);
+      };
+
+      mediaRecorder.start(100); // collect data every 100ms
+      setIsRecording(true);
+      setRecordingDuration(0);
+
+      // Timer to update duration display
+      const startTime = Date.now();
+      recordingTimerRef.current = window.setInterval(() => {
+        setRecordingDuration(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
+    } catch (err) {
+      logger.error("Failed to start recording:", err);
+      setSendError("Could not access microphone. Please check permissions.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current.stop();
+      // Stop all tracks
+      mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+    }
+    audioChunksRef.current = [];
+    setIsRecording(false);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
+
+  const sendVoiceNote = async (audioBlob: Blob) => {
+    if (!activeChannelId || !user) return;
+
+    setSendError(null);
+    setIsSending(true);
+
+    const membersWithSelf = communityMembers.some((m) => m.id === user.id)
+      ? communityMembers
+      : [...communityMembers, { id: user.id, displayName: user.displayName || "Me" }];
+
+    try {
+      const { key: channelKey } = await ensureChannelKey(
+        activeChannelId,
+        membersWithSelf,
+        user.id
+      );
+
+      // Encrypt voice note
+      const file = new File([audioBlob], "voice-note.webm", { type: "audio/webm" });
+      const { encryptedBlob, iv } = await encryptFile(file, channelKey);
+
+      // Upload encrypted audio
+      const { fileId } = await api.files.upload(encryptedBlob, activeChannelId, iv);
+
+      // Send message with voice metadata
+      const voiceMetadata = JSON.stringify({
+        type: "voice",
+        fileId,
+        duration: recordingDuration,
+        mimeType: "audio/webm",
+      });
+
+      const ciphertext = await encryptChannelMessage(
+        activeChannelId,
+        voiceMetadata,
+        membersWithSelf,
+        user.id
+      );
+
+      wsClient.sendMessage(activeChannelId, ciphertext);
+    } catch (err) {
+      logger.error("Failed to send voice note:", err);
+      setSendError("Failed to send voice note. Please try again.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const formatRecordingTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
   // Cleanup typing timeout on unmount
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
+      }
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
       }
     };
   }, []);
@@ -377,129 +510,184 @@ export function MessageInput() {
       <div
         className={`bg-background-tertiary flex items-end px-4 ${replyingTo ? "rounded-b-lg" : "rounded-lg"}`}
       >
-        <button
-          ref={plusBtnRef}
-          type="button"
-          onClick={() => {
-            if (!showPlusMenu && plusBtnRef.current) {
-              const rect = plusBtnRef.current.getBoundingClientRect();
-              setPlusMenuPos({ x: rect.left, y: rect.top });
-            }
-            setShowPlusMenu(!showPlusMenu);
-          }}
-          className="text-text-muted hover:text-text-primary p-2"
-          title="More options"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
-
-        {showPlusMenu && plusMenuPos && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setShowPlusMenu(false)} />
-            <div
-              className="fixed z-50 bg-background-secondary border border-background-tertiary rounded-lg shadow-lg py-1 min-w-[160px]"
-              style={{ left: plusMenuPos.x, bottom: window.innerHeight - plusMenuPos.y + 8 }}
+        {isRecording ? (
+          /* Recording UI */
+          <div className="flex items-center flex-1 py-3 gap-3">
+            <button
+              type="button"
+              onClick={cancelRecording}
+              className="text-red-400 hover:text-red-300 p-2"
+              title="Cancel recording"
             >
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPlusMenu(false);
-                  fileInputRef.current?.click();
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-background-tertiary flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-                Upload File
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPlusMenu(false);
-                  setShowPollCreator(true);
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-background-tertiary flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                Create Poll
-              </button>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="flex items-center gap-2 flex-1">
+              <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+              <span className="text-red-400 text-sm font-mono">
+                {formatRecordingTime(recordingDuration)}
+              </span>
+              <span className="text-text-muted text-sm">Recording...</span>
             </div>
+            <button
+              type="button"
+              onClick={stopRecording}
+              className="text-accent-primary hover:text-accent-hover p-2"
+              title="Send voice note"
+            >
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          /* Normal input UI */
+          <>
+            <button
+              ref={plusBtnRef}
+              type="button"
+              onClick={() => {
+                if (!showPlusMenu && plusBtnRef.current) {
+                  const rect = plusBtnRef.current.getBoundingClientRect();
+                  setPlusMenuPos({ x: rect.left, y: rect.top });
+                }
+                setShowPlusMenu(!showPlusMenu);
+              }}
+              className="text-text-muted hover:text-text-primary p-2"
+              title="More options"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+
+            {showPlusMenu && plusMenuPos && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowPlusMenu(false)} />
+                <div
+                  className="fixed z-50 bg-background-secondary border border-background-tertiary rounded-lg shadow-lg py-1 min-w-[160px]"
+                  style={{ left: plusMenuPos.x, bottom: window.innerHeight - plusMenuPos.y + 8 }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPlusMenu(false);
+                      fileInputRef.current?.click();
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-background-tertiary flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    Upload File
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPlusMenu(false);
+                      setShowPollCreator(true);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-background-tertiary flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    Create Poll
+                  </button>
+                </div>
+              </>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+
+            <div className="relative flex-1">
+              {mentionQuery && filteredMentionMembers.length > 0 && (
+                <MentionAutocomplete
+                  members={filteredMentionMembers}
+                  selectedIndex={mentionIndex}
+                  onSelect={insertMention}
+                />
+              )}
+              <textarea
+                ref={inputRef}
+                rows={1}
+                value={message}
+                onChange={handleChange}
+                onKeyDown={handleKeyDown}
+                placeholder={`Message #${activeChannel?.name || "channel"}`}
+                className="w-full bg-transparent text-text-primary py-3 px-2 outline-none resize-none overflow-y-auto placeholder:truncate"
+                style={{ maxHeight: 200 }}
+              />
+            </div>
+
+            <div className="relative">
+              <button
+                ref={emojiBtnRef}
+                type="button"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className="text-text-muted hover:text-text-primary p-2"
+                title="Emoji"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </button>
+
+              {showEmojiPicker && (
+                <EmojiPicker
+                  onSelect={insertEmoji}
+                  onClose={() => setShowEmojiPicker(false)}
+                />
+              )}
+            </div>
+
+            {message.trim() ? (
+              <button
+                type="submit"
+                disabled={isSending || communityMembers.length === 0}
+                className="text-text-muted hover:text-accent-primary p-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={communityMembers.length === 0 ? "Loading..." : "Send message"}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                  />
+                </svg>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={startRecording}
+                disabled={isSending || communityMembers.length === 0}
+                className="text-text-muted hover:text-accent-primary p-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Record voice note"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                  />
+                </svg>
+              </button>
+            )}
           </>
         )}
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
-
-        <div className="relative flex-1">
-          {mentionQuery && filteredMentionMembers.length > 0 && (
-            <MentionAutocomplete
-              members={filteredMentionMembers}
-              selectedIndex={mentionIndex}
-              onSelect={insertMention}
-            />
-          )}
-          <textarea
-            ref={inputRef}
-            rows={1}
-            value={message}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            placeholder={`Message #${activeChannel?.name || "channel"}`}
-            className="w-full bg-transparent text-text-primary py-3 px-2 outline-none resize-none overflow-y-auto placeholder:truncate"
-            style={{ maxHeight: 200 }}
-          />
-        </div>
-
-        <div className="relative">
-          <button
-            ref={emojiBtnRef}
-            type="button"
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="text-text-muted hover:text-text-primary p-2"
-            title="Emoji"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </button>
-
-          {showEmojiPicker && (
-            <EmojiPicker
-              onSelect={insertEmoji}
-              onClose={() => setShowEmojiPicker(false)}
-            />
-          )}
-        </div>
-
-        <button
-          type="submit"
-          disabled={!message.trim() || isSending || communityMembers.length === 0}
-          className="text-text-muted hover:text-accent-primary p-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          title={communityMembers.length === 0 ? "Loading..." : "Send message"}
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-            />
-          </svg>
-        </button>
       </div>
     </form>
 
