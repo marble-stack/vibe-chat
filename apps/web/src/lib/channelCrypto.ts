@@ -221,26 +221,44 @@ export async function ensureChannelKey(
         );
       } else {
         // Normal path: A key exists but we don't have it - request redistribution via WebSocket
-        const keyOwner = senderKeyOwners[0];
-        const requestKey = `${channelId}:${keyOwner.userId}`;
 
-        if (!pendingKeyRequests.has(requestKey)) {
-          pendingKeyRequests.add(requestKey);
-          logger.debug(
-            `Requesting key redistribution from ${keyOwner.userId} for channel ${channelId}`
+        // Check if the only key owners are the current user (solo-user / self-redistribution case).
+        // This happens when a user logs in on a new device — their old key is on the server
+        // encrypted to the old identity, but no OTHER user can redistribute it.
+        // If backup restore failed or user "Started Fresh", the old key is irrecoverable.
+        const otherKeyOwner = senderKeyOwners.find(
+          (o) => o.userId !== currentUserId && members.some((m) => m.id === o.userId)
+        );
+
+        if (!otherKeyOwner) {
+          // Only key owner is the current user (on another device) — skip WebSocket request
+          // since we can't redistribute to ourselves. Create a new key instead.
+          logger.warn(
+            `Solo-user key redistribution for channel ${channelId} — no other active key holder. Creating new channel key.`
           );
-          wsClient.requestKey(channelId, keyOwner.userId);
+          // Fall through to create new key below
+        } else {
+          const keyOwner = otherKeyOwner;
+          const requestKey = `${channelId}:${keyOwner.userId}`;
 
-          // Remove from pending after 5 seconds to allow faster retry
-          setTimeout(() => pendingKeyRequests.delete(requestKey), 5000);
+          if (!pendingKeyRequests.has(requestKey)) {
+            pendingKeyRequests.add(requestKey);
+            logger.debug(
+              `Requesting key redistribution from ${keyOwner.userId} for channel ${channelId}`
+            );
+            wsClient.requestKey(channelId, keyOwner.userId);
+
+            // Remove from pending after 5 seconds to allow faster retry
+            setTimeout(() => pendingKeyRequests.delete(requestKey), 5000);
+          }
+
+          if (!createIfMissing) {
+            throw new Error("Syncing keys...");
+          }
+
+          // For sending: wait briefly for key redistribution, then retry
+          throw new Error("Syncing channel key. Please try again in a moment.");
         }
-
-        if (!createIfMissing) {
-          throw new Error("Syncing keys...");
-        }
-
-        // For sending: wait briefly for key redistribution, then retry
-        throw new Error("Syncing channel key. Please try again in a moment.");
       }
     }
   } catch (err) {

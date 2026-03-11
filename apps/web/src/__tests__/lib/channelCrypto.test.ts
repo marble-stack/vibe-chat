@@ -331,8 +331,9 @@ describe("Channel Crypto Integration", () => {
       });
 
       // Should throw syncing error for createIfMissing=false
+      // Members list must include the key owner for redistribution to be attempted
       await expect(
-        ensureChannelKey("channel-123", [], "user-1", false)
+        ensureChannelKey("channel-123", [{ id: "owner-1" }], "user-1", false)
       ).rejects.toThrow("Syncing keys...");
 
       expect(wsClient.requestKey).toHaveBeenCalledWith("channel-123", "owner-1");
@@ -733,8 +734,9 @@ describe("Channel Crypto Integration", () => {
       });
 
       // Should still throw syncing error (anti-fragmentation preserved)
+      // Members list must include the key owner for redistribution to be attempted
       await expect(
-        ensureChannelKey("channel-123", [], "user-1", true)
+        ensureChannelKey("channel-123", [{ id: "owner-1" }], "user-1", true)
       ).rejects.toThrow("Syncing channel key");
 
       expect(wsClient.requestKey).toHaveBeenCalledWith("channel-123", "owner-1");
@@ -788,8 +790,9 @@ describe("Channel Crypto Integration", () => {
       });
 
       // createIfMissing=false (receive mode) - should NOT create new key, should throw
+      // Members list must include the key owner for redistribution to be attempted
       await expect(
-        ensureChannelKey("channel-123", [], "user-1", false)
+        ensureChannelKey("channel-123", [{ id: "sender-1" }], "user-1", false)
       ).rejects.toThrow("Syncing keys...");
 
       expect(wsClient.requestKey).toHaveBeenCalled();
