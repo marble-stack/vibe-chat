@@ -12,6 +12,7 @@ import { wsClient } from "./websocket";
 import {
   generateChannelKey,
   exportAesKey,
+  importAesKey,
   encryptMessage,
   decryptMessage,
   encryptChannelKeyForRecipient,
@@ -26,10 +27,14 @@ import {
   getIdentityKeys,
   storeUserKey,
   getUserKey,
+  getAllChannelKeys,
 } from "./keyStore";
 
 // Track pending key requests to avoid duplicate requests
 const pendingKeyRequests = new Set<string>();
+
+// Track channels that have already been escrowed in this session to avoid redundant uploads
+const escrowedChannels = new Set<string>();
 
 // Throttle redistribution to avoid excessive API calls on every message send
 const lastRedistributionTime = new Map<string, number>();
@@ -146,6 +151,9 @@ export async function ensureChannelKey(
           // Success! Store locally
           const keyBase64 = await exportAesKey(channelKey);
           await storeChannelKey(channelId, keyBase64);
+
+          // Escrow to self so we can retrieve on future device switches
+          escrowChannelKeyToSelf(channelId, keyBase64, currentUserId).catch(() => {});
 
           // Clear deadlock timeout tracker since we got the key
           redistributionRequestStart.delete(channelId);
@@ -439,6 +447,9 @@ export async function decryptChannelMessage(
           const keyBase64 = await exportAesKey(channelKey);
           await storeChannelKey(channelId, keyBase64);
 
+          // Escrow to self for future device switches
+          escrowChannelKeyToSelf(channelId, keyBase64, currentUserId).catch(() => {});
+
           // Try to decrypt the message
           return await decryptMessage(ciphertext, channelKey);
         } catch {
@@ -556,6 +567,9 @@ export async function tryFetchChannelKey(
 
           const keyBase64 = await exportAesKey(channelKey);
           await storeChannelKey(channelId, keyBase64);
+
+          // Escrow to self for future device switches
+          escrowChannelKeyToSelf(channelId, keyBase64, currentUserId).catch(() => {});
 
           // Clear pending request and deadlock timeout since we got the key
           clearPendingKeyRequest(channelId, senderKey.userId);
@@ -688,4 +702,74 @@ export async function prefetchAllChannelKeys(currentUserId: string): Promise<str
   }
 
   return fetchedChannelIds;
+}
+
+/**
+ * Escrow a channel key to self by encrypting it with the current user's own
+ * public key and uploading as a self-addressed sender key.
+ *
+ * This ensures the user can retrieve the key on a new device without depending
+ * on other users being online for redistribution.
+ *
+ * Best-effort: errors are logged but never thrown.
+ */
+export async function escrowChannelKeyToSelf(
+  channelId: string,
+  channelKeyBase64: string,
+  currentUserId: string
+): Promise<void> {
+  // Deduplicate: skip if already escrowed this session
+  if (escrowedChannels.has(channelId)) return;
+
+  try {
+    const identityKeys = await getIdentityKeys();
+    if (!identityKeys) {
+      logger.debug("escrowChannelKeyToSelf: no identity keys, skipping");
+      return;
+    }
+
+    const channelKey = await importAesKey(channelKeyBase64);
+    const privateKey = await importPrivateKey(identityKeys.identityKeyPair.privateKey);
+
+    const encryptedKey = await encryptChannelKeyForRecipient(
+      channelKey,
+      privateKey,
+      identityKeys.identityKeyPair.publicKey
+    );
+
+    await api.channels.distributeSenderKey({
+      channelId,
+      userId: currentUserId,
+      distributionId: crypto.randomUUID(),
+      senderPublicKey: identityKeys.identityKeyPair.publicKey,
+      encryptedKeys: [{ forUserId: currentUserId, encryptedKey }],
+    });
+
+    escrowedChannels.add(channelId);
+    logger.debug(`Escrowed channel key to self for channel ${channelId}`);
+  } catch (err) {
+    logger.error(`Failed to escrow channel key for channel ${channelId}:`, err);
+  }
+}
+
+/**
+ * Escrow all locally-stored channel keys to self.
+ * Called after backup restore to ensure the server has sender keys
+ * encrypted with the current identity.
+ */
+export async function escrowAllChannelKeysToSelf(
+  currentUserId: string
+): Promise<void> {
+  const allKeys = await getAllChannelKeys();
+  const entries = Object.entries(allKeys);
+
+  if (entries.length === 0) return;
+
+  logger.debug(`Escrowing ${entries.length} channel keys to self`);
+
+  await Promise.allSettled(
+    entries.map(([channelId, keyBase64]) =>
+      escrowChannelKeyToSelf(channelId, keyBase64, currentUserId)
+    )
+  );
 }

@@ -657,9 +657,12 @@ export function Chat() {
 
     // Handle key available notification - bump keySyncVersion to trigger re-decryption in MessageList
     const handleKeyAvailable = async (msg: { payload: Record<string, unknown> }) => {
-      const { channelId } = msg.payload as { channelId: string; fromUserId: string };
+      const { channelId, fromUserId } = msg.payload as { channelId: string; fromUserId: string };
 
       if (!user) return;
+
+      // Skip self-notifications from escrow uploads to avoid redundant re-fetches
+      if (fromUserId === user.id) return;
 
       logger.debug(`Key available for channel ${channelId}, bumping keySyncVersion`);
 

@@ -4,6 +4,7 @@ import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
 import { generateIdentityKeys, decryptKeyBackup, uploadKeyBackupWithRetry } from "../lib/crypto";
 import { storeIdentityKeys, clearAllKeys, getIdentityKeys, importAllChannelKeys } from "../lib/keyStore";
+import { escrowAllChannelKeysToSelf } from "../lib/channelCrypto";
 
 export function Login() {
   const [email, setEmail] = useState("");
@@ -48,6 +49,10 @@ export function Login() {
             await storeIdentityKeys(user.id, identityKeys);
             if (restoredChannelKeys && Object.keys(restoredChannelKeys).length > 0) {
               await importAllChannelKeys(restoredChannelKeys);
+              // Re-escrow restored channel keys so server has sender keys for current identity
+              escrowAllChannelKeysToSelf(user.id).catch((err) =>
+                console.warn("Failed to re-escrow channel keys after restore:", err)
+              );
             }
             useAuthStore.getState().setSessionPassword(password);
             setKeyBackupStatus("success");
@@ -119,6 +124,10 @@ export function Login() {
         await storeIdentityKeys(user.id, identityKeys);
         if (restoredChannelKeys && Object.keys(restoredChannelKeys).length > 0) {
           await importAllChannelKeys(restoredChannelKeys);
+          // Re-escrow restored channel keys so server has sender keys for current identity
+          escrowAllChannelKeysToSelf(user.id).catch((err) =>
+            console.warn("Failed to re-escrow channel keys after retry restore:", err)
+          );
         }
         useAuthStore.getState().setSessionPassword(password);
         setKeyBackupStatus("success");
