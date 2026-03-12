@@ -14,7 +14,7 @@ import {
 } from "../lib/channelCrypto";
 import { uploadKeyBackupWithRetry } from "../lib/crypto";
 import { getChannelKey, getIdentityKeys, getAllChannelKeys, getFullIdentityKeysForBackup } from "../lib/keyStore";
-import { initKeyBackupSync, cleanupKeyBackupSync } from "../lib/keyBackupSync";
+import { initKeyBackupSync } from "../lib/keyBackupSync";
 import { logger } from "../lib/logger";
 import { Sidebar } from "../components/Sidebar";
 import { ChannelList } from "../components/ChannelList";
