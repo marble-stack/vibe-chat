@@ -10,6 +10,7 @@ import {
   tryFetchChannelKey,
   isDecryptionError,
   prefetchChannelKeysByIds,
+  escrowAllChannelKeysToSelf,
 } from "../lib/channelCrypto";
 import { uploadKeyBackupWithRetry } from "../lib/crypto";
 import { getChannelKey, getIdentityKeys, getAllChannelKeys, getFullIdentityKeysForBackup } from "../lib/keyStore";
@@ -205,6 +206,10 @@ export function Chat() {
         for (const channelId of fetchedChannelIds) {
           bumpKeySyncVersion(channelId);
         }
+
+        // Escrow all local channel keys to self so they're available on future device switches
+        // This covers read-only channels that wouldn't be escrowed via the send path
+        escrowAllChannelKeysToSelf(user.id).catch(() => {});
 
         // Backup re-upload is now handled by the keyBackupSync module
         // which triggers automatically when channel keys change
