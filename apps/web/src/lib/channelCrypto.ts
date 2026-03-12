@@ -12,6 +12,7 @@ import { wsClient } from "./websocket";
 import {
   generateChannelKey,
   exportAesKey,
+  importAesKey,
   encryptMessage,
   decryptMessage,
   encryptChannelKeyForRecipient,
@@ -26,10 +27,14 @@ import {
   getIdentityKeys,
   storeUserKey,
   getUserKey,
+  getAllChannelKeys,
 } from "./keyStore";
 
 // Track pending key requests to avoid duplicate requests
 const pendingKeyRequests = new Set<string>();
+
+// Track channels that have already been escrowed in this session to avoid redundant uploads
+const escrowedChannels = new Set<string>();
 
 // Throttle redistribution to avoid excessive API calls on every message send
 const lastRedistributionTime = new Map<string, number>();
@@ -147,6 +152,9 @@ export async function ensureChannelKey(
           const keyBase64 = await exportAesKey(channelKey);
           await storeChannelKey(channelId, keyBase64);
 
+          // Escrow to self so we can retrieve on future device switches
+          escrowChannelKeyToSelf(channelId, keyBase64, currentUserId).catch(() => {});
+
           // Clear deadlock timeout tracker since we got the key
           redistributionRequestStart.delete(channelId);
 
@@ -221,26 +229,44 @@ export async function ensureChannelKey(
         );
       } else {
         // Normal path: A key exists but we don't have it - request redistribution via WebSocket
-        const keyOwner = senderKeyOwners[0];
-        const requestKey = `${channelId}:${keyOwner.userId}`;
 
-        if (!pendingKeyRequests.has(requestKey)) {
-          pendingKeyRequests.add(requestKey);
-          logger.debug(
-            `Requesting key redistribution from ${keyOwner.userId} for channel ${channelId}`
+        // Check if the only key owners are the current user (solo-user / self-redistribution case).
+        // This happens when a user logs in on a new device — their old key is on the server
+        // encrypted to the old identity, but no OTHER user can redistribute it.
+        // If backup restore failed or user "Started Fresh", the old key is irrecoverable.
+        const otherKeyOwner = senderKeyOwners.find(
+          (o) => o.userId !== currentUserId && members.some((m) => m.id === o.userId)
+        );
+
+        if (!otherKeyOwner) {
+          // Only key owner is the current user (on another device) — skip WebSocket request
+          // since we can't redistribute to ourselves. Create a new key instead.
+          logger.warn(
+            `Solo-user key redistribution for channel ${channelId} — no other active key holder. Creating new channel key.`
           );
-          wsClient.requestKey(channelId, keyOwner.userId);
+          // Fall through to create new key below
+        } else {
+          const keyOwner = otherKeyOwner;
+          const requestKey = `${channelId}:${keyOwner.userId}`;
 
-          // Remove from pending after 5 seconds to allow faster retry
-          setTimeout(() => pendingKeyRequests.delete(requestKey), 5000);
+          if (!pendingKeyRequests.has(requestKey)) {
+            pendingKeyRequests.add(requestKey);
+            logger.debug(
+              `Requesting key redistribution from ${keyOwner.userId} for channel ${channelId}`
+            );
+            wsClient.requestKey(channelId, keyOwner.userId);
+
+            // Remove from pending after 5 seconds to allow faster retry
+            setTimeout(() => pendingKeyRequests.delete(requestKey), 5000);
+          }
+
+          if (!createIfMissing) {
+            throw new Error("Syncing keys...");
+          }
+
+          // For sending: wait briefly for key redistribution, then retry
+          throw new Error("Syncing channel key. Please try again in a moment.");
         }
-
-        if (!createIfMissing) {
-          throw new Error("Syncing keys...");
-        }
-
-        // For sending: wait briefly for key redistribution, then retry
-        throw new Error("Syncing channel key. Please try again in a moment.");
       }
     }
   } catch (err) {
@@ -421,6 +447,9 @@ export async function decryptChannelMessage(
           const keyBase64 = await exportAesKey(channelKey);
           await storeChannelKey(channelId, keyBase64);
 
+          // Escrow to self for future device switches
+          escrowChannelKeyToSelf(channelId, keyBase64, currentUserId).catch(() => {});
+
           // Try to decrypt the message
           return await decryptMessage(ciphertext, channelKey);
         } catch {
@@ -538,6 +567,9 @@ export async function tryFetchChannelKey(
 
           const keyBase64 = await exportAesKey(channelKey);
           await storeChannelKey(channelId, keyBase64);
+
+          // Escrow to self for future device switches
+          escrowChannelKeyToSelf(channelId, keyBase64, currentUserId).catch(() => {});
 
           // Clear pending request and deadlock timeout since we got the key
           clearPendingKeyRequest(channelId, senderKey.userId);
@@ -670,4 +702,74 @@ export async function prefetchAllChannelKeys(currentUserId: string): Promise<str
   }
 
   return fetchedChannelIds;
+}
+
+/**
+ * Escrow a channel key to self by encrypting it with the current user's own
+ * public key and uploading as a self-addressed sender key.
+ *
+ * This ensures the user can retrieve the key on a new device without depending
+ * on other users being online for redistribution.
+ *
+ * Best-effort: errors are logged but never thrown.
+ */
+export async function escrowChannelKeyToSelf(
+  channelId: string,
+  channelKeyBase64: string,
+  currentUserId: string
+): Promise<void> {
+  // Deduplicate: skip if already escrowed this session
+  if (escrowedChannels.has(channelId)) return;
+
+  try {
+    const identityKeys = await getIdentityKeys();
+    if (!identityKeys) {
+      logger.debug("escrowChannelKeyToSelf: no identity keys, skipping");
+      return;
+    }
+
+    const channelKey = await importAesKey(channelKeyBase64);
+    const privateKey = await importPrivateKey(identityKeys.identityKeyPair.privateKey);
+
+    const encryptedKey = await encryptChannelKeyForRecipient(
+      channelKey,
+      privateKey,
+      identityKeys.identityKeyPair.publicKey
+    );
+
+    await api.channels.distributeSenderKey({
+      channelId,
+      userId: currentUserId,
+      distributionId: crypto.randomUUID(),
+      senderPublicKey: identityKeys.identityKeyPair.publicKey,
+      encryptedKeys: [{ forUserId: currentUserId, encryptedKey }],
+    });
+
+    escrowedChannels.add(channelId);
+    logger.debug(`Escrowed channel key to self for channel ${channelId}`);
+  } catch (err) {
+    logger.error(`Failed to escrow channel key for channel ${channelId}:`, err);
+  }
+}
+
+/**
+ * Escrow all locally-stored channel keys to self.
+ * Called after backup restore to ensure the server has sender keys
+ * encrypted with the current identity.
+ */
+export async function escrowAllChannelKeysToSelf(
+  currentUserId: string
+): Promise<void> {
+  const allKeys = await getAllChannelKeys();
+  const entries = Object.entries(allKeys);
+
+  if (entries.length === 0) return;
+
+  logger.debug(`Escrowing ${entries.length} channel keys to self`);
+
+  await Promise.allSettled(
+    entries.map(([channelId, keyBase64]) =>
+      escrowChannelKeyToSelf(channelId, keyBase64, currentUserId)
+    )
+  );
 }

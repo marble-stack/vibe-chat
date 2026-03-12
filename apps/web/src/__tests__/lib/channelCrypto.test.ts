@@ -41,6 +41,7 @@ vi.mock("../../lib/keyStore", () => ({
   getIdentityKeys: vi.fn(),
   storeUserKey: vi.fn(),
   getUserKey: vi.fn(),
+  getAllChannelKeys: vi.fn(),
 }));
 
 vi.mock("../../lib/logger", () => ({
@@ -331,8 +332,9 @@ describe("Channel Crypto Integration", () => {
       });
 
       // Should throw syncing error for createIfMissing=false
+      // Members list must include the key owner for redistribution to be attempted
       await expect(
-        ensureChannelKey("channel-123", [], "user-1", false)
+        ensureChannelKey("channel-123", [{ id: "owner-1" }], "user-1", false)
       ).rejects.toThrow("Syncing keys...");
 
       expect(wsClient.requestKey).toHaveBeenCalledWith("channel-123", "owner-1");
@@ -733,8 +735,9 @@ describe("Channel Crypto Integration", () => {
       });
 
       // Should still throw syncing error (anti-fragmentation preserved)
+      // Members list must include the key owner for redistribution to be attempted
       await expect(
-        ensureChannelKey("channel-123", [], "user-1", true)
+        ensureChannelKey("channel-123", [{ id: "owner-1" }], "user-1", true)
       ).rejects.toThrow("Syncing channel key");
 
       expect(wsClient.requestKey).toHaveBeenCalledWith("channel-123", "owner-1");
@@ -788,8 +791,9 @@ describe("Channel Crypto Integration", () => {
       });
 
       // createIfMissing=false (receive mode) - should NOT create new key, should throw
+      // Members list must include the key owner for redistribution to be attempted
       await expect(
-        ensureChannelKey("channel-123", [], "user-1", false)
+        ensureChannelKey("channel-123", [{ id: "sender-1" }], "user-1", false)
       ).rejects.toThrow("Syncing keys...");
 
       expect(wsClient.requestKey).toHaveBeenCalled();
@@ -817,6 +821,190 @@ describe("Channel Crypto Integration", () => {
       const result = await canEncryptInChannel("channel-123");
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe("escrowChannelKeyToSelf", () => {
+    it("should encrypt channel key to self and upload as sender key", async () => {
+      const { getIdentityKeys } = await import("../../lib/keyStore");
+      const { api } = await import("../../lib/api");
+      const { escrowChannelKeyToSelf } = await import("../../lib/channelCrypto");
+
+      const userKeyPair = await generateKeyPair();
+      const userPublicKey = await exportPublicKey(userKeyPair.publicKey);
+      const userPrivateKey = await exportPrivateKey(userKeyPair.privateKey);
+
+      vi.mocked(getIdentityKeys).mockResolvedValue({
+        userId: "user-1",
+        identityKeyPair: {
+          publicKey: userPublicKey,
+          privateKey: userPrivateKey,
+        },
+        signedPreKeyPair: {
+          publicKey: "signed-pub",
+          privateKey: "signed-priv",
+        },
+      });
+
+      vi.mocked(api.channels.distributeSenderKey).mockResolvedValue({
+        success: true,
+      });
+
+      // Generate a real channel key and export it
+      const channelKey = await generateChannelKey();
+      const channelKeyBase64 = await exportAesKey(channelKey);
+
+      await escrowChannelKeyToSelf("escrow-channel-1", channelKeyBase64, "user-1");
+
+      expect(api.channels.distributeSenderKey).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channelId: "escrow-channel-1",
+          userId: "user-1",
+          senderPublicKey: userPublicKey,
+          encryptedKeys: [
+            expect.objectContaining({
+              forUserId: "user-1",
+            }),
+          ],
+        })
+      );
+    });
+
+    it("should not throw when identity keys are missing", async () => {
+      const { getIdentityKeys } = await import("../../lib/keyStore");
+      const { escrowChannelKeyToSelf } = await import("../../lib/channelCrypto");
+
+      vi.mocked(getIdentityKeys).mockResolvedValue(null);
+
+      const channelKey = await generateChannelKey();
+      const channelKeyBase64 = await exportAesKey(channelKey);
+
+      // Should not throw
+      await escrowChannelKeyToSelf("escrow-channel-2", channelKeyBase64, "user-1");
+    });
+
+    it("should not throw on network failure", async () => {
+      const { getIdentityKeys } = await import("../../lib/keyStore");
+      const { api } = await import("../../lib/api");
+      const { escrowChannelKeyToSelf } = await import("../../lib/channelCrypto");
+
+      const userKeyPair = await generateKeyPair();
+      const userPublicKey = await exportPublicKey(userKeyPair.publicKey);
+      const userPrivateKey = await exportPrivateKey(userKeyPair.privateKey);
+
+      vi.mocked(getIdentityKeys).mockResolvedValue({
+        userId: "user-1",
+        identityKeyPair: {
+          publicKey: userPublicKey,
+          privateKey: userPrivateKey,
+        },
+        signedPreKeyPair: {
+          publicKey: "signed-pub",
+          privateKey: "signed-priv",
+        },
+      });
+
+      vi.mocked(api.channels.distributeSenderKey).mockRejectedValue(
+        new Error("Network error")
+      );
+
+      const channelKey = await generateChannelKey();
+      const channelKeyBase64 = await exportAesKey(channelKey);
+
+      // Should not throw
+      await escrowChannelKeyToSelf("escrow-channel-3", channelKeyBase64, "user-1");
+    });
+
+    it("should deduplicate escrow calls for the same channel", async () => {
+      const { getIdentityKeys } = await import("../../lib/keyStore");
+      const { api } = await import("../../lib/api");
+      const { escrowChannelKeyToSelf } = await import("../../lib/channelCrypto");
+
+      const userKeyPair = await generateKeyPair();
+      const userPublicKey = await exportPublicKey(userKeyPair.publicKey);
+      const userPrivateKey = await exportPrivateKey(userKeyPair.privateKey);
+
+      vi.mocked(getIdentityKeys).mockResolvedValue({
+        userId: "user-1",
+        identityKeyPair: {
+          publicKey: userPublicKey,
+          privateKey: userPrivateKey,
+        },
+        signedPreKeyPair: {
+          publicKey: "signed-pub",
+          privateKey: "signed-priv",
+        },
+      });
+
+      vi.mocked(api.channels.distributeSenderKey).mockResolvedValue({
+        success: true,
+      });
+
+      const channelKey = await generateChannelKey();
+      const channelKeyBase64 = await exportAesKey(channelKey);
+
+      // Call twice for same channel
+      await escrowChannelKeyToSelf("escrow-channel-4", channelKeyBase64, "user-1");
+      await escrowChannelKeyToSelf("escrow-channel-4", channelKeyBase64, "user-1");
+
+      // Should only call API once
+      expect(api.channels.distributeSenderKey).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("escrowAllChannelKeysToSelf", () => {
+    it("should escrow all channel keys from local store", async () => {
+      const { getIdentityKeys, getAllChannelKeys } = await import("../../lib/keyStore");
+      const { api } = await import("../../lib/api");
+      const { escrowAllChannelKeysToSelf } = await import("../../lib/channelCrypto");
+
+      const userKeyPair = await generateKeyPair();
+      const userPublicKey = await exportPublicKey(userKeyPair.publicKey);
+      const userPrivateKey = await exportPrivateKey(userKeyPair.privateKey);
+
+      vi.mocked(getIdentityKeys).mockResolvedValue({
+        userId: "user-1",
+        identityKeyPair: {
+          publicKey: userPublicKey,
+          privateKey: userPrivateKey,
+        },
+        signedPreKeyPair: {
+          publicKey: "signed-pub",
+          privateKey: "signed-priv",
+        },
+      });
+
+      vi.mocked(api.channels.distributeSenderKey).mockResolvedValue({
+        success: true,
+      });
+
+      // Generate real channel keys
+      const key1 = await generateChannelKey();
+      const key2 = await generateChannelKey();
+      const key1Base64 = await exportAesKey(key1);
+      const key2Base64 = await exportAesKey(key2);
+
+      vi.mocked(getAllChannelKeys).mockResolvedValue({
+        "escrow-all-channel-a": key1Base64,
+        "escrow-all-channel-b": key2Base64,
+      });
+
+      await escrowAllChannelKeysToSelf("user-1");
+
+      // Should call distributeSenderKey for each channel
+      expect(api.channels.distributeSenderKey).toHaveBeenCalledTimes(2);
+    });
+
+    it("should handle empty channel keys gracefully", async () => {
+      const { getAllChannelKeys } = await import("../../lib/keyStore");
+      const { api } = await import("../../lib/api");
+      const { escrowAllChannelKeysToSelf } = await import("../../lib/channelCrypto");
+
+      vi.mocked(getAllChannelKeys).mockResolvedValue({});
+
+      await escrowAllChannelKeysToSelf("user-1");
+
+      expect(api.channels.distributeSenderKey).not.toHaveBeenCalled();
     });
   });
 });

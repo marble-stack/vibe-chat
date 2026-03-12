@@ -117,11 +117,27 @@ export async function getIdentityPrivateKey(): Promise<CryptoKey | null> {
   return await importPrivateKey(identity.identityKeyPrivate);
 }
 
+// Channel key change listeners for backup sync
+type ChannelKeyChangeListener = () => void;
+const channelKeyChangeListeners = new Set<ChannelKeyChangeListener>();
+
+export function onChannelKeyChange(listener: ChannelKeyChangeListener): () => void {
+  channelKeyChangeListeners.add(listener);
+  return () => channelKeyChangeListeners.delete(listener);
+}
+
+function notifyChannelKeyChange(): void {
+  for (const listener of channelKeyChangeListeners) {
+    listener();
+  }
+}
+
 /**
  * Store a channel encryption key
  */
 export async function storeChannelKey(channelId: string, keyBase64: string): Promise<void> {
   await db.channelKeys.put({ channelId, keyBase64 });
+  notifyChannelKeyChange();
 }
 
 /**
@@ -196,6 +212,7 @@ export async function importAllChannelKeys(keys: Record<string, string>): Promis
   }));
   if (entries.length > 0) {
     await db.channelKeys.bulkPut(entries);
+    notifyChannelKeyChange();
   }
 }
 

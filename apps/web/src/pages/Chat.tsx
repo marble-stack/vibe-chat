@@ -13,6 +13,7 @@ import {
 } from "../lib/channelCrypto";
 import { uploadKeyBackupWithRetry } from "../lib/crypto";
 import { getChannelKey, getIdentityKeys, getAllChannelKeys, getFullIdentityKeysForBackup } from "../lib/keyStore";
+import { initKeyBackupSync, cleanupKeyBackupSync } from "../lib/keyBackupSync";
 import { logger } from "../lib/logger";
 import { Sidebar } from "../components/Sidebar";
 import { ChannelList } from "../components/ChannelList";
@@ -205,16 +206,8 @@ export function Chat() {
           bumpKeySyncVersion(channelId);
         }
 
-        // Re-upload backup with channel keys included so future logins restore them
-        const sessionPassword = useAuthStore.getState().sessionPassword;
-        if (sessionPassword && token) {
-          const fullKeys = await getFullIdentityKeysForBackup();
-          const channelKeys = await getAllChannelKeys();
-          if (fullKeys && Object.keys(channelKeys).length > 0) {
-            uploadKeyBackupWithRetry(fullKeys, sessionPassword, token, channelKeys)
-              .then(() => useAuthStore.getState().setSessionPassword(null));
-          }
-        }
+        // Backup re-upload is now handled by the keyBackupSync module
+        // which triggers automatically when channel keys change
       } catch (err) {
         logger.error("Channel key prefetch failed:", err);
       }
@@ -244,6 +237,36 @@ export function Chat() {
 
     return () => unsubscribe();
   }, [user, hasHydrated, token, bumpKeySyncVersion]);
+
+  // Initialize key backup sync: automatically re-uploads backup when channel keys change
+  useEffect(() => {
+    if (!user || !hasHydrated || !token) return;
+
+    const cleanup = initKeyBackupSync();
+    return cleanup;
+  }, [user, hasHydrated, token]);
+
+  // Trigger initial backup re-upload when sessionPassword becomes available after login
+  // This ensures channel keys restored from prefetch are included in the backup
+  const sessionPassword = useAuthStore((state) => state.sessionPassword);
+  useEffect(() => {
+    if (!sessionPassword || !token || !user) return;
+
+    const reuploadBackup = async () => {
+      try {
+        const fullKeys = await getFullIdentityKeysForBackup();
+        const channelKeys = await getAllChannelKeys();
+        if (fullKeys && Object.keys(channelKeys).length > 0) {
+          await uploadKeyBackupWithRetry(fullKeys, sessionPassword, token, channelKeys);
+          useAuthStore.getState().setSessionPassword(null);
+        }
+      } catch (err) {
+        logger.error("Backup re-upload failed:", err);
+      }
+    };
+
+    reuploadBackup();
+  }, [sessionPassword, token, user]);
 
   // Process pending key requests on login (for offline key sync)
   // When a key holder comes online, they should redistribute keys to users who requested while offline
@@ -634,9 +657,12 @@ export function Chat() {
 
     // Handle key available notification - bump keySyncVersion to trigger re-decryption in MessageList
     const handleKeyAvailable = async (msg: { payload: Record<string, unknown> }) => {
-      const { channelId } = msg.payload as { channelId: string; fromUserId: string };
+      const { channelId, fromUserId } = msg.payload as { channelId: string; fromUserId: string };
 
       if (!user) return;
+
+      // Skip self-notifications from escrow uploads to avoid redundant re-fetches
+      if (fromUserId === user.id) return;
 
       logger.debug(`Key available for channel ${channelId}, bumping keySyncVersion`);
 
