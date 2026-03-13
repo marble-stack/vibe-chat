@@ -3,17 +3,18 @@
  */
 
 import Dexie, { Table } from "dexie";
-import { IdentityKeys, KeyPairData, importPrivateKey, importAesKey } from "./crypto";
+import { IdentityKeys, KeyPairData, importPrivateKey, importAesKey, encryptMessage, decryptMessage } from "./crypto";
 
 // Stored identity keys for the local user
 interface StoredIdentity {
   id: string; // Always "local" - we only store one identity
   userId: string;
   identityKeyPublic: string;
-  identityKeyPrivate: string;
+  identityKeyPrivate: string; // May be encrypted at rest
   signedPreKeyPublic: string;
-  signedPreKeyPrivate: string;
+  signedPreKeyPrivate: string; // May be encrypted at rest
   signedPreKeySignature: string;
+  signingKeyPublic: string;
 }
 
 // Stored one-time pre-keys
@@ -35,6 +36,7 @@ interface StoredUserKey {
   userId: string;
   identityKeyPublic: string;
   signedPreKeyPublic: string;
+  signingKeyPublic?: string;
 }
 
 class KeyStoreDatabase extends Dexie {
@@ -52,24 +54,72 @@ class KeyStoreDatabase extends Dexie {
       channelKeys: "channelId",
       userKeys: "userId",
     });
+
+    // v2: Added signingKeyPublic to identity and userKeys
+    this.version(2).stores({
+      identity: "id, userId",
+      preKeys: "id, used",
+      channelKeys: "channelId",
+      userKeys: "userId",
+    });
   }
 }
 
 const db = new KeyStoreDatabase();
 
+// Local encryption key for encrypting private keys at rest in IndexedDB
+let localEncryptionKey: CryptoKey | null = null;
+
+/**
+ * Set the local encryption key (derived from password at login)
+ */
+export function setLocalEncryptionKey(key: CryptoKey): void {
+  localEncryptionKey = key;
+}
+
+/**
+ * Clear the local encryption key (on logout)
+ */
+export function clearLocalEncryptionKey(): void {
+  localEncryptionKey = null;
+}
+
+/**
+ * Encrypt a value for storage (if local encryption key is set)
+ */
+async function encryptForStorage(value: string): Promise<string> {
+  if (!localEncryptionKey) return value;
+  return await encryptMessage(value, localEncryptionKey);
+}
+
+/**
+ * Decrypt a value from storage (if local encryption key is set)
+ * Falls back to returning the value as-is if decryption fails (migration from unencrypted)
+ */
+async function decryptFromStorage(value: string): Promise<string> {
+  if (!localEncryptionKey) return value;
+  try {
+    return await decryptMessage(value, localEncryptionKey);
+  } catch {
+    // Value was stored unencrypted (pre-migration) — return as-is
+    return value;
+  }
+}
+
 /**
  * Store identity keys after registration
  */
 export async function storeIdentityKeys(userId: string, keys: IdentityKeys): Promise<void> {
-  // Store main identity
+  // Store main identity (encrypt private keys at rest)
   await db.identity.put({
     id: "local",
     userId,
     identityKeyPublic: keys.identityKeyPair.publicKey,
-    identityKeyPrivate: keys.identityKeyPair.privateKey,
+    identityKeyPrivate: await encryptForStorage(keys.identityKeyPair.privateKey),
     signedPreKeyPublic: keys.signedPreKeyPair.publicKey,
-    signedPreKeyPrivate: keys.signedPreKeyPair.privateKey,
+    signedPreKeyPrivate: await encryptForStorage(keys.signedPreKeyPair.privateKey),
     signedPreKeySignature: keys.signedPreKeySignature,
+    signingKeyPublic: keys.signingKeyPublic || "",
   });
 
   // Store pre-keys
@@ -90,6 +140,7 @@ export async function getIdentityKeys(): Promise<{
   userId: string;
   identityKeyPair: KeyPairData;
   signedPreKeyPair: KeyPairData;
+  signingKeyPublic: string;
 } | null> {
   const identity = await db.identity.get("local");
   if (!identity) return null;
@@ -98,12 +149,13 @@ export async function getIdentityKeys(): Promise<{
     userId: identity.userId,
     identityKeyPair: {
       publicKey: identity.identityKeyPublic,
-      privateKey: identity.identityKeyPrivate,
+      privateKey: await decryptFromStorage(identity.identityKeyPrivate),
     },
     signedPreKeyPair: {
       publicKey: identity.signedPreKeyPublic,
-      privateKey: identity.signedPreKeyPrivate,
+      privateKey: await decryptFromStorage(identity.signedPreKeyPrivate),
     },
+    signingKeyPublic: identity.signingKeyPublic || "",
   };
 }
 
@@ -114,7 +166,8 @@ export async function getIdentityPrivateKey(): Promise<CryptoKey | null> {
   const identity = await db.identity.get("local");
   if (!identity) return null;
 
-  return await importPrivateKey(identity.identityKeyPrivate);
+  const decryptedPrivate = await decryptFromStorage(identity.identityKeyPrivate);
+  return await importPrivateKey(decryptedPrivate);
 }
 
 // Channel key change listeners for backup sync
@@ -136,7 +189,8 @@ function notifyChannelKeyChange(): void {
  * Store a channel encryption key
  */
 export async function storeChannelKey(channelId: string, keyBase64: string): Promise<void> {
-  await db.channelKeys.put({ channelId, keyBase64 });
+  const encrypted = await encryptForStorage(keyBase64);
+  await db.channelKeys.put({ channelId, keyBase64: encrypted });
   notifyChannelKeyChange();
 }
 
@@ -147,7 +201,8 @@ export async function getChannelKey(channelId: string): Promise<CryptoKey | null
   const stored = await db.channelKeys.get(channelId);
   if (!stored) return null;
 
-  return await importAesKey(stored.keyBase64);
+  const decrypted = await decryptFromStorage(stored.keyBase64);
+  return await importAesKey(decrypted);
 }
 
 /**
@@ -164,12 +219,14 @@ export async function hasChannelKey(channelId: string): Promise<boolean> {
 export async function storeUserKey(
   userId: string,
   identityKeyPublic: string,
-  signedPreKeyPublic: string
+  signedPreKeyPublic: string,
+  signingKeyPublic?: string
 ): Promise<void> {
   await db.userKeys.put({
     userId,
     identityKeyPublic,
     signedPreKeyPublic,
+    signingKeyPublic,
   });
 }
 
@@ -197,7 +254,7 @@ export async function getAllChannelKeys(): Promise<Record<string, string>> {
   const all = await db.channelKeys.toArray();
   const result: Record<string, string> = {};
   for (const entry of all) {
-    result[entry.channelId] = entry.keyBase64;
+    result[entry.channelId] = await decryptFromStorage(entry.keyBase64);
   }
   return result;
 }
@@ -226,13 +283,14 @@ export async function getFullIdentityKeysForBackup(): Promise<IdentityKeys | nul
   return {
     identityKeyPair: {
       publicKey: identity.identityKeyPublic,
-      privateKey: identity.identityKeyPrivate,
+      privateKey: await decryptFromStorage(identity.identityKeyPrivate),
     },
     signedPreKeyPair: {
       publicKey: identity.signedPreKeyPublic,
-      privateKey: identity.signedPreKeyPrivate,
+      privateKey: await decryptFromStorage(identity.signedPreKeyPrivate),
     },
     signedPreKeySignature: identity.signedPreKeySignature,
+    signingKeyPublic: identity.signingKeyPublic || "",
     preKeyPairs: preKeys.map((pk) => ({
       keyId: parseInt(pk.id, 10),
       keyPair: { publicKey: pk.publicKey, privateKey: pk.privateKey },
@@ -276,6 +334,7 @@ export async function regenerateIdentityKeys(
         identityKeyPublic: publicBundle.identityKeyPublic,
         signedPreKeyPublic: publicBundle.signedPreKeyPublic,
         signedPreKeySignature: publicBundle.signedPreKeySignature,
+        signingKeyPublic: publicBundle.signingKeyPublic,
         preKeys: publicBundle.preKeys,
       },
       token

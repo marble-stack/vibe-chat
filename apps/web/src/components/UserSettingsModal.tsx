@@ -1,8 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
 import { isSupportedImageType, resizeImage } from "../lib/imageUtils";
+import { generateFingerprint } from "../lib/crypto";
+import { getIdentityKeys } from "../lib/keyStore";
 
 interface UserSettingsModalProps {
   onClose: () => void;
@@ -20,7 +22,18 @@ export function UserSettingsModal({ onClose }: UserSettingsModalProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [fingerprint, setFingerprint] = useState<string | null>(null);
+  const [fpCopied, setFpCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load own fingerprint
+  useEffect(() => {
+    getIdentityKeys().then((keys) => {
+      if (keys) {
+        generateFingerprint(keys.identityKeyPair.publicKey).then(setFingerprint);
+      }
+    });
+  }, []);
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -98,6 +111,15 @@ export function UserSettingsModal({ onClose }: UserSettingsModalProps) {
     }
   };
 
+  const handleCopyFingerprint = () => {
+    if (fingerprint) {
+      navigator.clipboard.writeText(fingerprint).then(() => {
+        setFpCopied(true);
+        setTimeout(() => setFpCopied(false), 2000);
+      });
+    }
+  };
+
   return createPortal(
     <div
       className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]"
@@ -171,6 +193,25 @@ export function UserSettingsModal({ onClose }: UserSettingsModalProps) {
           maxLength={50}
           className="w-full bg-background-primary border border-text-muted/30 text-text-primary placeholder:text-text-muted rounded px-4 py-3 mb-4 outline-none focus:ring-2 focus:ring-accent-primary"
         />
+
+        {/* Security Fingerprint */}
+        {fingerprint && (
+          <div className="bg-background-primary border border-text-muted/20 rounded p-3 mb-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-text-muted">Your Security Fingerprint</span>
+              <button
+                onClick={handleCopyFingerprint}
+                className="text-xs text-accent-primary hover:underline"
+              >
+                {fpCopied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <code className="text-sm text-text-secondary font-mono">{fingerprint}</code>
+            <p className="text-xs text-text-muted mt-2">
+              Share this with your contacts to verify your identity. If it matches what they see on your profile, your connection is secure.
+            </p>
+          </div>
+        )}
 
         {/* Error/Success messages */}
         {error && (

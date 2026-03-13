@@ -64,6 +64,7 @@ export const api = {
       identityKeyPublic: string;
       signedPreKeyPublic: string;
       signedPreKeySignature: string;
+      signingKeyPublic?: string;
       preKeys: { keyId: string; publicKey: string }[];
     }) =>
       request<{ user: { id: string; email: string; displayName: string; avatarUrl?: string | null }; token: string }>(
@@ -128,6 +129,7 @@ export const api = {
       request<{
         identityKey: string;
         signedPreKey: { publicKey: string; signature: string };
+        signingKeyPublic: string | null;
         preKey: { keyId: string; publicKey: string } | null;
       }>(`/auth/users/${userId}/keys`),
 
@@ -136,6 +138,7 @@ export const api = {
         identityKeyPublic: string;
         signedPreKeyPublic: string;
         signedPreKeySignature: string;
+        signingKeyPublic?: string;
         preKeys: { keyId: string; publicKey: string }[];
       },
       token: string

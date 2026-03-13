@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { decryptChannelMessage, encryptChannelMessage, isDecryptionError, tryFetchChannelKey } from "../lib/channelCrypto";
 import { wsClient } from "../lib/websocket";
 import { logger } from "../lib/logger";
+import { getUserKey } from "../lib/keyStore";
 import { DecryptionErrorMessage } from "./DecryptionErrorMessage";
 import { FileMessage } from "./FileMessage";
 import { VoiceMessage } from "./VoiceMessage";
@@ -499,6 +500,18 @@ export function MessageList() {
     userId: string;
     position: { x: number; y: number };
   } | null>(null);
+  const [profileIdentityKey, setProfileIdentityKey] = useState<string | undefined>();
+
+  // Fetch identity key when profile card opens
+  useEffect(() => {
+    if (profileCard) {
+      getUserKey(profileCard.userId).then((key) => {
+        setProfileIdentityKey(key?.identityKeyPublic);
+      });
+    } else {
+      setProfileIdentityKey(undefined);
+    }
+  }, [profileCard?.userId]);
 
   // Scroll-to-bottom button state
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -864,6 +877,7 @@ export function MessageList() {
           isOnline={onlineUserIds.includes(profileCard.userId)}
           position={profileCard.position}
           onClose={() => setProfileCard(null)}
+          identityKeyPublic={profileIdentityKey}
         />
       )}
 

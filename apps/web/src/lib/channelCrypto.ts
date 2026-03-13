@@ -18,6 +18,7 @@ import {
   encryptChannelKeyForRecipient,
   decryptChannelKey,
   importPrivateKey,
+  verifySignedPreKey,
 } from "./crypto";
 import { startTimer, endTimer } from "./perfLogger";
 import {
@@ -337,7 +338,21 @@ export async function distributeChannelKey(
   const results = await Promise.allSettled(
     freshMembers.map(async (member) => {
       const userKeys = await api.auth.getUserKeys(member.id);
-      await storeUserKey(member.id, userKeys.identityKey, userKeys.signedPreKey.publicKey);
+
+      // Verify signed prekey signature if signing key is available
+      if (userKeys.signingKeyPublic) {
+        const isValid = await verifySignedPreKey(
+          userKeys.signedPreKey.publicKey,
+          userKeys.signedPreKey.signature,
+          userKeys.signingKeyPublic
+        );
+        if (!isValid) {
+          logger.warn(`Signed prekey verification FAILED for user ${member.id} — skipping key distribution to this member`);
+          throw new Error(`Key verification failed for user ${member.id}`);
+        }
+      }
+
+      await storeUserKey(member.id, userKeys.identityKey, userKeys.signedPreKey.publicKey, userKeys.signingKeyPublic ?? undefined);
 
       const encryptedKey = await encryptChannelKeyForRecipient(
         channelKey,

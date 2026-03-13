@@ -41,6 +41,8 @@ export const useAuthStore = create<AuthState>()(
       setAuth: (user, token) => set({ user, token }),
       logout: () => {
         set({ user: null, token: null, keyBackupStatus: "pending" as KeyBackupStatus, lastBackupAt: null, sessionPassword: null });
+        // Clear local encryption key from memory
+        import("../lib/keyStore").then(({ clearLocalEncryptionKey }) => clearLocalEncryptionKey());
         // Clear saved last-channel so the next user doesn't inherit it
         try { localStorage.removeItem("vibe-chat-last-channel"); } catch { /* ignore */ }
         // Clear chat store so next user doesn't see previous user's communities/messages

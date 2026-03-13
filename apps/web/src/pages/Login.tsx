@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
-import { generateIdentityKeys, decryptKeyBackup, uploadKeyBackupWithRetry } from "../lib/crypto";
-import { storeIdentityKeys, clearAllKeys, getIdentityKeys, importAllChannelKeys } from "../lib/keyStore";
+import { generateIdentityKeys, decryptKeyBackup, uploadKeyBackupWithRetry, deriveLocalStorageKey } from "../lib/crypto";
+import { storeIdentityKeys, clearAllKeys, getIdentityKeys, importAllChannelKeys, setLocalEncryptionKey } from "../lib/keyStore";
 import { escrowAllChannelKeysToSelf } from "../lib/channelCrypto";
 
 export function Login() {
@@ -28,6 +28,10 @@ export function Login() {
     try {
       const { user, token, hasKeyBackup } = await api.auth.login(email, password);
       const { setKeyBackupStatus, setLastBackupAt } = useAuthStore.getState();
+
+      // Derive local encryption key from password for IndexedDB encryption at rest
+      const localKey = await deriveLocalStorageKey(password);
+      setLocalEncryptionKey(localKey);
 
       // Check if we already have identity keys for this user
       const existingKeys = await getIdentityKeys();
@@ -116,6 +120,10 @@ export function Login() {
     const { setKeyBackupStatus } = useAuthStore.getState();
 
     try {
+      // Ensure local encryption key is set for IndexedDB encryption
+      const localKey = await deriveLocalStorageKey(password);
+      setLocalEncryptionKey(localKey);
+
       const { encryptedKeyBackup, salt } = await api.auth.getKeyBackup(token);
       if (encryptedKeyBackup && salt) {
         const restored = await decryptKeyBackup(encryptedKeyBackup, password, salt);
@@ -154,6 +162,10 @@ export function Login() {
     const { setKeyBackupStatus } = useAuthStore.getState();
 
     try {
+      // Ensure local encryption key is set for IndexedDB encryption
+      const localKey = await deriveLocalStorageKey(password);
+      setLocalEncryptionKey(localKey);
+
       await clearAllKeys();
       const { keys, publicBundle } = await generateIdentityKeys();
       await api.auth.updateKeys(publicBundle, token);

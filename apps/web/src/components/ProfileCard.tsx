@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { generateFingerprint } from "../lib/crypto";
 
 interface ProfileCardProps {
   displayName: string;
@@ -6,10 +7,13 @@ interface ProfileCardProps {
   isOnline: boolean;
   position: { x: number; y: number };
   onClose: () => void;
+  identityKeyPublic?: string;
 }
 
-export function ProfileCard({ displayName, avatarUrl, isOnline, position, onClose }: ProfileCardProps) {
+export function ProfileCard({ displayName, avatarUrl, isOnline, position, onClose, identityKeyPublic }: ProfileCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const [fingerprint, setFingerprint] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Adjust position to stay within viewport
   useEffect(() => {
@@ -23,6 +27,22 @@ export function ProfileCard({ displayName, avatarUrl, isOnline, position, onClos
       card.style.top = `${window.innerHeight - rect.height - 8}px`;
     }
   }, []);
+
+  // Generate fingerprint from identity key
+  useEffect(() => {
+    if (identityKeyPublic) {
+      generateFingerprint(identityKeyPublic).then(setFingerprint).catch(() => {});
+    }
+  }, [identityKeyPublic]);
+
+  const handleCopyFingerprint = () => {
+    if (fingerprint) {
+      navigator.clipboard.writeText(fingerprint).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    }
+  };
 
   return (
     <>
@@ -68,6 +88,24 @@ export function ProfileCard({ displayName, avatarUrl, isOnline, position, onClos
               {isOnline ? "Online" : "Offline"}
             </span>
           </div>
+
+          {/* Key Fingerprint */}
+          {fingerprint && (
+            <div className="mt-3 pt-3 border-t border-background-tertiary">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-text-muted font-medium">Key Fingerprint</span>
+                <button
+                  onClick={handleCopyFingerprint}
+                  className="text-xs text-accent-primary hover:underline"
+                >
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <code className="text-xs text-text-secondary font-mono break-all">
+                {fingerprint}
+              </code>
+            </div>
+          )}
         </div>
       </div>
     </>
