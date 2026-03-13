@@ -98,6 +98,7 @@ describe("Auth Routes - Prekey Security", () => {
       identityKeyPublic: "identity-key-public-base64",
       signedPreKeyPublic: "signed-prekey-public-base64",
       signedPreKeySignature: "signature-base64",
+      signingKeyPublic: "signing-key-public-base64",
       createdAt: new Date(),
     };
 
@@ -154,6 +155,7 @@ describe("Auth Routes - Prekey Security", () => {
       expect(body).toHaveProperty("identityKey", mockUser.identityKeyPublic);
       expect(body).toHaveProperty("signedPreKey");
       expect(body.signedPreKey).toHaveProperty("publicKey", mockUser.signedPreKeyPublic);
+      expect(body).toHaveProperty("signingKeyPublic", mockUser.signingKeyPublic);
       expect(body).toHaveProperty("preKey");
       expect(body.preKey).toHaveProperty("keyId", mockPreKey.keyId);
     });
@@ -313,6 +315,7 @@ describe("Auth Routes - Registration", () => {
       identityKeyPublic: "identity-key-base64",
       signedPreKeyPublic: "signed-prekey-base64",
       signedPreKeySignature: "signature-base64",
+      signingKeyPublic: "signing-key-base64",
       preKeys: [
         { keyId: "key-1", publicKey: "prekey-1-public" },
         { keyId: "key-2", publicKey: "prekey-2-public" },
@@ -616,6 +619,7 @@ describe("Auth Routes - Update Keys", () => {
       identityKeyPublic: "new-identity-key",
       signedPreKeyPublic: "new-signed-prekey",
       signedPreKeySignature: "new-signature",
+      signingKeyPublic: "new-signing-key",
       preKeys: [
         { keyId: "new-key-1", publicKey: "new-prekey-1" },
         { keyId: "new-key-2", publicKey: "new-prekey-2" },
