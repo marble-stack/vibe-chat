@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useChatStore } from "../stores/chat";
 import { ProfileCard } from "./ProfileCard";
+import { getUserKey } from "../lib/keyStore";
 
 export function MemberList() {
   const { members, activeCommunityId, onlineUsers } = useChatStore();
@@ -8,8 +9,20 @@ export function MemberList() {
     userId: string;
     position: { x: number; y: number };
   } | null>(null);
+  const [profileIdentityKey, setProfileIdentityKey] = useState<string | undefined>();
   const communityMembers = activeCommunityId ? members[activeCommunityId] || [] : [];
   const onlineUserIds = activeCommunityId ? onlineUsers[activeCommunityId] || [] : [];
+
+  // Fetch identity key when profile card opens
+  useEffect(() => {
+    if (profileCard) {
+      getUserKey(profileCard.userId).then((key) => {
+        setProfileIdentityKey(key?.identityKeyPublic);
+      });
+    } else {
+      setProfileIdentityKey(undefined);
+    }
+  }, [profileCard?.userId]);
 
   // Sort members: online first, then alphabetically
   const sortedMembers = [...communityMembers].sort((a, b) => {
@@ -78,6 +91,7 @@ export function MemberList() {
           isOnline={onlineUserIds.includes(profileCard.userId)}
           position={profileCard.position}
           onClose={() => setProfileCard(null)}
+          identityKeyPublic={profileIdentityKey}
         />
       )}
       <div className="p-4">

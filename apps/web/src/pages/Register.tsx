@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../stores/auth";
 import { api } from "../lib/api";
-import { generateIdentityKeys, uploadKeyBackupWithRetry } from "../lib/crypto";
-import { storeIdentityKeys } from "../lib/keyStore";
+import { generateIdentityKeys, uploadKeyBackupWithRetry, deriveLocalStorageKey } from "../lib/crypto";
+import { storeIdentityKeys, setLocalEncryptionKey } from "../lib/keyStore";
 
 export function Register() {
   const [email, setEmail] = useState("");
@@ -46,7 +46,12 @@ export function Register() {
         ...publicBundle,
       });
 
-      // Store private keys locally in IndexedDB
+      // Derive local encryption key for IndexedDB encryption at rest
+      setLoadingStatus("Securing keys...");
+      const localKey = await deriveLocalStorageKey(password);
+      setLocalEncryptionKey(localKey);
+
+      // Store private keys locally in IndexedDB (encrypted at rest)
       setLoadingStatus("Storing keys...");
       await storeIdentityKeys(user.id, keys);
 

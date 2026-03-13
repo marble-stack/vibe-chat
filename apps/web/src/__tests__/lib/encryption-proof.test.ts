@@ -27,6 +27,9 @@ import {
   decryptChannelKey,
   arrayBufferToBase64,
   base64ToArrayBuffer,
+  generateIdentityKeys,
+  verifySignedPreKey,
+  generateFingerprint,
 } from "../../lib/crypto.js";
 
 /**
@@ -343,5 +346,99 @@ describe("Proof: Tampered messages are detected and rejected", () => {
     const truncatedBase64 = arrayBufferToBase64(truncated.buffer);
 
     await expect(decryptMessage(truncatedBase64, key)).rejects.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PROOF 6: Signed prekey signatures are verified
+// ---------------------------------------------------------------------------
+describe("Proof: Signed prekey signatures prevent key substitution attacks", () => {
+  it("verifySignedPreKey returns true for a valid signature", async () => {
+    const { keys, publicBundle } = await generateIdentityKeys();
+
+    const isValid = await verifySignedPreKey(
+      publicBundle.signedPreKeyPublic,
+      publicBundle.signedPreKeySignature,
+      publicBundle.signingKeyPublic
+    );
+
+    expect(isValid).toBe(true);
+  });
+
+  it("verifySignedPreKey returns false for a tampered prekey", async () => {
+    const { publicBundle } = await generateIdentityKeys();
+
+    // Generate a different key pair and use its public key as the "tampered" prekey
+    const fakeKeyPair = await generateKeyPair();
+    const fakePreKeyPublic = await exportPublicKey(fakeKeyPair.publicKey);
+
+    const isValid = await verifySignedPreKey(
+      fakePreKeyPublic,
+      publicBundle.signedPreKeySignature,
+      publicBundle.signingKeyPublic
+    );
+
+    expect(isValid).toBe(false);
+  });
+
+  it("verifySignedPreKey returns false for a wrong signing key", async () => {
+    const { publicBundle } = await generateIdentityKeys();
+    const { publicBundle: otherBundle } = await generateIdentityKeys();
+
+    // Use the correct prekey and signature but a different user's signing key
+    const isValid = await verifySignedPreKey(
+      publicBundle.signedPreKeyPublic,
+      publicBundle.signedPreKeySignature,
+      otherBundle.signingKeyPublic
+    );
+
+    expect(isValid).toBe(false);
+  });
+
+  it("generateIdentityKeys includes a signing public key in the output", async () => {
+    const { keys, publicBundle } = await generateIdentityKeys();
+
+    // Both the private keys and public bundle should include the signing key
+    expect(keys.signingKeyPublic).toBeDefined();
+    expect(keys.signingKeyPublic.length).toBeGreaterThan(0);
+    expect(publicBundle.signingKeyPublic).toBeDefined();
+    expect(publicBundle.signingKeyPublic).toBe(keys.signingKeyPublic);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PROOF 7: Key fingerprints allow out-of-band identity verification
+// ---------------------------------------------------------------------------
+describe("Proof: Key fingerprints allow users to verify identities", () => {
+  it("generates a consistent fingerprint for the same key", async () => {
+    const keyPair = await generateKeyPair();
+    const publicKeyBase64 = await exportPublicKey(keyPair.publicKey);
+
+    const fp1 = await generateFingerprint(publicKeyBase64);
+    const fp2 = await generateFingerprint(publicKeyBase64);
+
+    expect(fp1).toBe(fp2);
+  });
+
+  it("generates different fingerprints for different keys", async () => {
+    const key1 = await generateKeyPair();
+    const key2 = await generateKeyPair();
+
+    const fp1 = await generateFingerprint(await exportPublicKey(key1.publicKey));
+    const fp2 = await generateFingerprint(await exportPublicKey(key2.publicKey));
+
+    expect(fp1).not.toBe(fp2);
+  });
+
+  it("fingerprint format is 8 groups of 4 hex characters", async () => {
+    const keyPair = await generateKeyPair();
+    const fp = await generateFingerprint(await exportPublicKey(keyPair.publicKey));
+
+    // Should be "xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx"
+    const groups = fp.split(" ");
+    expect(groups).toHaveLength(8);
+    for (const group of groups) {
+      expect(group).toMatch(/^[0-9a-f]{4}$/);
+    }
   });
 });

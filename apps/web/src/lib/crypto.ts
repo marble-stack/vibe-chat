@@ -34,6 +34,7 @@ export interface IdentityKeys {
   identityKeyPair: KeyPairData;
   signedPreKeyPair: KeyPairData;
   signedPreKeySignature: string;
+  signingKeyPublic: string;
   preKeyPairs: Array<{ keyId: number; keyPair: KeyPairData }>;
 }
 
@@ -192,6 +193,63 @@ export async function signData(data: ArrayBuffer, privateKey: CryptoKey): Promis
 }
 
 /**
+ * Export an ECDSA signing public key to base64
+ */
+export async function exportSigningPublicKey(publicKey: CryptoKey): Promise<string> {
+  const exported = await crypto.subtle.exportKey("spki", publicKey);
+  return arrayBufferToBase64(exported);
+}
+
+/**
+ * Import an ECDSA signing public key from base64
+ */
+export async function importSigningPublicKey(publicKeyBase64: string): Promise<CryptoKey> {
+  const keyData = base64ToArrayBuffer(publicKeyBase64);
+  return await crypto.subtle.importKey(
+    "spki",
+    keyData,
+    { name: "ECDSA", namedCurve: "P-256" },
+    true,
+    ["verify"]
+  );
+}
+
+/**
+ * Verify a signed pre-key signature using the signing public key
+ */
+export async function verifySignedPreKey(
+  signedPreKeyPublicBase64: string,
+  signatureBase64: string,
+  signingPublicKeyBase64: string
+): Promise<boolean> {
+  const signingPublicKey = await importSigningPublicKey(signingPublicKeyBase64);
+  const preKeyData = base64ToArrayBuffer(signedPreKeyPublicBase64);
+  const signature = base64ToArrayBuffer(signatureBase64);
+
+  return await crypto.subtle.verify(
+    { name: "ECDSA", hash: "SHA-256" },
+    signingPublicKey,
+    signature,
+    preKeyData
+  );
+}
+
+/**
+ * Generate a fingerprint from an identity public key for out-of-band verification
+ * Returns 8 groups of 4 hex chars (e.g., "a1b2 c3d4 e5f6 7890 ...")
+ */
+export async function generateFingerprint(identityKeyPublicBase64: string): Promise<string> {
+  const keyData = base64ToArrayBuffer(identityKeyPublicBase64);
+  const hash = await crypto.subtle.digest("SHA-256", keyData);
+  const bytes = new Uint8Array(hash);
+  // Take first 16 bytes (32 hex chars) and format as 8 groups of 4
+  const hex = Array.from(bytes.slice(0, 16))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return hex.match(/.{4}/g)!.join(" ");
+}
+
+/**
  * Generate all identity keys for a new user
  */
 export async function generateIdentityKeys(): Promise<{
@@ -200,6 +258,7 @@ export async function generateIdentityKeys(): Promise<{
     identityKeyPublic: string;
     signedPreKeyPublic: string;
     signedPreKeySignature: string;
+    signingKeyPublic: string;
     preKeys: Array<{ keyId: string; publicKey: string }>;
   };
 }> {
@@ -217,6 +276,7 @@ export async function generateIdentityKeys(): Promise<{
   const signingKeyPair = await generateSigningKeyPair();
   const preKeyData = base64ToArrayBuffer(signedPreKeyPublic);
   const signature = await signData(preKeyData, signingKeyPair.privateKey);
+  const signingPublicKeyBase64 = await exportSigningPublicKey(signingKeyPair.publicKey);
 
   // Generate one-time pre-keys
   const preKeyPairs: Array<{ keyId: number; keyPair: KeyPairData }> = [];
@@ -243,12 +303,14 @@ export async function generateIdentityKeys(): Promise<{
       identityKeyPair: { publicKey: identityPublic, privateKey: identityPrivate },
       signedPreKeyPair: { publicKey: signedPreKeyPublic, privateKey: signedPreKeyPrivate },
       signedPreKeySignature: signature,
+      signingKeyPublic: signingPublicKeyBase64,
       preKeyPairs,
     },
     publicBundle: {
       identityKeyPublic: identityPublic,
       signedPreKeyPublic: signedPreKeyPublic,
       signedPreKeySignature: signature,
+      signingKeyPublic: signingPublicKeyBase64,
       preKeys: preKeysPublic,
     },
   };
@@ -374,6 +436,37 @@ export async function uploadKeyBackupWithRetry(
     }
   }
   return false;
+}
+
+/**
+ * Derive a local storage encryption key from the user's password.
+ * Used to encrypt private keys in IndexedDB at rest.
+ */
+export async function deriveLocalStorageKey(password: string): Promise<CryptoKey> {
+  // Fixed app-specific salt for local storage encryption (different from backup salt)
+  const saltString = "vibe-chat-local-storage-key-v1";
+  const salt = new TextEncoder().encode(saltString);
+
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  return await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: 600000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
 }
 
 /**

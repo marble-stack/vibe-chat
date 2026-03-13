@@ -13,6 +13,7 @@ const registerSchema = z.object({
   identityKeyPublic: z.string(),
   signedPreKeyPublic: z.string(),
   signedPreKeySignature: z.string(),
+  signingKeyPublic: z.string().optional(),
   preKeys: z.array(
     z.object({
       keyId: z.string(),
@@ -50,6 +51,7 @@ const updateKeysSchema = z.object({
   identityKeyPublic: z.string(),
   signedPreKeyPublic: z.string(),
   signedPreKeySignature: z.string(),
+  signingKeyPublic: z.string().optional(),
   preKeys: z.array(
     z.object({
       keyId: z.string(),
@@ -85,6 +87,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         identityKeyPublic: body.identityKeyPublic,
         signedPreKeyPublic: body.signedPreKeyPublic,
         signedPreKeySignature: body.signedPreKeySignature,
+        signingKeyPublic: body.signingKeyPublic,
       })
       .returning();
 
@@ -289,6 +292,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         identityKeyPublic: body.identityKeyPublic,
         signedPreKeyPublic: body.signedPreKeyPublic,
         signedPreKeySignature: body.signedPreKeySignature,
+        signingKeyPublic: body.signingKeyPublic,
       })
       .where(eq(users.id, request.user.userId));
 
@@ -386,6 +390,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         publicKey: user.signedPreKeyPublic,
         signature: user.signedPreKeySignature,
       },
+      signingKeyPublic: user.signingKeyPublic,
       preKey: preKey
         ? {
             keyId: preKey.keyId,
