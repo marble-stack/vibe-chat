@@ -3,12 +3,11 @@ import { z } from "zod";
 import { db, communities, communityMembers, channels, users, messages } from "../db/index.js";
 import { eq, and, gte, sql, count } from "drizzle-orm";
 import { randomBytes } from "crypto";
-import { isUserInCommunity } from "../lib/authorization.js";
+import { isUserInCommunity, isCommunityOwner } from "../lib/authorization.js";
 import { sendToCommunity } from "../websocket/connectionMaps.js";
 
 const createCommunitySchema = z.object({
   name: z.string().min(1).max(100),
-  userId: z.string().uuid(),
   iconUrl: z.string().optional(),
 });
 
@@ -19,7 +18,6 @@ const updateCommunitySchema = z.object({
 
 const joinCommunitySchema = z.object({
   inviteCode: z.string(),
-  userId: z.string().uuid(),
 });
 
 export const communityRoutes: FastifyPluginAsync = async (fastify) => {
@@ -99,8 +97,13 @@ export const communityRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Create community
-  fastify.post("/", async (request, _reply) => {
+  fastify.post("/", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
     const body = createCommunitySchema.parse(request.body);
+    const userId = request.user.userId;
 
     const inviteCode = randomBytes(8).toString("hex");
 
@@ -110,14 +113,14 @@ export const communityRoutes: FastifyPluginAsync = async (fastify) => {
         name: body.name,
         iconUrl: body.iconUrl || null,
         inviteCode,
-        createdBy: body.userId,
+        createdBy: userId,
       })
       .returning();
 
     // Add creator as member
     await db.insert(communityMembers).values({
       communityId: community.id,
-      userId: body.userId,
+      userId,
     });
 
     // Create default #general channel
@@ -209,7 +212,12 @@ export const communityRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Join community via invite code
   fastify.post("/join", async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
     const body = joinCommunitySchema.parse(request.body);
+    const userId = request.user.userId;
 
     const community = await db.query.communities.findFirst({
       where: eq(communities.inviteCode, body.inviteCode),
@@ -223,7 +231,7 @@ export const communityRoutes: FastifyPluginAsync = async (fastify) => {
     const existing = await db.query.communityMembers.findFirst({
       where: and(
         eq(communityMembers.communityId, community.id),
-        eq(communityMembers.userId, body.userId)
+        eq(communityMembers.userId, userId)
       ),
     });
 
@@ -233,12 +241,12 @@ export const communityRoutes: FastifyPluginAsync = async (fastify) => {
 
     await db.insert(communityMembers).values({
       communityId: community.id,
-      userId: body.userId,
+      userId,
     });
 
     // Get user info to include in the notification
     const user = await db.query.users.findFirst({
-      where: eq(users.id, body.userId),
+      where: eq(users.id, userId),
       columns: { id: true, displayName: true, avatarUrl: true },
     });
 
@@ -269,9 +277,10 @@ export const communityRoutes: FastifyPluginAsync = async (fastify) => {
     const { communityId } = request.params as { communityId: string };
     const body = updateCommunitySchema.parse(request.body);
 
-    const isMember = await isUserInCommunity(request.user.userId, communityId);
-    if (!isMember) {
-      return reply.status(403).send({ error: "Not a member of this community" });
+    // Authorization: only the community owner can modify the community
+    const isOwner = await isCommunityOwner(request.user.userId, communityId);
+    if (!isOwner) {
+      return reply.status(403).send({ error: "Only the community owner can do this" });
     }
 
     const updates: Record<string, unknown> = {};

@@ -1,4 +1,4 @@
-import { db, communityMembers, channels } from "../db/index.js";
+import { db, communityMembers, channels, communities } from "../db/index.js";
 import { eq, and } from "drizzle-orm";
 
 /**
@@ -27,6 +27,35 @@ export async function canUserAccessChannel(userId: string, channelId: string): P
 
   // Then check if user is member of that community
   return isUserInCommunity(userId, channel.communityId);
+}
+
+/**
+ * Check if a user is the owner (creator) of a community
+ */
+export async function isCommunityOwner(userId: string, communityId: string): Promise<boolean> {
+  const community = await db.query.communities.findFirst({
+    where: eq(communities.id, communityId),
+  });
+
+  return community?.createdBy === userId;
+}
+
+/**
+ * Check if a user is the owner (creator) of the community a channel belongs to
+ */
+export async function isChannelCommunityOwner(
+  userId: string,
+  channelId: string
+): Promise<boolean> {
+  const channel = await db.query.channels.findFirst({
+    where: eq(channels.id, channelId),
+  });
+
+  if (!channel) {
+    return false;
+  }
+
+  return isCommunityOwner(userId, channel.communityId);
 }
 
 /**

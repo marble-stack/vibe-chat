@@ -198,7 +198,7 @@ export const api = {
   },
 
   communities: {
-    create: (data: { name: string; userId: string; iconUrl?: string }) =>
+    create: (data: { name: string; iconUrl?: string }) =>
       request<{ community: { id: string; name: string; iconUrl?: string; inviteCode: string } }>("/communities", {
         method: "POST",
         body: JSON.stringify(data),
@@ -225,12 +225,12 @@ export const api = {
         members: { id: string; displayName: string; avatarUrl?: string }[];
       }>(`/communities/${communityId}`),
 
-    join: (inviteCode: string, userId: string) =>
+    join: (inviteCode: string) =>
       request<{ community: { id: string; name: string; iconUrl?: string; inviteCode: string } }>(
         "/communities/join",
         {
           method: "POST",
-          body: JSON.stringify({ inviteCode, userId }),
+          body: JSON.stringify({ inviteCode }),
         }
       ),
 

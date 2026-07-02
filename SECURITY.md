@@ -43,23 +43,33 @@ Please be aware of these current security limitations:
 
 2. **No Key Rotation**: When a member leaves a channel, channel keys are not currently rotated. This means departed members could theoretically decrypt future messages if they obtained the ciphertext.
 
-3. **No Key Verification**: There is no mechanism to verify user identity or detect man-in-the-middle attacks on key exchange.
+3. **No Key Verification (MITM)**: There is no enforced mechanism to verify user identity out-of-band. Identity public keys are fetched from the server and trusted on first use (TOFU); a malicious server could substitute its own keys to intercept channel-key distribution. Key fingerprints are displayed but not enforced.
 
-4. **Simplified Authentication**: The current authentication system is simplified and does not include password verification. This should be enhanced before production use with sensitive data.
+4. **Backup Key Derived From Account Password**: The client-side encrypted key backup is unlocked with the user's account password, which is also sent to the server for authentication. A compromised server that captures the login password could re-derive the backup key and decrypt the stored private/channel keys. Decoupling the backup passphrase from the login credential is required for a stronger threat model.
 
 5. **No Forward Secrecy**: The current implementation does not provide forward secrecy. Compromise of long-term keys could allow decryption of past messages.
+
+> Items 3 and 4 are known, deferred cryptographic-protocol limitations. Fixing them requires a breaking protocol change plus migration and is tracked separately from the access-control hardening described below.
+
+### Implemented Authentication & Access Control
+
+- Passwords are hashed with **bcrypt (cost 12)** and verified on login (`apps/server/src/lib/auth.ts`).
+- **JWT** auth (HS256, algorithm pinned on verification) is required on protected REST endpoints and WebSocket connections.
+- **Authorization** is enforced per route: community membership for read/post access; **community-owner-only** for destructive actions (rename/delete channel, update community). Reaction add/remove enforce channel membership and creator-ownership over both REST and WebSocket.
+- The key-bundle endpoint (which consumes one-time prekeys) requires authentication to prevent anonymous prekey exhaustion and identity harvesting.
+- **Rate limiting**: global 300 req/min per IP, with stricter 10/min limits on credential endpoints (login/register/forgot-password/reset-password).
+- **Security headers** via `@fastify/helmet`; a global error handler returns generic 400/500 responses instead of leaking internals.
 
 ### Recommended Production Hardening
 
 Before deploying in a production environment with sensitive data:
 
-1. Implement proper authentication with secure password hashing (bcrypt/argon2)
-2. Add authorization checks for channel/community access
+1. Decouple the key-backup passphrase from the account password (item 4 above)
+2. Add key-verification / safety-number enforcement to defeat MITM (item 3 above)
 3. Implement key rotation when members leave
-4. Add rate limiting to prevent abuse
-5. Enable HTTPS/WSS for all connections
-6. Implement audit logging
-7. Regular security audits of cryptographic code
+4. Enable HTTPS/WSS for all connections
+5. Implement audit logging
+6. Regular security audits of cryptographic code
 
 ## Supported Versions
 

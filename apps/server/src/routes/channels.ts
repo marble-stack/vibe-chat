@@ -2,7 +2,11 @@ import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { db, channels, senderKeys, pendingKeyRequests, communityMembers, users, messages, fileAttachments } from "../db/index.js";
 import { eq, and, sql, inArray } from "drizzle-orm";
-import { canUserAccessChannel, isUserInCommunity } from "../lib/authorization.js";
+import {
+  canUserAccessChannel,
+  isUserInCommunity,
+  isChannelCommunityOwner,
+} from "../lib/authorization.js";
 import { sendToUser } from "../websocket/connectionMaps.js";
 
 const createChannelSchema = z.object({
@@ -104,9 +108,10 @@ export const channelRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: "Channel not found" });
     }
 
-    const canAccess = await canUserAccessChannel(request.user.userId, channelId);
-    if (!canAccess) {
-      return reply.status(403).send({ error: "Not a member of this channel's community" });
+    // Authorization: only the community owner can rename channels
+    const isOwner = await isChannelCommunityOwner(request.user.userId, channelId);
+    if (!isOwner) {
+      return reply.status(403).send({ error: "Only the community owner can do this" });
     }
 
     const [updated] = await db
@@ -134,9 +139,10 @@ export const channelRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: "Channel not found" });
     }
 
-    const canAccess = await canUserAccessChannel(request.user.userId, channelId);
-    if (!canAccess) {
-      return reply.status(403).send({ error: "Not a member of this channel's community" });
+    // Authorization: only the community owner can delete channels
+    const isOwner = await isChannelCommunityOwner(request.user.userId, channelId);
+    if (!isOwner) {
+      return reply.status(403).send({ error: "Only the community owner can do this" });
     }
 
     // Delete related data first

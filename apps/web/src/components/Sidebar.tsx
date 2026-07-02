@@ -104,7 +104,6 @@ export function Sidebar() {
 
       const { community } = await api.communities.create({
         name: newName.trim(),
-        userId: user.id,
         iconUrl,
       });
 
@@ -122,7 +121,7 @@ export function Sidebar() {
     if (!user || !inviteCode.trim()) return;
 
     try {
-      const { community } = await api.communities.join(inviteCode.trim(), user.id);
+      const { community } = await api.communities.join(inviteCode.trim());
       addCommunity(community);
       setInviteCode("");
       closeJoinModal();
