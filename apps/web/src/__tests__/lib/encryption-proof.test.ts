@@ -354,7 +354,7 @@ describe("Proof: Tampered messages are detected and rejected", () => {
 // ---------------------------------------------------------------------------
 describe("Proof: Signed prekey signatures prevent key substitution attacks", () => {
   it("verifySignedPreKey returns true for a valid signature", async () => {
-    const { keys, publicBundle } = await generateIdentityKeys();
+    const { publicBundle } = await generateIdentityKeys();
 
     const isValid = await verifySignedPreKey(
       publicBundle.signedPreKeyPublic,

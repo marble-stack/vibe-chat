@@ -160,7 +160,7 @@ export async function ensureChannelKey(
           redistributionRequestStart.delete(channelId);
 
           return { key: channelKey, isNew: false };
-        } catch (err) {
+        } catch {
           // This key didn't work, try the next one
           logger.debug(`Sender key from ${senderKey.userId} failed to decrypt, trying next`);
           continue;
@@ -592,7 +592,7 @@ export async function tryFetchChannelKey(
 
           logger.debug(`Successfully fetched channel key for ${channelId}`);
           return true;
-        } catch (err) {
+        } catch {
           // This sender key didn't work, try next one
           logger.debug(`Sender key from ${senderKey.userId} failed in tryFetchChannelKey, trying next`);
           continue;
