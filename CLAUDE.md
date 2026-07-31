@@ -192,21 +192,25 @@ Copy `apps/web/.env.example` to `apps/web/.env` if you need to override default 
 - REST API payloads validated with Zod
 - UUID format validation on all ID parameters
 
-**Rate Limiting:** API endpoints are rate-limited (100 requests/minute per IP).
+**Rate Limiting:** API endpoints are rate-limited (300 requests/minute per IP globally; 10/minute on credential endpoints — login, register, forgot/reset password).
+
+**Security Headers:** Applied via `@fastify/helmet`. A global error handler returns generic 400/500 responses (invalid input → 400, unexpected → 500) instead of leaking internals.
 
 ### Security Improvements Needed for Production
 
 **Authentication:**
 
-- Proper password hashing (bcrypt/argon2) - currently simplified
-- OAuth integration for social login
-- Session management and refresh tokens
+- Password hashing uses bcrypt (cost 12) with verification on login — implemented
+- JWT verification pins the HS256 algorithm; tokens are still non-revocable with a 7-day expiry
+- OAuth integration for social login — not yet
+- Session management and refresh tokens — not yet
 
-**Encryption:**
+**Encryption (deferred protocol-level limitations):**
 
+- **Backup key == account password**: the client-side encrypted key backup is unlocked by the account password, which is also sent to the server for auth. A compromised server could re-derive the backup key. Decoupling requires a breaking protocol change + migration.
+- **TOFU identity keys / MITM**: identity keys are fetched from the server and trusted on first use; no enforced out-of-band verification. Fingerprints are displayed but not enforced.
 - Key rotation on member leave not yet implemented
 - No forward secrecy - key compromise could expose past messages
-- No key verification mechanism for MITM detection
 
 ## Deployment Environments
 

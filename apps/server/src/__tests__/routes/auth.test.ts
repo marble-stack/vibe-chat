@@ -90,6 +90,7 @@ describe("Auth Routes - Prekey Security", () => {
   });
 
   describe("GET /api/auth/users/:userId/keys", () => {
+    const authToken = generateToken({ userId: testUserId, email: "test@example.com" });
     const mockUser = {
       id: testUserId,
       email: "test@example.com",
@@ -116,10 +117,29 @@ describe("Auth Routes - Prekey Security", () => {
       const response = await app.inject({
         method: "GET",
         url: `/api/auth/users/${testUserId}/keys`,
+        headers: { authorization: authHeader(authToken) },
       });
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toHaveProperty("error", "User not found");
+    });
+
+    it("should reject unauthenticated requests with 401 and not consume a prekey", async () => {
+      let transactionCalled = false;
+      (mockDb.transaction as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+        transactionCalled = true;
+        return null;
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/auth/users/${testUserId}/keys`,
+      });
+
+      expect(response.statusCode).toBe(401);
+      // The prekey-consuming transaction must never run for anonymous callers.
+      expect(transactionCalled).toBe(false);
+      expect(mockDb.query.users.findFirst).not.toHaveBeenCalled();
     });
 
     it("should return key bundle with prekey if available", async () => {
@@ -148,6 +168,7 @@ describe("Auth Routes - Prekey Security", () => {
       const response = await app.inject({
         method: "GET",
         url: `/api/auth/users/${testUserId}/keys`,
+        headers: { authorization: authHeader(authToken) },
       });
 
       expect(response.statusCode).toBe(200);
@@ -186,6 +207,7 @@ describe("Auth Routes - Prekey Security", () => {
       const response = await app.inject({
         method: "GET",
         url: `/api/auth/users/${testUserId}/keys`,
+        headers: { authorization: authHeader(authToken) },
       });
 
       expect(response.statusCode).toBe(200);
@@ -229,6 +251,7 @@ describe("Auth Routes - Prekey Security", () => {
       await app.inject({
         method: "GET",
         url: `/api/auth/users/${testUserId}/keys`,
+        headers: { authorization: authHeader(authToken) },
       });
 
       expect(transactionCalled).toBe(true);
@@ -269,6 +292,7 @@ describe("Auth Routes - Prekey Security", () => {
       await app.inject({
         method: "GET",
         url: `/api/auth/users/${testUserId}/keys`,
+        headers: { authorization: authHeader(authToken) },
       });
 
       // Verify only one prekey selected and deleted

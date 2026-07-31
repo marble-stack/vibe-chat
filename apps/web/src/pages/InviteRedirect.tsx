@@ -17,7 +17,7 @@ export function InviteRedirect() {
 
     const joinCommunity = async () => {
       try {
-        const { community } = await api.communities.join(inviteCode, user.id);
+        const { community } = await api.communities.join(inviteCode);
         addCommunity(community);
         setActiveCommunity(community.id);
         navigate("/chat", { replace: true });

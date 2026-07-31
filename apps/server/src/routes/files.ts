@@ -8,6 +8,7 @@ import { createReadStream, existsSync } from "fs";
 import { join, extname } from "path";
 
 const UPLOADS_DIR = join(process.cwd(), "uploads");
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 const MAX_EMOJI_SIZE = 256 * 1024; // 256KB
 const ALLOWED_EMOJI_MIMES = new Set(["image/png", "image/gif", "image/webp", "image/jpeg"]);
@@ -29,6 +30,12 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (!channelId || !iv) {
       return reply.status(400).send({ error: "channelId and iv are required" });
+    }
+
+    // Validate channelId is a UUID before it is used as a filesystem path
+    // segment, to prevent path traversal.
+    if (!UUID_RE.test(channelId)) {
+      return reply.status(400).send({ error: "Invalid channelId" });
     }
 
     const canAccess = await canUserAccessChannel(request.user.userId, channelId);

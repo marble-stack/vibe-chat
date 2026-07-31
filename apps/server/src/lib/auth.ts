@@ -67,7 +67,10 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
  * Generate a JWT token for a user
  */
 export function generateToken(payload: JwtPayload): string {
-  return jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign(payload, getJwtSecret(), {
+    expiresIn: JWT_EXPIRES_IN,
+    algorithm: "HS256",
+  });
 }
 
 /**
@@ -75,7 +78,8 @@ export function generateToken(payload: JwtPayload): string {
  */
 export function verifyToken(token: string): JwtPayload | null {
   try {
-    return jwt.verify(token, getJwtSecret()) as JwtPayload;
+    // Pin the algorithm to prevent alg-confusion / "none" attacks.
+    return jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] }) as JwtPayload;
   } catch {
     return null;
   }

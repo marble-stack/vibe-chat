@@ -60,9 +60,20 @@ const updateKeysSchema = z.object({
   ),
 });
 
+// Stricter per-route rate limit for credential endpoints to slow brute-force
+// and enumeration. Relies on the globally-registered @fastify/rate-limit plugin.
+const authRateLimit = {
+  config: {
+    rateLimit: {
+      max: 10,
+      timeWindow: "1 minute",
+    },
+  },
+};
+
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
   // Register new user
-  fastify.post("/register", async (request, reply) => {
+  fastify.post("/register", authRateLimit, async (request, reply) => {
     const body = registerSchema.parse(request.body);
 
     // Check if user exists
@@ -112,7 +123,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Login
-  fastify.post("/login", async (request, reply) => {
+  fastify.post("/login", authRateLimit, async (request, reply) => {
     const body = loginSchema.parse(request.body);
 
     const user = await db.query.users.findFirst({
@@ -151,7 +162,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Forgot password - sends temporary password via email
-  fastify.post("/forgot-password", async (request, reply) => {
+  fastify.post("/forgot-password", authRateLimit, async (request, _reply) => {
     const body = forgotPasswordSchema.parse(request.body);
 
     const user = await db.query.users.findFirst({
@@ -185,7 +196,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Reset password - validates temporary password and sets new password
-  fastify.post("/reset-password", async (request, reply) => {
+  fastify.post("/reset-password", authRateLimit, async (request, reply) => {
     const body = resetPasswordSchema.parse(request.body);
 
     const user = await db.query.users.findFirst({
@@ -353,6 +364,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Get user's key bundle (for establishing encrypted session)
   fastify.get("/users/:userId/keys", async (request, reply) => {
+    // Authorization: require authentication. This endpoint consumes a one-time
+    // prekey per call, so leaving it open enables anonymous prekey exhaustion
+    // and identity-key harvesting.
+    if (!request.user) {
+      return reply.status(401).send({ error: "Authentication required" });
+    }
+
     const { userId } = request.params as { userId: string };
 
     const user = await db.query.users.findFirst({

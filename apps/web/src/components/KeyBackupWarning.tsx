@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuthStore } from "../stores/auth";
-import { getIdentityKeys } from "../lib/keyStore";
+import { getFullIdentityKeysForBackup } from "../lib/keyStore";
 import { uploadKeyBackupWithRetry } from "../lib/crypto";
 import { logger } from "../lib/logger";
 
@@ -15,8 +15,8 @@ export function KeyBackupWarning() {
   const handleRetry = async () => {
     setRetrying(true);
     try {
-      const identityKeys = await getIdentityKeys();
-      if (!identityKeys) {
+      const keys = await getFullIdentityKeysForBackup();
+      if (!keys) {
         logger.error("No identity keys to back up");
         return;
       }
@@ -29,17 +29,6 @@ export function KeyBackupWarning() {
         setRetrying(false);
         return;
       }
-
-      // Reconstruct IdentityKeys from stored data (preKeys aren't stored after registration)
-      const keys = {
-        identityKeyPair: identityKeys.identityKeyPair,
-        signedPreKeyPair: {
-          publicKey: identityKeys.signedPreKeyPair.publicKey,
-          privateKey: identityKeys.signedPreKeyPair.privateKey,
-        },
-        signedPreKeySignature: "",
-        preKeyPairs: [],
-      };
 
       const success = await uploadKeyBackupWithRetry(keys, password, token);
       const { setKeyBackupStatus, setLastBackupAt } = useAuthStore.getState();

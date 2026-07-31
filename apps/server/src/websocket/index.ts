@@ -45,7 +45,7 @@ export const websocketHandler: FastifyPluginAsync = async (fastify) => {
   });
 };
 
-async function handleMessage(socket: WebSocket, message: WsMessage) {
+export async function handleMessage(socket: WebSocket, message: WsMessage) {
   // Helper to send validation error
   const sendValidationError = () => {
     socket.send(JSON.stringify({ type: "error", payload: { message: "Invalid payload" } }));
@@ -500,6 +500,15 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
         return;
       }
 
+      // Authorization: user must be able to access the channel
+      const canReact = await canUserAccessChannel(user.userId, channelId);
+      if (!canReact) {
+        socket.send(
+          JSON.stringify({ type: "error", payload: { message: "Cannot access this channel" } })
+        );
+        return;
+      }
+
       // Check if user already reacted with this emoji
       const existing = await db.query.reactions.findFirst({
         where: and(
@@ -550,6 +559,28 @@ async function handleMessage(socket: WebSocket, message: WsMessage) {
 
       if (!user) {
         socket.send(JSON.stringify({ type: "error", payload: { message: "Not authenticated" } }));
+        return;
+      }
+
+      // Authorization: only the user who created the reaction can remove it
+      const existingReaction = await db.query.reactions.findFirst({
+        where: eq(reactions.id, reactionId),
+      });
+
+      if (!existingReaction) {
+        socket.send(
+          JSON.stringify({ type: "error", payload: { message: "Reaction not found" } })
+        );
+        return;
+      }
+
+      if (existingReaction.userId !== user.userId) {
+        socket.send(
+          JSON.stringify({
+            type: "error",
+            payload: { message: "Cannot delete reactions created by others" },
+          })
+        );
         return;
       }
 

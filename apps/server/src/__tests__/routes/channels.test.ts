@@ -14,6 +14,13 @@ vi.mock("../../db/index.js", () => ({
     delete: vi.fn().mockReturnValue({
       where: vi.fn().mockResolvedValue(undefined),
     }),
+    update: vi.fn().mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: "channel-123", name: "renamed" }]),
+        }),
+      }),
+    }),
     query: {
       channels: {
         findFirst: vi.fn(),
@@ -29,12 +36,18 @@ vi.mock("../../db/index.js", () => ({
   },
   channels: { id: "id", communityId: "communityId", name: "name" },
   senderKeys: { channelId: "channelId", userId: "userId", forUserId: "forUserId" },
+  pendingKeyRequests: { channelId: "channelId" },
+  fileAttachments: { channelId: "channelId" },
+  messages: { channelId: "channelId" },
+  communityMembers: { communityId: "communityId", userId: "userId" },
+  users: { id: "id" },
 }));
 
 // Mock authorization module
 vi.mock("../../lib/authorization.js", () => ({
   canUserAccessChannel: vi.fn(),
   isUserInCommunity: vi.fn(),
+  isChannelCommunityOwner: vi.fn(),
 }));
 
 // Mock WebSocket connection maps
@@ -43,7 +56,11 @@ vi.mock("../../websocket/connectionMaps.js", () => ({
 }));
 
 import { db } from "../../db/index.js";
-import { canUserAccessChannel, isUserInCommunity } from "../../lib/authorization.js";
+import {
+  canUserAccessChannel,
+  isUserInCommunity,
+  isChannelCommunityOwner,
+} from "../../lib/authorization.js";
 import { sendToUser } from "../../websocket/connectionMaps.js";
 
 describe("Channel Routes - Sender Key Security", () => {
@@ -470,6 +487,70 @@ describe('Channel Routes - Create and Get Channels', () => {
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toHaveProperty('error', 'Channel not found');
+    });
+  });
+
+  describe("Channel modification - owner only", () => {
+    beforeEach(() => {
+      vi.mocked(db.query.channels.findFirst).mockResolvedValue({
+        id: testChannelId,
+        communityId: "community-1",
+        name: "general",
+      } as never);
+    });
+
+    it("PATCH should reject a non-owner member with 403", async () => {
+      const token = createTestToken(testUserId);
+      vi.mocked(isChannelCommunityOwner).mockResolvedValue(false);
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/channels/${testChannelId}`,
+        headers: { authorization: authHeader(token) },
+        payload: { name: "renamed" },
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
+
+    it("PATCH should allow the community owner", async () => {
+      const token = createTestToken(testUserId);
+      vi.mocked(isChannelCommunityOwner).mockResolvedValue(true);
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/channels/${testChannelId}`,
+        headers: { authorization: authHeader(token) },
+        payload: { name: "renamed" },
+      });
+
+      expect(response.statusCode).toBe(200);
+    });
+
+    it("DELETE should reject a non-owner member with 403", async () => {
+      const token = createTestToken(testUserId);
+      vi.mocked(isChannelCommunityOwner).mockResolvedValue(false);
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/channels/${testChannelId}`,
+        headers: { authorization: authHeader(token) },
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
+
+    it("DELETE should allow the community owner", async () => {
+      const token = createTestToken(testUserId);
+      vi.mocked(isChannelCommunityOwner).mockResolvedValue(true);
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/channels/${testChannelId}`,
+        headers: { authorization: authHeader(token) },
+      });
+
+      expect(response.statusCode).toBe(200);
     });
   });
 });
